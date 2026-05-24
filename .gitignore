@@ -32,6 +32,7 @@ lerna-debug.log*
 # É uma boa prática ignorar o arquivo do banco de dados para não versionar
 # dados de usuários e evitar conflitos.
 backend/database.db
+!backend/database.template.db
 
 # Arquivos de sistema operacional e de editores de código
 .DS_Store

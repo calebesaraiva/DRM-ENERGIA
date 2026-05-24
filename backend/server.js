@@ -62,6 +62,8 @@ const JWT_SECRET = 'seu-segredo-super-secreto-e-dificil-de-adivinhar';
 
 // --- CONFIGURAÇÃO DO BANCO DE DADOS SQLITE ---
 let db;
+const DB_PATH = path.join(__dirname, 'database.db');
+const TEMPLATE_DB_PATH = path.join(__dirname, 'database.template.db');
 
 const DEFAULT_PERMISSIONS = {
   dashboard: true,
@@ -985,8 +987,12 @@ const buildContratoHtml = async (contrato) => {
 };
 
 (async () => {
+  if (!fs.existsSync(DB_PATH) && fs.existsSync(TEMPLATE_DB_PATH)) {
+    fs.copyFileSync(TEMPLATE_DB_PATH, DB_PATH);
+  }
+
   db = await open({
-    filename: './database.db',
+    filename: DB_PATH,
     driver: sqlite3.Database
   });
 
