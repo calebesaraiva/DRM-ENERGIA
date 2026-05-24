@@ -1,0 +1,146 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid transparent;
+  transition: var(--transition);
+  padding: 1rem 0;
+}
+
+.header.scrolled {
+  padding: 0.5rem 0;
+  background-color: rgba(255, 255, 255, 0.98);
+  box-shadow: var(--sombra-sm);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.logo-img {
+  width: 122px;
+  height: auto; /* Garante que a altura se ajuste para manter a proporção */
+  max-height: 58px;
+  object-fit: contain;
+  transition: var(--transition);
+}
+
+.header.scrolled .logo-img {
+  width: 112px;
+  max-height: 52px;
+}
+
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.nav-links {
+  display: flex;
+  list-style: none;
+  gap: 1.5rem;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: var(--cor-texto);
+  font-weight: 500;
+  transition: var(--transition);
+  position: relative;
+}
+
+.nav-links a:hover {
+  color: var(--cor-primaria-hover);
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: -4px;
+  left: 0;
+  background-color: var(--cor-primaria);
+  transition: var(--transition);
+}
+
+.nav-links a:hover::after {
+  width: 100%;
+}
+
+.login-btn {
+  text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  /* Garante que o header seja compacto e contenha a logo */
+  .header,
+  .header.scrolled {
+    height: auto; /* Altura se ajusta ao conteúdo */
+    padding: 8px 0; /* Espaçamento interno */
+    overflow: hidden; /* Impede que a logo vaze */
+  }
+
+  /* Alinha os itens horizontalmente: logo à esquerda, botões à direita */
+  .header-content {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+
+  /* Reseta a navegação para ficar em linha */
+  .main-nav {
+    order: initial;
+    width: auto;
+    gap: 0.6rem;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  /* Ajusta o tamanho da logo para não vazar */
+  .logo-img {
+    max-height: 50px; /* Altura máxima para a logo */
+    max-width: 128px;
+    width: auto; /* Largura se ajusta proporcionalmente */
+  }
+
+  .nav-links a {
+    font-size: 13px;
+  }
+
+  .login-btn {
+    width: auto;
+    min-height: 38px;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 420px) {
+  .logo-img,
+  .header.scrolled .logo-img {
+    max-height: 42px;
+    max-width: 92px;
+  }
+
+  .login-btn {
+    padding: 0.5rem 0.65rem;
+    font-size: 0.76rem;
+  }
+}

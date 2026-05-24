@@ -1,0 +1,54 @@
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import './Header.css';
+
+const Header = () => {
+  const [scrolled, setScrolled] = useState(false);
+  const [role, setRole] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    
+    // Check login state
+    setRole(localStorage.getItem('role'));
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('role');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setRole(null);
+    navigate('/');
+  };
+
+  return (
+    <header className={`header ${scrolled ? 'scrolled' : ''}`}>
+      <div className="container header-content">
+        <Link to="/" className="logo-link">
+          <img src="/assets/logo.png" alt="DRM Energia Solar" className="logo-img" />
+        </Link>
+        <nav className="main-nav">
+          <ul className="nav-links">
+            <li><a href="#contato">Contato</a></li>
+          </ul>
+          {role ? (
+            <div className="user-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <Link to={['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(role) ? '/admin' : '/dashboard'} className="btn btn-primary login-btn">Meu Painel</Link>
+              <button onClick={handleLogout} className="btn btn-outline" style={{ borderColor: 'white', color: 'white' }}>Sair</button>
+            </div>
+          ) : (
+            <Link to="/login" className="btn btn-primary login-btn">Login / Cadastro</Link>
+          )}
+        </nav>
+      </div>
+    </header>
+  );
+};
+
+export default Header;

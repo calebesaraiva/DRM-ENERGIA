@@ -1,0 +1,44 @@
+# Dependências
+# As pastas node_modules contêm milhares de arquivos que são baixados
+# automaticamente com o comando `npm install`. Elas nunca devem ir para o repositório.
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Build de Produção
+# A pasta 'dist' é gerada automaticamente quando você cria a versão final do seu site.
+frontend/dist/
+frontend/dist-ssr/
+
+# Logs
+# Arquivos de log gerados por erros ou debug.
+logs/
+*.log
+*.err
+npm-debug.log*
+yarn-debug.log
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Variáveis de Ambiente
+# Arquivos .env contêm senhas e chaves de API. São informações sensíveis.
+.env
+.env.local
+.env.*.local
+*.local
+
+# Banco de Dados SQLite
+# É uma boa prática ignorar o arquivo do banco de dados para não versionar
+# dados de usuários e evitar conflitos.
+backend/database.db
+
+# Arquivos de sistema operacional e de editores de código
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
