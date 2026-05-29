@@ -1,4 +1,3 @@
-import React from 'react';
 import './Benefits.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
 

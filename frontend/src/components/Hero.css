@@ -19,8 +19,8 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(108deg, rgba(8, 15, 24, 0.92), rgba(21, 20, 19, 0.8) 46%, rgba(249, 115, 22, 0.3)),
-    radial-gradient(circle at 84% 14%, rgba(251, 146, 60, 0.26), transparent 44%);
+    linear-gradient(108deg, rgba(11, 23, 40, 0.9), rgba(15, 23, 42, 0.74) 46%, rgba(30, 64, 175, 0.22)),
+    radial-gradient(circle at 84% 14%, rgba(148, 163, 184, 0.2), transparent 44%);
 }
 
 .hero-aurora {
@@ -52,14 +52,14 @@
 
 .hero-badge {
   display: inline-block;
-  background: rgba(249, 115, 22, 0.2);
-  color: #ffd7b4;
+  background: rgba(30, 64, 175, 0.2);
+  color: #dbeafe;
   padding: 0.42rem 1rem;
   border-radius: 50px;
   font-weight: 600;
   font-size: 0.88rem;
   margin-bottom: 1.15rem;
-  border: 1px solid rgba(249, 115, 22, 0.55);
+  border: 1px solid rgba(147, 197, 253, 0.5);
 }
 
 .hero-title {
@@ -69,8 +69,8 @@
 }
 
 .highlight {
-  color: #ffd4ad;
-  text-shadow: 0 0 28px rgba(249, 115, 22, 0.42);
+  color: #eff6ff;
+  text-shadow: 0 0 22px rgba(30, 64, 175, 0.34);
 }
 
 .hero-description {
@@ -92,13 +92,13 @@
   padding: 0.82rem 0.86rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.34);
+  background: rgba(15, 23, 42, 0.44);
   backdrop-filter: blur(6px);
 }
 
 .hero-proof strong {
   display: block;
-  color: #ffbd85;
+  color: #bfdbfe;
   font-size: 1.05rem;
   line-height: 1.15;
 }
@@ -120,14 +120,14 @@
 }
 
 .btn-white {
-  border-color: rgba(255, 255, 255, 0.56);
+  border-color: rgba(148, 163, 184, 0.72);
   color: white;
   backdrop-filter: blur(5px);
 }
 
 .btn-white:hover {
-  background-color: white;
-  color: #111;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
 .solar-orbit-scene {
@@ -148,8 +148,8 @@
   height: 112px;
   margin: -56px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #ffe2c3 0%, #f97316 55%, #7c2d12 100%);
-  box-shadow: 0 0 44px rgba(249, 115, 22, 0.8), 0 0 90px rgba(249, 115, 22, 0.4);
+  background: radial-gradient(circle at 30% 30%, #dbeafe 0%, #60a5fa 55%, #1d4ed8 100%);
+  box-shadow: 0 0 36px rgba(37, 99, 235, 0.65), 0 0 72px rgba(37, 99, 235, 0.34);
 }
 
 .orbit {

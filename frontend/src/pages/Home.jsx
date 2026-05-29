@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Hero from '../components/Hero';
 import Benefits from '../components/Benefits';
 import ProjectGallery from '../components/ProjectGallery';
@@ -7,14 +7,15 @@ import LeadSimulationModal from '../components/LeadSimulationModal';
 import { OfferBanner, ObjectionBreakers, SocialProof, TrustBar } from '../components/ConversionSections';
 
 const Home = () => {
-  const [isSimulationOpen, setIsSimulationOpen] = useState(false);
+  const [isSimulationOpen, setIsSimulationOpen] = useState(
+    () => localStorage.getItem('openSimulationOnHome') === '1'
+  );
 
   useEffect(() => {
     const openFromGlobal = () => setIsSimulationOpen(true);
     window.addEventListener('open-simulation-request', openFromGlobal);
 
     if (localStorage.getItem('openSimulationOnHome') === '1') {
-      setIsSimulationOpen(true);
       localStorage.removeItem('openSimulationOnHome');
     }
 

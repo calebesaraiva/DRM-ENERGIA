@@ -1,4 +1,3 @@
-import React from 'react';
 import { makeWhatsAppLink } from '../utils/whatsapp';
 import './ConversionSections.css';
 

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Header.css';
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
-  const [role, setRole] = useState(null);
+  const [role, setRole] = useState(() => localStorage.getItem('role'));
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -12,9 +12,6 @@ const Header = () => {
       setScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
-    
-    // Check login state
-    setRole(localStorage.getItem('role'));
     
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);

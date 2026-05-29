@@ -1,4 +1,3 @@
-import React from 'react';
 import './HowItWorks.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
 

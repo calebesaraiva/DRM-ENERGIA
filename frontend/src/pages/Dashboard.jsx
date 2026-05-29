@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import SimulationForm from '../components/SimulationForm';
 import './Dashboard.css';
@@ -7,15 +7,8 @@ function Dashboard() {
   const [simulationResults, setSimulationResults] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
-  const [user, setUser] = useState(null);
+  const [user] = useState(() => JSON.parse(localStorage.getItem('user') || 'null'));
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const loggedInUser = JSON.parse(localStorage.getItem('user'));
-    if (loggedInUser) {
-      setUser(loggedInUser);
-    }
-  }, []);
 
   const handleLogout = () => {
     // Em um app real, você invalidaria o token aqui

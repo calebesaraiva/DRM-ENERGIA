@@ -1,14 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root {
-  --cor-primaria: #F97316;
-  --cor-primaria-hover: #EA580C;
-  --cor-primaria-transparente: rgba(249, 115, 22, 0.14);
+  --cor-primaria: #ea7a1f;
+  --cor-primaria-hover: #c86416;
+  --cor-primaria-transparente: rgba(234, 122, 31, 0.12);
   --cor-secundaria: #FFFFFF;
-  --cor-texto: #1E1E24;
-  --cor-texto-mutado: #6B7280;
-  --cor-fundo: #F3F4F6;
-  --cor-borda: #E5E7EB;
+  --cor-texto: #111827;
+  --cor-texto-mutado: #64748b;
+  --cor-fundo: #f2f5f9;
+  --cor-borda: #dbe2ea;
 
   --sombra-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --sombra-md: 0 10px 25px rgba(0, 0, 0, 0.11);
@@ -34,9 +34,9 @@ html {
 body {
   font-family: 'Sora', sans-serif;
   background:
-    radial-gradient(circle at 8% 8%, rgba(249, 115, 22, 0.16), transparent 34%),
-    radial-gradient(circle at 90% 10%, rgba(249, 115, 22, 0.1), transparent 30%),
-    radial-gradient(circle at 50% 105%, rgba(249, 115, 22, 0.08), transparent 24%),
+    radial-gradient(circle at 8% 8%, rgba(30, 64, 175, 0.08), transparent 34%),
+    radial-gradient(circle at 90% 10%, rgba(234, 122, 31, 0.08), transparent 32%),
+    radial-gradient(circle at 50% 105%, rgba(30, 41, 59, 0.06), transparent 24%),
     var(--cor-fundo);
   color: var(--cor-texto);
   line-height: 1.6;
@@ -118,21 +118,21 @@ main {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--cor-primaria) 0%, #fb923c 100%);
-  color: #111;
-  box-shadow: 0 16px 32px rgba(249, 115, 22, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.22) inset;
+  background: linear-gradient(135deg, var(--cor-primaria) 0%, #f09a4f 100%);
+  color: #111827;
+  box-shadow: 0 10px 22px rgba(234, 122, 31, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
 }
 
 .btn-primary:hover {
-  transform: translateY(-3px) scale(1.01);
-  box-shadow: 0 18px 34px rgba(249, 115, 22, 0.42);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(234, 122, 31, 0.34);
 }
 
 .btn-simular {
   position: relative;
   isolation: isolate;
-  box-shadow: 0 14px 34px rgba(249, 115, 22, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.08) inset;
-  animation: pulseSimular 1.8s ease-in-out infinite;
+  box-shadow: 0 12px 28px rgba(234, 122, 31, 0.36), 0 0 0 2px rgba(255, 255, 255, 0.08) inset;
+  animation: none;
 }
 
 .btn-simular::after {
@@ -141,18 +141,11 @@ main {
   inset: -4px;
   border-radius: inherit;
   z-index: -1;
-  background: radial-gradient(circle, rgba(249, 115, 22, 0.45), transparent 70%);
-  filter: blur(8px);
+  background: radial-gradient(circle, rgba(234, 122, 31, 0.35), transparent 70%);
+  filter: blur(7px);
 }
 
-.btn-simular:hover {
-  transform: translateY(-4px) scale(1.03);
-}
-
-@keyframes pulseSimular {
-  0%, 100% { box-shadow: 0 14px 34px rgba(249, 115, 22, 0.45), 0 0 0 0 rgba(249, 115, 22, 0.35); }
-  50% { box-shadow: 0 18px 42px rgba(249, 115, 22, 0.6), 0 0 0 10px rgba(249, 115, 22, 0); }
-}
+.btn-simular:hover { transform: translateY(-3px); }
 
 .btn-outline {
   background-color: transparent;

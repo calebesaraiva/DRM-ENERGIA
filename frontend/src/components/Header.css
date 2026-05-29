@@ -4,18 +4,18 @@
   left: 0;
   width: 100%;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(248, 250, 252, 0.82);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid transparent;
   transition: var(--transition);
-  padding: 1.1rem 0;
+  padding: 0.55rem 0;
 }
 
 .header.scrolled {
-  padding: 0.75rem 0;
-  background: rgba(255, 255, 255, 0.92);
-  border-bottom-color: rgba(249, 115, 22, 0.2);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  padding: 0.45rem 0;
+  background: rgba(248, 250, 252, 0.96);
+  border-bottom-color: rgba(148, 163, 184, 0.28);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09);
 }
 
 .header-content {
@@ -26,21 +26,21 @@
 }
 
 .logo-img {
-  width: 270px;
-  max-height: 124px;
+  width: 190px;
+  max-height: 84px;
   object-fit: contain;
   transition: var(--transition);
 }
 
 .header.scrolled .logo-img {
-  width: 238px;
-  max-height: 108px;
+  width: 176px;
+  max-height: 78px;
 }
 
 .main-nav {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 1.2rem;
 }
 
 .nav-links {
@@ -56,13 +56,20 @@
 }
 
 .nav-links a:hover {
-  color: var(--cor-primaria-hover);
+  color: #1d4ed8;
 }
 
 .user-actions {
   display: flex;
   gap: 0.55rem;
   align-items: center;
+}
+
+.login-btn,
+.logout-btn {
+  min-height: 40px;
+  padding: 0.55rem 1rem;
+  border-radius: 12px;
 }
 
 .logout-btn {
@@ -85,8 +92,8 @@
   }
 
   .logo-img {
-    max-height: 88px;
-    max-width: 206px;
+    max-height: 70px;
+    max-width: 168px;
   }
 
   .login-btn,
@@ -106,8 +113,8 @@
 
 @media (max-width: 420px) {
   .logo-img {
-    max-height: 78px;
-    max-width: 184px;
+    max-height: 62px;
+    max-width: 150px;
   }
 
   .login-btn,

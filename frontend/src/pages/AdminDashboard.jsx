@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import io from 'socket.io-client';
 import './AdminDashboard.css';
@@ -131,9 +131,25 @@ const emptyPriceForm = {
   comissaoPercentual: '',
 };
 
+const getInitialAdminUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('user') || 'null') || { nome: 'DRM', email: '' };
+  } catch {
+    return { nome: 'DRM', email: '' };
+  }
+};
+
+const resolveInitialTab = (user) => {
+  if (!user) return 'leads';
+  const firstTab = ['dashboard', 'leads', 'orcamentos', 'contratos', 'equipeTecnica', 'ordensServico', 'precosSistemas', 'clientes', 'financeiro', 'usuarios']
+    .find(permission => user.role === 'ADM' || user.permissions?.[permission]);
+  return firstTab === 'equipeTecnica' ? 'projetos' : firstTab || 'leads';
+};
+
 const AdminDashboard = () => {
+  const initialUser = getInitialAdminUser();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('leads');
+  const [activeTab, setActiveTab] = useState(() => resolveInitialTab(initialUser));
   const [clientes, setClientes] = useState([]);
   const [leads, setLeads] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -165,7 +181,7 @@ const AdminDashboard = () => {
   const [priceResult, setPriceResult] = useState(null);
   const [priceError, setPriceError] = useState('');
   const [quickModal, setQuickModal] = useState(null);
-  const [adminUser, setAdminUser] = useState({ nome: 'DRM', email: '' });
+  const [adminUser] = useState(initialUser);
   const [error, setError] = useState('');
 
   const headers = useMemo(() => ({
@@ -275,7 +291,7 @@ const AdminDashboard = () => {
     resolvidas: ordensServico.filter(item => item.status === 'Resolvida').length,
   }), [ordensServico]);
 
-  const request = async (path, options = {}) => {
+  const request = useCallback(async (path, options = {}) => {
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}${path}`, {
       ...options,
       headers: { ...headers, ...(options.headers || {}) },
@@ -283,9 +299,9 @@ const AdminDashboard = () => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Falha ao carregar dados.');
     return data;
-  };
+  }, [headers]);
 
-  const loadData = async (user) => {
+  const loadData = useCallback(async (user) => {
     const calls = [];
 
     if (user.role === 'ADM' || user.permissions?.clientes) {
@@ -328,7 +344,7 @@ const AdminDashboard = () => {
     }
 
     await Promise.allSettled(calls);
-  };
+  }, [request]);
 
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
@@ -344,10 +360,6 @@ const AdminDashboard = () => {
       return;
     }
 
-    setAdminUser(loggedInUser);
-    const firstTab = ['dashboard', 'leads', 'orcamentos', 'contratos', 'equipeTecnica', 'ordensServico', 'precosSistemas', 'clientes', 'financeiro', 'usuarios']
-      .find(permission => loggedInUser.role === 'ADM' || loggedInUser.permissions?.[permission]);
-    setActiveTab(firstTab === 'equipeTecnica' ? 'projetos' : firstTab || 'leads');
     loadData(loggedInUser).catch(err => setError(err.message));
 
     const handleNewOrcamento = (novoOrcamento) => {
@@ -420,7 +432,7 @@ const AdminDashboard = () => {
       socket.off('projeto_foto_criada', handleProjetoFotoCriada);
       socket.off('os_atualizada', handleOsAtualizada);
     };
-  }, [navigate]);
+  }, [loadData, navigate]);
 
   const handleSair = () => {
     localStorage.removeItem('role');

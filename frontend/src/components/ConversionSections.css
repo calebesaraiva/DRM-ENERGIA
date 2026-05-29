@@ -1,6 +1,6 @@
 .trust-bar {
   padding: 1.35rem 0;
-  background: linear-gradient(100deg, #0f172a, #1f2937 55%, #111827);
+  background: linear-gradient(100deg, #0f172a, #1e293b 55%, #334155);
   color: #fff;
 }
 
@@ -20,7 +20,7 @@
 
 .trust-grid strong {
   display: block;
-  color: #ffb67a;
+  color: #bfdbfe;
   font-size: 1.2rem;
 }
 
@@ -31,7 +31,7 @@
 
 .offer-banner {
   padding: 1.15rem 0;
-  background: linear-gradient(90deg, #1f2937, #7c2d12);
+  background: linear-gradient(90deg, #1e293b, #334155);
   color: #fff;
 }
 
@@ -63,8 +63,8 @@
 .social-proof { background: #fff; }
 .objections {
   background:
-    radial-gradient(circle at 12% 8%, rgba(249, 115, 22, 0.1), transparent 34%),
-    linear-gradient(180deg, #fffaf5 0%, #fff7ed 100%);
+    radial-gradient(circle at 12% 8%, rgba(30, 64, 175, 0.08), transparent 34%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
 }
 
 .before-after-grid,
@@ -78,8 +78,8 @@
 
 .proof-card,
 .objection-grid article {
-  border: 1px solid #fed7aa;
-  background: linear-gradient(180deg, #ffffff, #fffaf5);
+  border: 1px solid #dbe2ea;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
   border-radius: var(--card-radius);
   padding: var(--card-padding);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
@@ -98,8 +98,8 @@
   transition: var(--transition);
   position: relative;
   overflow: hidden;
-  border: 1px solid #fdcfa2;
-  box-shadow: 0 10px 22px rgba(194, 65, 12, 0.07);
+  border: 1px solid #d5deea;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
 }
 
 .objection-card::after {
@@ -107,7 +107,7 @@
   position: absolute;
   inset: auto -20% -40% -20%;
   height: 62%;
-  background: radial-gradient(circle, rgba(249, 115, 22, 0.13), transparent 70%);
+  background: radial-gradient(circle, rgba(30, 64, 175, 0.1), transparent 70%);
   pointer-events: none;
 }
 
@@ -121,7 +121,7 @@
 .objection-icon {
   width: 34px;
   height: 34px;
-  color: #c2410c;
+  color: #1d4ed8;
   flex-shrink: 0;
 }
 
@@ -134,8 +134,8 @@
   border-radius: 9px;
   font-weight: 800;
   font-size: 0.92rem;
-  color: #c2410c;
-  background: rgba(249, 115, 22, 0.12);
+  color: #1d4ed8;
+  background: rgba(30, 64, 175, 0.12);
 }
 
 .objection-card h4 {
@@ -154,8 +154,8 @@
 
 .objection-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 32px rgba(194, 65, 12, 0.15);
-  border-color: #f4b26b;
+  box-shadow: 0 16px 32px rgba(30, 41, 59, 0.15);
+  border-color: #93c5fd;
 }
 
 .objection-cta {
@@ -165,7 +165,7 @@
 }
 
 .proof-card strong {
-  color: #c2410c;
+  color: #1d4ed8;
 }
 
 .proof-card h3 {
