@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import io from 'socket.io-client';
 import './AdminDashboard.css';
+import { getApiBaseUrl, withApiBase } from '../utils/apiBase';
 
-const socket = io(import.meta.env.VITE_API_BASE_URL);
+const socket = io(getApiBaseUrl() || undefined);
 
 const permissionLabels = {
   dashboard: 'Painel geral',
@@ -292,7 +293,7 @@ const AdminDashboard = () => {
   }), [ordensServico]);
 
   const request = useCallback(async (path, options = {}) => {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}${path}`, {
+    const response = await fetch(withApiBase(path), {
       ...options,
       headers: { ...headers, ...(options.headers || {}) },
     });
@@ -639,7 +640,7 @@ const AdminDashboard = () => {
   };
 
   const getContratoDownloadUrl = (contratoId) => (
-    `${import.meta.env.VITE_API_BASE_URL}/api/admin/contratos/${contratoId}/download?token=${localStorage.getItem('token')}`
+    `${withApiBase(`/api/admin/contratos/${contratoId}/download`)}?token=${localStorage.getItem('token')}`
   );
 
   const createEquipamento = async (event) => {

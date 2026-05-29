@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Login.css';
+import { withApiBase } from '../utils/apiBase';
 
 function ChangePassword() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ function ChangePassword() {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/change-password`, {
+      const response = await fetch(withApiBase('/api/change-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import SimulationForm from '../components/SimulationForm';
 import './Dashboard.css';
+import { withApiBase } from '../utils/apiBase';
 
 function Dashboard() {
   const [simulationResults, setSimulationResults] = useState(null);
@@ -41,7 +42,7 @@ function Dashboard() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/salvar-orcamento`, {
+      const response = await fetch(withApiBase('/api/salvar-orcamento'), {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(simulationResults),

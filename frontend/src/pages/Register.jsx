@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Register.css';
+import { withApiBase } from '../utils/apiBase';
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -20,7 +21,7 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/register`, {
+      const response = await fetch(withApiBase('/api/register'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
