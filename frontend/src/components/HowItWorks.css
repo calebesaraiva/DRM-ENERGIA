@@ -1,6 +1,6 @@
 .how-it-works {
   position: relative;
-  padding: 6rem 0;
+  padding: var(--section-space) 0;
   background:
     radial-gradient(circle at 10% 15%, rgba(249, 115, 22, 0.26), transparent 30%),
     linear-gradient(135deg, #101820 0%, #1f160f 100%);
@@ -20,7 +20,7 @@
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1.5fr;
-  gap: 3.5rem;
+  gap: 2.8rem;
   align-items: center;
 }
 
@@ -51,13 +51,13 @@
 
 .hiw-steps {
   display: grid;
-  gap: 1rem;
+  gap: 0.9rem;
 }
 
 .step-card {
   background: linear-gradient(130deg, rgba(255, 255, 255, 0.1), rgba(249, 115, 22, 0.08));
-  padding: 1.3rem;
-  border-radius: 16px;
+  padding: var(--card-padding);
+  border-radius: var(--card-radius);
   display: flex;
   gap: 1.2rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -66,20 +66,20 @@
 }
 
 .step-card:hover {
-  transform: translateX(8px) scale(1.01);
+  transform: translateY(-4px);
   border-color: rgba(249, 115, 22, 0.72);
   box-shadow: 0 16px 30px rgba(0, 0, 0, 0.26);
 }
 
 .step-number {
-  font-size: 2.3rem;
+  font-size: 2.15rem;
   font-weight: 800;
   color: rgba(255, 173, 105, 0.62);
   line-height: 1;
 }
 
 @media (max-width: 900px) {
-  .how-it-works { padding: 4rem 0; }
+  .how-it-works { padding: 3.8rem 0; }
   .hiw-content { grid-template-columns: 1fr; gap: 2.5rem; }
 }
 @media (max-width: 768px) {
@@ -102,12 +102,12 @@
   }
 
   .step-info h4 {
-    font-size: 0.98rem;
+    font-size: 1.02rem;
     margin-bottom: 0.25rem;
   }
 
   .step-info p {
-    font-size: 0.84rem;
+    font-size: 0.92rem;
     line-height: 1.45;
   }
 

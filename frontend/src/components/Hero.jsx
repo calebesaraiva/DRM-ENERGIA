@@ -13,6 +13,20 @@ const Hero = ({ onOpenSimulation = () => {} }) => {
           <span className="hero-badge">Energia Inteligente</span>
           <h1 className="hero-title highlight">Transforme a luz do sol em economia real</h1>
           <p className="hero-description">Gere sua própria energia limpa com a DRM. Reduza sua conta de luz em até 82% e valorize seu imóvel com sistemas solares de alta performance.</p>
+          <div className="hero-proof">
+            <article>
+              <strong>+450</strong>
+              <span>projetos entregues</span>
+            </article>
+            <article>
+              <strong>4.9/5</strong>
+              <span>avaliação média de clientes</span>
+            </article>
+            <article>
+              <strong>até 82%</strong>
+              <span>de economia na conta</span>
+            </article>
+          </div>
           <div className="hero-actions">
             <button type="button" className="btn btn-primary btn-lg btn-simular" onClick={() => onOpenSimulation()}>Simular economia agora</button>
             <a href="#projetos" className="btn btn-outline btn-lg btn-white">Ver Projetos</a>

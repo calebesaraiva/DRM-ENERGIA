@@ -1,6 +1,6 @@
 .benefits-section {
   position: relative;
-  padding: 6rem 0;
+  padding: var(--section-space) 0;
   background:
     radial-gradient(circle at 15% 14%, rgba(249, 115, 22, 0.12), transparent 32%),
     linear-gradient(180deg, #fff 0%, #fff7ed 100%);
@@ -34,24 +34,25 @@
 .benefits-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
-  gap: 1.35rem;
-  margin-top: 3rem;
+  gap: 1.1rem;
+  margin-top: 2.4rem;
 }
 
 .benefit-card {
-  padding: 2.1rem 1.3rem;
+  padding: var(--card-padding);
   background: linear-gradient(165deg, #ffffff, #fff7ed);
-  border-radius: 20px;
+  border-radius: var(--card-radius);
   text-align: center;
   border: 1px solid #fed7aa;
-  transform-style: preserve-3d;
+  min-height: 224px;
   transition: var(--transition);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
 }
 
 .benefit-card:hover {
-  transform: rotateX(7deg) rotateY(-8deg) translateY(-8px);
+  transform: translateY(-6px);
   border-color: var(--cor-primaria);
-  box-shadow: 0 28px 45px rgba(249, 115, 22, 0.18);
+  box-shadow: 0 20px 40px rgba(249, 115, 22, 0.17);
 }
 
 .icon-wrapper {
@@ -65,11 +66,6 @@
   justify-content: center;
   color: var(--cor-primaria-hover);
   transition: var(--transition);
-  transform: translateZ(28px);
-}
-
-.benefit-card:hover .icon-wrapper {
-  transform: translateZ(42px) rotate(-6deg);
 }
 
 .benefit-icon {
@@ -78,24 +74,16 @@
 }
 
 .benefit-title {
-  font-size: 1.12rem;
+  font-size: 1.2rem;
   margin-bottom: 0.7rem;
 }
 
 .benefit-desc {
   color: var(--cor-texto-mutado);
-  font-size: 0.93rem;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
-@media (max-width: 768px) {
-  .benefits-section {
-    padding: 4rem 0;
-  }
-
-  .benefit-card:hover {
-    transform: translateY(-5px);
-  }
-}
 @media (max-width: 768px) {
   .benefits-section {
     padding: 3.4rem 0;
@@ -110,6 +98,7 @@
   .benefit-card {
     text-align: left;
     padding: 1.15rem;
+    min-height: 0;
     display: grid;
     grid-template-columns: 60px 1fr;
     gap: 0.8rem;

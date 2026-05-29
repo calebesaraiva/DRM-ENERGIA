@@ -1,5 +1,5 @@
 .gallery-section {
-  padding: 6rem 0;
+  padding: var(--section-space) 0;
   background:
     radial-gradient(circle at 85% 15%, rgba(249, 115, 22, 0.11), transparent 30%),
     var(--cor-fundo);
@@ -8,24 +8,23 @@
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
-  gap: 2rem;
+  gap: 1.1rem;
 }
 
 .project-card {
   background: linear-gradient(180deg, #ffffff, #fffbf7);
-  border-radius: 18px;
+  border-radius: var(--card-radius);
   overflow: hidden;
   border: 1px solid #fcd6b5;
   box-shadow: var(--sombra-md);
   transition: var(--transition);
-  animation: fadeUp 0.6s ease-out both;
-  opacity: 0;
-  transform-style: preserve-3d;
+  min-height: 100%;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
 }
 
 .project-card:hover {
-  transform: translateY(-8px) rotateX(4deg) rotateY(-4deg);
-  box-shadow: 0 26px 50px rgba(0, 0, 0, 0.16);
+  transform: translateY(-6px);
+  box-shadow: 0 24px 44px rgba(15, 23, 42, 0.16);
 }
 
 .project-image-wrapper {
@@ -53,26 +52,22 @@
 }
 
 .project-info {
-  padding: 1.6rem;
+  padding: var(--card-padding);
 }
 
 .project-info h3 {
-  font-size: 1.18rem;
-  margin-bottom: 0.4rem;
+  font-size: 1.2rem;
+  margin-bottom: 0.45rem;
 }
 
 .project-info p {
   color: var(--cor-texto-mutado);
-  font-size: 0.93rem;
-}
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  font-size: 1rem;
+  line-height: 1.58;
 }
 
 @media (max-width: 768px) {
-  .gallery-section { padding: 4rem 0; }
+  .gallery-section { padding: 3.8rem 0; }
   .gallery-grid { gap: 1.25rem; }
   .project-image-wrapper { height: 240px; }
 }
@@ -103,11 +98,11 @@
   }
 
   .project-info h3 {
-    font-size: 1rem;
+    font-size: 1.05rem;
   }
 
   .project-info p {
-    font-size: 0.86rem;
+    font-size: 0.9rem;
   }
 }
 

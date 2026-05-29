@@ -1,6 +1,6 @@
 .hero {
   position: relative;
-  min-height: 94vh;
+  min-height: 96vh;
   display: flex;
   align-items: center;
   padding-top: 86px;
@@ -18,7 +18,9 @@
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, rgba(11, 17, 24, 0.94), rgba(25, 22, 16, 0.82) 42%, rgba(249, 115, 22, 0.32));
+  background:
+    linear-gradient(108deg, rgba(8, 15, 24, 0.92), rgba(21, 20, 19, 0.8) 46%, rgba(249, 115, 22, 0.3)),
+    radial-gradient(circle at 84% 14%, rgba(251, 146, 60, 0.26), transparent 44%);
 }
 
 .hero-aurora {
@@ -36,12 +38,12 @@
   z-index: 2;
   display: grid;
   grid-template-columns: 1fr 440px;
-  gap: 2rem;
+  gap: 2.4rem;
   align-items: center;
 }
 
 .hero-text-box {
-  max-width: 680px;
+  max-width: 720px;
   color: var(--cor-secundaria);
   animation: slideUp 0.8s ease-out forwards;
   position: relative;
@@ -56,13 +58,13 @@
   border-radius: 50px;
   font-weight: 600;
   font-size: 0.88rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.15rem;
   border: 1px solid rgba(249, 115, 22, 0.55);
 }
 
 .hero-title {
-  font-size: clamp(2.2rem, 5vw, 4rem);
-  line-height: 1.05;
+  font-size: clamp(2.25rem, 4.8vw, 4.35rem);
+  line-height: 1.02;
   margin-bottom: 1.2rem;
 }
 
@@ -72,11 +74,38 @@
 }
 
 .hero-description {
-  font-size: 1.04rem;
+  font-size: 1.12rem;
   color: #f3f4f6;
-  margin-bottom: 2.25rem;
+  margin-bottom: 1.4rem;
   max-width: 58ch;
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.34);
+}
+
+.hero-proof {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1.6rem;
+}
+
+.hero-proof article {
+  padding: 0.82rem 0.86rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.34);
+  backdrop-filter: blur(6px);
+}
+
+.hero-proof strong {
+  display: block;
+  color: #ffbd85;
+  font-size: 1.05rem;
+  line-height: 1.15;
+}
+
+.hero-proof span {
+  color: #e5e7eb;
+  font-size: 0.78rem;
 }
 
 .hero-actions {
@@ -250,13 +279,34 @@
   }
 
   .hero-title {
-    font-size: 2.2rem;
+    font-size: 2.1rem;
   }
 
   .hero-description {
-    font-size: 0.97rem;
-    margin-bottom: 1.4rem;
-    max-width: 30ch;
+    font-size: 0.98rem;
+    margin-bottom: 1rem;
+    max-width: 34ch;
+  }
+
+  .hero-proof {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    margin-bottom: 1rem;
+  }
+
+  .hero-proof article {
+    display: flex;
+    gap: 0.55rem;
+    align-items: baseline;
+    padding: 0.6rem 0.75rem;
+  }
+
+  .hero-proof strong {
+    font-size: 0.95rem;
+  }
+
+  .hero-proof span {
+    font-size: 0.74rem;
   }
 
   .hero-actions {
@@ -322,7 +372,7 @@
   }
 
   .hero-title {
-    font-size: 1.95rem;
+    font-size: 1.82rem;
   }
 
   .hero-badge {
@@ -331,7 +381,7 @@
   }
 
   .hero-description {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     max-width: 34ch;
   }
 

@@ -58,7 +58,7 @@
 }
 
 .social-proof,
-.objections { padding: 4rem 0; }
+.objections { padding: var(--section-space) 0; }
 
 .social-proof { background: #fff; }
 .objections {
@@ -69,10 +69,10 @@
 
 .before-after-grid,
 .objection-grid {
-  margin-top: 1.5rem;
+  margin-top: 2rem;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  gap: 1.1rem;
   margin-bottom: 1.25rem;
 }
 
@@ -80,8 +80,9 @@
 .objection-grid article {
   border: 1px solid #fed7aa;
   background: linear-gradient(180deg, #ffffff, #fffaf5);
-  border-radius: 16px;
-  padding: 1.1rem;
+  border-radius: var(--card-radius);
+  padding: var(--card-padding);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .objection-grid {
@@ -138,7 +139,7 @@
 }
 
 .objection-card h4 {
-  font-size: 2rem;
+  font-size: 1.36rem;
   line-height: 1.2;
   margin-bottom: 0.7rem;
   letter-spacing: -0.02em;
@@ -146,7 +147,7 @@
 
 .objection-card p {
   color: #3f3f46;
-  font-size: 1.24rem;
+  font-size: 1rem;
   line-height: 1.45;
   max-width: 40ch;
 }
@@ -167,6 +168,16 @@
   color: #c2410c;
 }
 
+.proof-card h3 {
+  font-size: 1.14rem;
+  margin-bottom: 0.45rem;
+}
+
+.proof-card p {
+  color: #3f3f46;
+  margin-bottom: 0.45rem;
+}
+
 @media (max-width: 768px) {
   .trust-grid,
   .before-after-grid,
@@ -180,11 +191,11 @@
   }
 
   .objection-card h4 {
-    font-size: 1.45rem;
+    font-size: 1.12rem;
   }
 
   .objection-card p {
-    font-size: 1.05rem;
+    font-size: 0.93rem;
   }
 
   .offer-wrap {
