@@ -191,6 +191,17 @@
   gap: 1rem;
 }
 
+.lead-fallback-note {
+  margin: 0;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .lead-success-pill {
   display: inline-flex;
   align-items: center;

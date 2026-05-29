@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './SimulationForm.css';
+import { withApiBase } from '../utils/apiBase';
 
 function SimulationForm({ onResults }) {
   const [formData, setFormData] = useState({
@@ -22,7 +23,7 @@ function SimulationForm({ onResults }) {
     setError('');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/calcular`, {
+      const response = await fetch(withApiBase('/api/calcular'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

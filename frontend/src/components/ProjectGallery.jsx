@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import ImageSlider from './ImageSlider';
 import './ProjectGallery.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
+import { withApiBase } from '../utils/apiBase';
 
 const ProjectGallery = ({ onOpenSimulation }) => {
   const [projects, setProjects] = useState([]);
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/portfolio`)
+    fetch(withApiBase('/api/portfolio'))
       .then(res => res.json())
       .then(data => setProjects(data))
       .catch(() => setProjects([]));

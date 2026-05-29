@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import './LeadSimulationModal.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
+import { withApiBase } from '../utils/apiBase';
 
 const initialLead = { nome: '', telefone: '', email: '', cidade: '' };
 const initialSimulation = { contaEnergia: '' };
@@ -35,14 +36,6 @@ function LeadSimulationModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const formatMoney = (value) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  const resolveApiBase = () => {
-    const rawBase = String(import.meta.env.VITE_API_BASE_URL || '').trim();
-    if (!rawBase || rawBase.toLowerCase() === 'undefined' || rawBase.toLowerCase() === 'null') {
-      return '';
-    }
-    return rawBase.replace(/\/+$/, '');
-  };
 
   const buildFallbackResult = (contaEnergia) => {
     const conta = Number(contaEnergia || 0);
@@ -94,8 +87,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
     setError('');
 
     try {
-      const apiBase = resolveApiBase();
-      const endpoint = `${apiBase}/api/simulacao-publica`;
+      const endpoint = withApiBase('/api/simulacao-publica');
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
