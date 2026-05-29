@@ -4,7 +4,7 @@ import './ConversionSections.css';
 export const TrustBar = () => (
   <section className="trust-bar">
     <div className="container trust-grid">
-      <div><strong>+450</strong><span>projetos entregues</span></div>
+      <div><strong>+600</strong><span>projetos entregues</span></div>
       <div><strong>até 82%</strong><span>de economia na conta</span></div>
       <div><strong>25 anos</strong><span>de vida útil dos paineis</span></div>
       <div><strong>100%</strong><span>homologação cuidada pela DRM</span></div>

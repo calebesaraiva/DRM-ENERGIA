@@ -14,7 +14,7 @@ const Hero = ({ onOpenSimulation = () => {} }) => {
           <p className="hero-description">Gere sua própria energia limpa com a DRM. Reduza sua conta de luz em até 82% e valorize seu imóvel com sistemas solares de alta performance.</p>
           <div className="hero-proof">
             <article>
-              <strong>+450</strong>
+              <strong>+600</strong>
               <span>projetos entregues</span>
             </article>
             <article>
