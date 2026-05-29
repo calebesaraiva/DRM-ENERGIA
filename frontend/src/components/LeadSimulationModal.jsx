@@ -36,6 +36,10 @@ function LeadSimulationModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const formatMoney = (value) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatNumber = (value, digits = 0) => Number(value || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 
   const buildFallbackResult = (contaEnergia) => {
     const conta = Number(contaEnergia || 0);
@@ -141,7 +145,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
   return createPortal(
     <div className="lead-modal-backdrop" role="presentation" onMouseDown={handleClose}>
       <div className="lead-modal" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-        <button className="lead-modal-close" type="button" onClick={handleClose} aria-label="Fechar">x</button>
+        <button className="lead-modal-close" type="button" onClick={handleClose} aria-label="Fechar">✕</button>
 
         <div className="lead-modal-header">
           <span className="lead-modal-step">Etapa {step} de 3</span>
@@ -251,17 +255,25 @@ function LeadSimulationModal({ isOpen, onClose }) {
               <div className="lead-metric-card">
                 <div className="lead-metric-icon">⚡</div>
                 <span>Potência instalada</span>
-                <strong>{result?.dimensionamento?.potencia_real_instalada_kwp || '-'} kWp</strong>
+                <strong>
+                  {result?.dimensionamento?.potencia_real_instalada_kwp
+                    ? `${formatNumber(result.dimensionamento.potencia_real_instalada_kwp, 2)} kWp`
+                    : '-'}
+                </strong>
               </div>
               <div className="lead-metric-card">
                 <div className="lead-metric-icon">▦</div>
                 <span>Quantidade de painéis</span>
-                <strong>{result?.dimensionamento?.numero_paineis_necessarios || '-'}</strong>
+                <strong>{result?.dimensionamento?.numero_paineis_necessarios ? formatNumber(result.dimensionamento.numero_paineis_necessarios) : '-'}</strong>
               </div>
               <div className="lead-metric-card">
                 <div className="lead-metric-icon">↗</div>
                 <span>Geração estimada</span>
-                <strong>{result?.dimensionamento?.geracao_estimada_kwh || '-'} kWh</strong>
+                <strong>
+                  {result?.dimensionamento?.geracao_estimada_kwh
+                    ? `${formatNumber(result.dimensionamento.geracao_estimada_kwh)} kWh`
+                    : '-'}
+                </strong>
               </div>
             </div>
 
