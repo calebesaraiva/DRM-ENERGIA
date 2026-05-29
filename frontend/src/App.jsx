@@ -6,6 +6,7 @@ import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop.jsx';
+import StickyCTA from './components/StickyCTA.jsx';
 
 // Lazy loading das páginas para melhor performance
 const Home = React.lazy(() => import('./pages/Home'));
@@ -41,6 +42,7 @@ function AppShell() {
           <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
       </Suspense>
+      {!isSystemRoute && <StickyCTA />}
       {!isSystemRoute && <Footer />}
     </>
   );

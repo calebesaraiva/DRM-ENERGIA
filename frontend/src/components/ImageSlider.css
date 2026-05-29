@@ -96,3 +96,31 @@
     height: 10px;
   }
 }
+@media (max-width: 768px) {
+  .slider-container {
+    margin-top: 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .slider-wrapper {
+    aspect-ratio: 10 / 13;
+    border-radius: 16px;
+  }
+
+  .slider-dots {
+    bottom: 0.8rem;
+    gap: 0.45rem;
+  }
+
+  .dot {
+    width: 11px;
+    height: 11px;
+    border-width: 1px;
+  }
+}
+
+@media (max-width: 420px) {
+  .slider-wrapper {
+    aspect-ratio: 9 / 13;
+  }
+}

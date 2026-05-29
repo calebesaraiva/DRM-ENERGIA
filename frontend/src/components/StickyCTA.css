@@ -1,0 +1,111 @@
+.sticky-cta {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 2200;
+  width: min(640px, calc(100% - 20px));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  padding: 0.55rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 15px 34px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+}
+
+.sticky-btn {
+  width: 100%;
+  min-height: 44px;
+}
+
+.mobile-cta-trigger,
+.mobile-cta-popup-backdrop {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .sticky-cta {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .sticky-cta.show-desktop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .sticky-cta {
+    display: none;
+  }
+
+  .mobile-cta-trigger {
+    display: inline-flex;
+    position: fixed;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 2210;
+    width: auto;
+    min-height: 42px;
+    padding: 0.66rem 0.95rem;
+    font-size: 0.86rem;
+    letter-spacing: 0.01em;
+    border-radius: 12px;
+    box-shadow: 0 14px 30px rgba(249, 115, 22, 0.42);
+  }
+
+  .mobile-cta-popup-backdrop {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 2300;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(3, 7, 18, 0.58);
+    padding: 0.55rem;
+  }
+
+  .mobile-cta-popup {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    padding: 1rem;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #ffffff, #fffaf5);
+    border: 1px solid rgba(249, 115, 22, 0.35);
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.3);
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .mobile-cta-popup h4 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  .mobile-cta-popup p {
+    margin: 0;
+    color: #52525b;
+    font-size: 0.9rem;
+  }
+
+  .mobile-cta-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    border: 0;
+    background: transparent;
+    font-size: 1.05rem;
+    color: #52525b;
+    cursor: pointer;
+  }
+
+  .mobile-wa-btn {
+    color: #1f2937;
+  }
+}

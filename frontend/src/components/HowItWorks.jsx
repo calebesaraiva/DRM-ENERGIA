@@ -1,23 +1,12 @@
 import React from 'react';
 import './HowItWorks.css';
+import { makeWhatsAppLink } from '../utils/whatsapp';
 
-const HowItWorks = () => {
+const HowItWorks = ({ onOpenSimulation }) => {
   const steps = [
-    {
-      number: "01",
-      title: "Simulação Gratuita",
-      desc: "Você nos informa o valor da sua fatura e preparamos um estudo de viabilidade sem compromisso."
-    },
-    {
-      number: "02",
-      title: "Projeto Personalizado",
-      desc: "Nossos engenheiros desenham o sistema ideal para o seu telhado, garantindo a maior eficiência."
-    },
-    {
-      number: "03",
-      title: "Instalação e Homologação",
-      desc: "Nossa equipe instala os equipamentos e cuida de toda a burocracia com a concessionária de energia."
-    }
+    { number: '01', title: 'Simulação Gratuita', desc: 'Você informa seu consumo e recebe uma previsão de economia.' },
+    { number: '02', title: 'Projeto Personalizado', desc: 'A engenharia define o sistema ideal para seu imóvel.' },
+    { number: '03', title: 'Instalação e Homologação', desc: 'A equipe instala e cuida da burocracia com a concessionária.' }
   ];
 
   return (
@@ -27,15 +16,16 @@ const HowItWorks = () => {
           <div className="hiw-text">
             <span className="section-subtitle">Simples e Rápido</span>
             <h2 className="section-title">Como Funciona?</h2>
-            <p className="section-desc text-left">
-              O processo para você começar a gerar sua própria energia é descomplicado. Nós cuidamos de tudo, do projeto à homologação.
-            </p>
-            <a href="#contato" className="btn btn-primary mt-4">Falar com Especialista</a>
+            <p className="section-desc text-left">Nós cuidamos de tudo, do projeto à homologação.</p>
+            <div className="section-cta-row">
+              <button type="button" className="btn btn-primary mt-4" onClick={() => onOpenSimulation?.()}>Receber estudo gratuito</button>
+              <a href={makeWhatsAppLink('secao_como_funciona')} className="btn btn-outline mt-4" target="_blank" rel="noopener noreferrer">Falar com especialista</a>
+            </div>
           </div>
-          
+
           <div className="hiw-steps">
-            {steps.map((step, index) => (
-              <div key={index} className="step-card">
+            {steps.map((step) => (
+              <div key={step.number} className="step-card">
                 <div className="step-number">{step.number}</div>
                 <div className="step-info">
                   <h4>{step.title}</h4>

@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import ImageSlider from './ImageSlider';
 import './ProjectGallery.css';
+import { makeWhatsAppLink } from '../utils/whatsapp';
 
-const ProjectGallery = () => {
+const ProjectGallery = ({ onOpenSimulation }) => {
   const [projects, setProjects] = useState([]);
 
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_BASE_URL}/api/portfolio`)
       .then(res => res.json())
       .then(data => setProjects(data))
-      .catch(err => console.error("Erro ao buscar projetos:", err));
+      .catch(() => setProjects([]));
   }, []);
 
   return (
@@ -18,7 +19,7 @@ const ProjectGallery = () => {
         <div className="section-header">
           <span className="section-subtitle">Nosso Portfólio</span>
           <h2 className="section-title">Projetos Entregues</h2>
-          <p className="section-desc">Confira algumas das instalações realizadas pela nossa equipe técnica com máxima excelência.</p>
+          <p className="section-desc">Confira algumas instalações realizadas pela nossa equipe técnica.</p>
         </div>
 
         <ImageSlider />
@@ -35,6 +36,11 @@ const ProjectGallery = () => {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="section-cta-row">
+          <button className="btn btn-primary" type="button" onClick={() => onOpenSimulation?.()}>Quero um projeto assim</button>
+          <a className="btn btn-outline" href={makeWhatsAppLink('secao_projetos')} target="_blank" rel="noopener noreferrer">Ver condições no WhatsApp</a>
         </div>
       </div>
     </section>

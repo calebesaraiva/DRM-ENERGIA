@@ -1,115 +1,117 @@
 .how-it-works {
+  position: relative;
   padding: 6rem 0;
-  background: linear-gradient(135deg, #101820 0%, #1f160f 100%);
+  background:
+    radial-gradient(circle at 10% 15%, rgba(249, 115, 22, 0.26), transparent 30%),
+    linear-gradient(135deg, #101820 0%, #1f160f 100%);
   color: #fff;
+  overflow: hidden;
+}
+
+.how-it-works::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent, transparent 58px, rgba(255, 255, 255, 0.03) 60px);
+  pointer-events: none;
 }
 
 .hiw-content {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1.5fr;
-  gap: 4rem;
+  gap: 3.5rem;
   align-items: center;
 }
 
-.hiw-text .section-title {
+.hiw-text .section-title,
+.step-info h4 {
   color: #fff;
 }
 
-.hiw-text .section-desc {
-  color: #a1a1aa;
+.hiw-text .section-desc,
+.step-info p {
+  color: #d4d4d8;
 }
 
-.text-left {
-  text-align: left;
-  margin-left: 0;
+.how-it-works .btn-outline {
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.mt-4 {
-  margin-top: 1.5rem;
+.how-it-works .btn-outline:hover {
+  color: #111827;
+  background: #fff;
+  border-color: #fff;
 }
+
+.text-left { text-align: left; }
+.mt-4 { margin-top: 1.5rem; }
 
 .hiw-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  display: grid;
+  gap: 1rem;
 }
 
 .step-card {
-  background-color: rgba(255, 255, 255, 0.07);
-  padding: 1.5rem;
-  border-radius: var(--border-radius);
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.1), rgba(249, 115, 22, 0.08));
+  padding: 1.3rem;
+  border-radius: 16px;
   display: flex;
-  gap: 1.5rem;
-  align-items: flex-start;
+  gap: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
   transition: var(--transition);
-  border-left: 4px solid transparent;
 }
 
 .step-card:hover {
-  background-color: rgba(249, 115, 22, 0.13);
-  border-left-color: var(--cor-primaria);
-  transform: translateX(10px);
+  transform: translateX(8px) scale(1.01);
+  border-color: rgba(249, 115, 22, 0.72);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.26);
 }
 
 .step-number {
-  font-size: 2.5rem;
+  font-size: 2.3rem;
   font-weight: 800;
-  color: rgba(249, 115, 22, 0.42);
+  color: rgba(255, 173, 105, 0.62);
   line-height: 1;
 }
 
-.step-info h4 {
-  color: #fff;
-  font-size: 1.2rem;
-  margin-bottom: 0.5rem;
-}
-
-.step-info p {
-  color: #a1a1aa;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  margin: 0;
-}
-
 @media (max-width: 900px) {
-  .how-it-works {
-    padding: 4rem 0;
-  }
-
-  .hiw-content {
-    grid-template-columns: 1fr;
-    gap: 3rem;
-  }
-  
-  .step-card:hover {
-    transform: translateX(5px);
-  }
+  .how-it-works { padding: 4rem 0; }
+  .hiw-content { grid-template-columns: 1fr; gap: 2.5rem; }
 }
-
-@media (max-width: 520px) {
+@media (max-width: 768px) {
   .how-it-works {
-    padding: 3rem 0;
+    padding: 3.5rem 0;
   }
 
   .hiw-content {
-    gap: 2rem;
+    gap: 1.8rem;
   }
 
   .step-card {
-    gap: 1rem;
     padding: 1rem;
+    gap: 0.9rem;
   }
 
   .step-number {
-    min-width: 44px;
-    font-size: 2rem;
+    font-size: 1.7rem;
+    min-width: 32px;
   }
 
   .step-info h4 {
-    font-size: 1rem;
+    font-size: 0.98rem;
+    margin-bottom: 0.25rem;
   }
 
   .step-info p {
-    font-size: 0.88rem;
+    font-size: 0.84rem;
+    line-height: 1.45;
+  }
+
+  .hiw-text .btn {
+    width: 100%;
   }
 }

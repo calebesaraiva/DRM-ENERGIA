@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import './Footer.css';
 
 const Footer = () => {
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
   return (
     <footer className="footer" id="contato">
       <div className="container">
@@ -14,14 +16,16 @@ const Footer = () => {
           
           <div className="footer-contato">
             <h4>Contato</h4>
-            <p><strong>WhatsApp:</strong> (99) 99167-5608</p>
-            <p>
-              <strong>Instagram:</strong>
-              <a href="https://www.instagram.com/drm.energia.solar/" target="_blank" rel="noopener noreferrer" style={{ color: '#d1d5db', textDecoration: 'none', marginLeft: '5px' }}>
-                @drm.energia.solar
-              </a>
-            </p>
-            <p><strong>Endereço:</strong> Av Jacob, R. São Luís - Jardim Tropical, Imperatriz - MA, 65910-727</p>
+            <div className="contact-list">
+              <p><span className="contact-icon">◉</span><strong>WhatsApp:</strong> (99) 99167-5608</p>
+              <p>
+                <span className="contact-icon">◎</span><strong>Instagram:</strong>
+                <a href="https://www.instagram.com/drm.energia.solar/" target="_blank" rel="noopener noreferrer" className="footer-link-inline">
+                  @drm.energia.solar
+                </a>
+              </p>
+              <p><span className="contact-icon">◌</span><strong>Endereço:</strong> Av Jacob, R. São Luís - Jardim Tropical, Imperatriz - MA, 65910-727</p>
+            </div>
           </div>
         </div>
         
@@ -31,6 +35,9 @@ const Footer = () => {
           </div>
         </div>
       </div>
+      <button type="button" className="back-to-top" onClick={scrollToTop} aria-label="Voltar ao topo">
+        ↑
+      </button>
     </footer>
   );
 };

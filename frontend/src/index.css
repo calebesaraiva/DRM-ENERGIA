@@ -1,21 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root {
-  --cor-primaria: #F97316; /* Laranja DRM */
+  --cor-primaria: #F97316;
   --cor-primaria-hover: #EA580C;
   --cor-primaria-transparente: rgba(249, 115, 22, 0.14);
-  --cor-secundaria: #FFFFFF; /* Branco */
+  --cor-secundaria: #FFFFFF;
   --cor-texto: #1E1E24;
   --cor-texto-mutado: #6B7280;
   --cor-fundo: #F3F4F6;
   --cor-borda: #E5E7EB;
-  
+
   --sombra-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --sombra-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --sombra-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  
-  --border-radius: 12px;
-  --transition: all 0.3s ease;
+  --sombra-md: 0 10px 25px rgba(0, 0, 0, 0.11);
+  --sombra-lg: 0 22px 55px rgba(0, 0, 0, 0.18);
+
+  --border-radius: 16px;
+  --transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * {
@@ -24,9 +24,17 @@
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  font-family: 'Poppins', sans-serif;
-  background-color: var(--cor-fundo);
+  font-family: 'Sora', sans-serif;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(249, 115, 22, 0.16), transparent 34%),
+    radial-gradient(circle at 90% 10%, rgba(249, 115, 22, 0.1), transparent 30%),
+    radial-gradient(circle at 50% 105%, rgba(249, 115, 22, 0.08), transparent 24%),
+    var(--cor-fundo);
   color: var(--cor-texto);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -39,8 +47,10 @@ svg {
 }
 
 h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
   color: var(--cor-texto);
+  letter-spacing: -0.02em;
 }
 
 .container {
@@ -50,60 +60,95 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0 24px;
 }
 
-/* Custom Scrollbar */
+main {
+  perspective: 1200px;
+}
+
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--cor-primaria) #fff7ed;
+  scrollbar-color: #f97316 transparent;
 }
 
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #fff7ed;
+  background: transparent;
   border-radius: 999px;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--cor-primaria), var(--cor-primaria-hover));
-  border: 2px solid #fff7ed;
+  background: linear-gradient(180deg, #fb923c 0%, #f97316 45%, #ea580c 100%);
+  border: 2px solid rgba(255, 255, 255, 0.78);
   border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.22);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--cor-primaria-hover);
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #fdba74 0%, #f97316 45%, #c2410c 100%);
 }
 
-/* Botão Base */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--border-radius);
-  font-weight: 600;
+  padding: 0.8rem 1.6rem;
+  border-radius: 14px;
+  font-weight: 700;
   cursor: pointer;
   transition: var(--transition);
   border: none;
-  font-size: 1rem;
+  font-size: 0.98rem;
   text-align: center;
   text-decoration: none;
   line-height: 1.2;
 }
 
 .btn-primary {
-  background-color: var(--cor-primaria);
+  background: linear-gradient(135deg, var(--cor-primaria) 0%, #fb923c 100%);
   color: #111;
-  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.34);
+  box-shadow: 0 16px 32px rgba(249, 115, 22, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.22) inset;
 }
 
 .btn-primary:hover {
-  background-color: var(--cor-primaria-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.42);
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 18px 34px rgba(249, 115, 22, 0.42);
+}
+
+.btn-simular {
+  position: relative;
+  isolation: isolate;
+  box-shadow: 0 14px 34px rgba(249, 115, 22, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.08) inset;
+  animation: pulseSimular 1.8s ease-in-out infinite;
+}
+
+.btn-simular::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.45), transparent 70%);
+  filter: blur(8px);
+}
+
+.btn-simular:hover {
+  transform: translateY(-4px) scale(1.03);
+}
+
+@keyframes pulseSimular {
+  0%, 100% { box-shadow: 0 14px 34px rgba(249, 115, 22, 0.45), 0 0 0 0 rgba(249, 115, 22, 0.35); }
+  50% { box-shadow: 0 18px 42px rgba(249, 115, 22, 0.6), 0 0 0 10px rgba(249, 115, 22, 0); }
 }
 
 .btn-outline {
@@ -117,34 +162,6 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--cor-primaria-hover);
 }
 
-.btn-block {
-  width: 100%;
-  padding: 1rem;
-  font-size: 1.1rem;
-}
-
-.btn-voltar {
-  display: inline-block;
-  margin-top: 1rem;
-  color: var(--cor-texto-mutado);
-  text-decoration: none;
-  font-size: 0.9rem;
-  transition: var(--transition);
-}
-
-.btn-voltar:hover {
-  color: var(--cor-texto);
-}
-
-.error-message {
-  color: #dc2626;
-  background-color: #fee2e2;
-  padding: 0.75rem;
-  border-radius: var(--border-radius);
-  font-size: 0.9rem;
-  border: 1px solid #f87171;
-}
-
 @media (max-width: 640px) {
   .container {
     padding: 0 16px;
@@ -152,7 +169,117 @@ h1, h2, h3, h4, h5, h6 {
 
   .btn {
     width: 100%;
-    padding: 0.8rem 1rem;
+  }
+}
+@media (max-width: 640px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .btn {
+    width: 100%;
+    min-height: 46px;
+    border-radius: 12px;
+  }
+
+  .section-title {
+    line-height: 1.08;
+  }
+
+  .section-desc {
     font-size: 0.95rem;
+  }
+}
+.section-cta-row {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.7rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.section-cta-row .btn {
+  min-width: 220px;
+}
+
+.reveal-section {
+  opacity: 0;
+  transform: translateY(24px) scale(0.985);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-section.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.reveal-section.is-visible .benefit-card,
+.reveal-section.is-visible .project-card,
+.reveal-section.is-visible .step-card,
+.reveal-section.is-visible .objection-card,
+.reveal-section.is-visible .proof-card {
+  animation: staggerUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.reveal-section.is-visible .benefit-card:nth-child(2),
+.reveal-section.is-visible .project-card:nth-child(2),
+.reveal-section.is-visible .step-card:nth-child(2),
+.reveal-section.is-visible .objection-card:nth-child(2),
+.reveal-section.is-visible .proof-card:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.reveal-section.is-visible .benefit-card:nth-child(3),
+.reveal-section.is-visible .project-card:nth-child(3),
+.reveal-section.is-visible .step-card:nth-child(3),
+.reveal-section.is-visible .objection-card:nth-child(3),
+.reveal-section.is-visible .proof-card:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+.reveal-section.is-visible .benefit-card:nth-child(4),
+.reveal-section.is-visible .project-card:nth-child(4),
+.reveal-section.is-visible .step-card:nth-child(4),
+.reveal-section.is-visible .objection-card:nth-child(4),
+.reveal-section.is-visible .proof-card:nth-child(4) {
+  animation-delay: 240ms;
+}
+
+@keyframes staggerUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .section-cta-row {
+    flex-direction: column;
+  }
+
+  main {
+    padding-bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-section,
+  .reveal-section.is-visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .reveal-section.is-visible .benefit-card,
+  .reveal-section.is-visible .project-card,
+  .reveal-section.is-visible .step-card,
+  .reveal-section.is-visible .objection-card,
+  .reveal-section.is-visible .proof-card {
+    animation: none;
   }
 }

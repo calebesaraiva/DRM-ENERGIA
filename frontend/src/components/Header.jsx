@@ -38,9 +38,9 @@ const Header = () => {
             <li><a href="#contato">Contato</a></li>
           </ul>
           {role ? (
-            <div className="user-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div className="user-actions">
               <Link to={['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(role) ? '/admin' : '/dashboard'} className="btn btn-primary login-btn">Meu Painel</Link>
-              <button onClick={handleLogout} className="btn btn-outline" style={{ borderColor: 'white', color: 'white' }}>Sair</button>
+              <button onClick={handleLogout} className="btn btn-outline logout-btn">Sair</button>
             </div>
           ) : (
             <Link to="/login" className="btn btn-primary login-btn">Login / Cadastro</Link>

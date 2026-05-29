@@ -1,114 +1,157 @@
 .footer {
-  background-color: #111111;
+  position: relative;
+  background: linear-gradient(165deg, #0e1117 0%, #1b120b 100%);
   color: #f3f4f6;
-  padding: 4rem 0 0 0;
+  padding: 4rem 0 0;
+  overflow: hidden;
+}
+
+.footer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 183, 124, 0.75), transparent);
+}
+
+.footer::before {
+  content: '';
+  position: absolute;
+  inset: -20% 0 auto;
+  height: 180px;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.26), transparent 65%);
+  filter: blur(20px);
 }
 
 .footer-top {
+  position: relative;
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 4rem;
-  margin-bottom: 4rem;
+  margin-bottom: 3rem;
 }
 
 .footer-logo {
-  width: 150px;
-  max-height: 72px;
-  height: auto;
-  margin-bottom: 1.5rem;
-  object-fit: contain;
-  /* Se a logo for muito escura, talvez precise de filtro, assumiremos que tem fundo transparente */
+  width: 210px;
+  max-height: 96px;
+  margin-bottom: 1.1rem;
 }
 
 .footer-desc {
-  color: #9ca3af;
-  line-height: 1.8;
-  max-width: 400px;
+  color: #d1d5db;
+  max-width: 460px;
 }
 
 .footer h4 {
-  color: var(--cor-primaria);
-  font-size: 1.25rem;
-  margin-bottom: 1.5rem;
+  color: #ffb67a;
+  margin-bottom: 1rem;
 }
 
-.footer-links-group ul {
-  list-style: none;
-  padding: 0;
-}
-
-.footer-links-group li {
-  margin-bottom: 0.8rem;
-}
-
-.footer-links-group a {
-  color: #d1d5db;
+.footer-contato p,
+.footer-contato a {
+  color: #e5e7eb;
   text-decoration: none;
-  transition: var(--transition);
 }
 
-.footer-links-group a:hover {
-  color: var(--cor-primaria);
-  padding-left: 5px;
+.contact-list {
+  display: grid;
+  gap: 0.75rem;
 }
 
-.footer-contato p {
-  color: #d1d5db;
-  margin-bottom: 0.8rem;
+.contact-list p {
+  margin: 0;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
 }
 
-.footer-contato strong {
-  color: white;
+.footer-link-inline {
+  margin-left: 0.35rem;
+}
+
+.contact-icon {
+  color: #fb923c;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin-top: 0.2rem;
+}
+
+.footer-contato a:hover {
+  color: #ffb67a;
 }
 
 .footer-bottom {
-  border-top: 1px solid #333;
-  padding: 2rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 1.4rem 0;
   text-align: center;
 }
 
 .footer-copy {
-  color: #6b7280;
+  color: #9ca3af;
   font-size: 0.9rem;
+}
+
+.back-to-top {
+  position: fixed;
+  right: 14px;
+  bottom: 74px;
+  z-index: 2195;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  background: linear-gradient(180deg, #fb923c, #f97316);
+  color: #111827;
+  font-size: 1.1rem;
+  font-weight: 700;
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.32);
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.back-to-top:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(249, 115, 22, 0.42);
 }
 
 @media (max-width: 900px) {
   .footer-top {
     grid-template-columns: 1fr;
-    gap: 2.5rem;
+    gap: 2rem;
   }
-}
 
-@media (max-width: 768px) {
   .footer {
-    padding: 3rem 0 0 0;
+    padding: 2.75rem 0 0;
   }
+
   .footer-logo {
-    max-width: 145px;
-    height: auto;
-  }
-  .footer-top {
-    margin-bottom: 3rem;
-  }
-}
-
-@media (max-width: 420px) {
-  .footer {
-    padding-top: 2.25rem;
+    width: 170px;
+    max-height: 82px;
   }
 
-  .footer-top {
-    gap: 1.75rem;
-    margin-bottom: 2rem;
+  .footer-desc {
+    font-size: 0.95rem;
+    line-height: 1.65;
   }
 
-  .footer-desc,
-  .footer-contato p,
-  .footer-links-group a {
-    font-size: 0.92rem;
+  .contact-list p {
+    font-size: 0.94rem;
+    line-height: 1.5;
   }
 
-  .footer-bottom {
-    padding: 1.25rem 0;
+  .back-to-top {
+    bottom: 56px;
+    width: 34px;
+    height: 34px;
+    right: 10px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    box-shadow: 0 10px 24px rgba(249, 115, 22, 0.32);
   }
 }

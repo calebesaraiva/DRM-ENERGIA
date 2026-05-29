@@ -9,6 +9,7 @@ export default defineConfig({
     allowedHosts: [
       'quick-cougars-vanish.loca.lt',
       'toilet-manor-sapphire-clients.trycloudflare.com',
+      '.trycloudflare.com',
     ],
     proxy: {
       '/api': 'http://localhost:3001',
