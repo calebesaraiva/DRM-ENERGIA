@@ -144,12 +144,12 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 112px;
-  height: 112px;
-  margin: -56px;
+  width: 138px;
+  height: 138px;
+  margin: -69px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #dbeafe 0%, #60a5fa 55%, #1d4ed8 100%);
-  box-shadow: 0 0 36px rgba(37, 99, 235, 0.65), 0 0 72px rgba(37, 99, 235, 0.34);
+  background: radial-gradient(circle at 30% 30%, #ffe9d2 0%, #fb923c 52%, #ea580c 100%);
+  box-shadow: 0 0 42px rgba(249, 115, 22, 0.72), 0 0 86px rgba(251, 146, 60, 0.38);
 }
 
 .orbit {
@@ -163,11 +163,11 @@
 
 .orbit span {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: linear-gradient(160deg, #ffe2c3, #fb923c);
-  box-shadow: 0 0 16px rgba(255, 173, 105, 0.82);
+  background: linear-gradient(160deg, #bfdbfe, #3b82f6);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.82);
 }
 
 .orbit-1 {
@@ -178,8 +178,8 @@
 }
 
 .orbit-1 span {
-  top: -7px;
-  left: calc(50% - 7px);
+  top: -5.5px;
+  left: calc(50% - 5.5px);
 }
 
 .orbit-2 {
@@ -190,8 +190,8 @@
 }
 
 .orbit-2 span {
-  top: calc(50% - 7px);
-  right: -7px;
+  top: calc(50% - 5.5px);
+  right: -5.5px;
 }
 
 .orbit-3 {
@@ -202,8 +202,8 @@
 }
 
 .orbit-3 span {
-  bottom: -7px;
-  left: calc(50% - 7px);
+  bottom: -5.5px;
+  left: calc(50% - 5.5px);
 }
 
 .ring-shadow {
@@ -328,9 +328,9 @@
   }
 
   .core {
-    width: 64px;
-    height: 64px;
-    margin: -32px;
+    width: 76px;
+    height: 76px;
+    margin: -38px;
   }
 
   .orbit-1 {
@@ -352,8 +352,8 @@
   }
 
   .orbit span {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
 
   .hero-wave svg {
