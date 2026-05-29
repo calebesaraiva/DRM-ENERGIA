@@ -10,7 +10,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
 // Configuração do Servidor HTTP para suportar o Socket.io
 const server = http.createServer(app);
@@ -19,7 +19,15 @@ const io = new Server(server, {
 });
 
 // Middlewares
-const allowedOrigins = ['http://localhost:5173'];
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://drmenergiasolar.com.br',
+  'https://www.drmenergiasolar.com.br',
+  ...String(process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean),
+];
 const corsOptions = {
   origin: (origin, callback) => {
     // Permite requisições sem 'origin' (ex: Postman, apps mobile)

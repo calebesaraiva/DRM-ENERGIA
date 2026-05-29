@@ -13,6 +13,33 @@ fi
 cd /var/www/DRM-ENERGIA
 git fetch origin main
 git reset --hard origin/main
+cd backend
+npm ci >/tmp/npm-ci-backend.log 2>&1
+if [ ! -f database.db ]; then
+  cp database.template.db database.db
+fi
+cat > /etc/systemd/system/drm-solar-backend.service <<'EOF'
+[Unit]
+Description=DRM Solar Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/DRM-ENERGIA/backend
+Environment=NODE_ENV=production
+Environment=PORT=3401
+Environment=CORS_ALLOWED_ORIGINS=https://drmenergiasolar.com.br,https://www.drmenergiasolar.com.br
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable drm-solar-backend >/tmp/backend-enable.log 2>&1
+systemctl restart drm-solar-backend
 cd frontend
 npm ci >/tmp/npm-ci.log 2>&1
 npm run build >/tmp/npm-build.log 2>&1
@@ -29,7 +56,7 @@ server {
     index index.html;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:3001/api/;
+        proxy_pass http://127.0.0.1:3401/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -38,7 +65,7 @@ server {
     }
 
     location /socket.io/ {
-        proxy_pass http://127.0.0.1:3001/socket.io/;
+        proxy_pass http://127.0.0.1:3401/socket.io/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
