@@ -40,7 +40,7 @@ EOF
 systemctl daemon-reload
 systemctl enable drm-solar-backend >/tmp/backend-enable.log 2>&1
 systemctl restart drm-solar-backend
-cd frontend
+cd ../frontend
 npm ci >/tmp/npm-ci.log 2>&1
 npm run build >/tmp/npm-build.log 2>&1
 mkdir -p /var/www/drm-site
