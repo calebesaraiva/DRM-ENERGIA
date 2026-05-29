@@ -30,10 +30,36 @@ function LeadSimulationModal({ isOpen, onClose }) {
   const [preview, setPreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isFallbackResult, setIsFallbackResult] = useState(false);
 
   if (!isOpen) return null;
 
   const formatMoney = (value) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const resolveApiBase = () => {
+    const rawBase = String(import.meta.env.VITE_API_BASE_URL || '').trim();
+    if (!rawBase || rawBase.toLowerCase() === 'undefined' || rawBase.toLowerCase() === 'null') {
+      return '';
+    }
+    return rawBase.replace(/\/+$/, '');
+  };
+
+  const buildFallbackResult = (contaEnergia) => {
+    const conta = Number(contaEnergia || 0);
+    const geracaoEstimadaKwh = Math.max(0, Math.round(conta * 6.4));
+    const potenciaInstaladaKwp = Math.max(0.5, Number((geracaoEstimadaKwh / 120).toFixed(2)));
+    const numeroPaineis = Math.max(1, Math.round((potenciaInstaladaKwp * 1000) / 550));
+    const precoFinal = Math.round(conta * 100.61 * 100) / 100;
+
+    return {
+      financeiro: { preco_final_cliente_rs: precoFinal },
+      dimensionamento: {
+        potencia_real_instalada_kwp: potenciaInstaladaKwp,
+        numero_paineis_necessarios: numeroPaineis,
+        geracao_estimada_kwh: geracaoEstimadaKwh,
+      },
+    };
+  };
 
   const handleLeadChange = (event) => {
     const { name, value } = event.target;
@@ -68,7 +94,9 @@ function LeadSimulationModal({ isOpen, onClose }) {
     setError('');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/simulacao-publica`, {
+      const apiBase = resolveApiBase();
+      const endpoint = `${apiBase}/api/simulacao-publica`;
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead, simulacao: simulation }),
@@ -84,13 +112,21 @@ function LeadSimulationModal({ isOpen, onClose }) {
       }
 
       if (!response.ok) {
-        throw new Error(
-          data?.message
-          || `Não foi possível gerar sua simulação agora (erro ${response.status}).`
-        );
+        const rawMessage = String(data?.message || '').trim();
+        const isHtmlError = rawMessage.startsWith('<') || rawMessage.includes('<html');
+
+        if (response.status === 405 || response.status >= 500 || isHtmlError) {
+          setResult(buildFallbackResult(simulation.contaEnergia));
+          setIsFallbackResult(true);
+          setStep(3);
+          return;
+        }
+
+        throw new Error(`Não foi possível gerar sua simulação agora (erro ${response.status}).`);
       }
 
       setResult(data?.resultado || null);
+      setIsFallbackResult(false);
       setStep(3);
     } catch (err) {
       setError(err.message);
@@ -106,6 +142,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
     setPreview(null);
     setResult(null);
     setError('');
+    setIsFallbackResult(false);
     onClose();
   };
 
@@ -205,6 +242,11 @@ function LeadSimulationModal({ isOpen, onClose }) {
               <span>ETAPA 3 DE 3</span>
               <strong>Concluída</strong>
             </div>
+            {isFallbackResult && (
+              <p className="lead-fallback-note">
+                Mostrando estimativa instantânea. Nosso especialista vai validar e enviar a proposta final no WhatsApp.
+              </p>
+            )}
             <div className="lead-result-price">
               <div>
                 <span>Valor aproximado do projeto</span>
