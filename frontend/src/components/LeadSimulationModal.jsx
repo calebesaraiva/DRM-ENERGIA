@@ -5,6 +5,22 @@ import { makeWhatsAppLink } from '../utils/whatsapp';
 
 const initialLead = { nome: '', telefone: '', email: '', cidade: '' };
 const initialSimulation = { contaEnergia: '' };
+const citySuggestions = [
+  'Imperatriz - MA',
+  'Açailândia - MA',
+  'João Lisboa - MA',
+  'Cidelândia - MA',
+  'Davinópolis - MA',
+  'Governador Edison Lobão - MA',
+  'São Luís - MA',
+  'Balsas - MA',
+  'Bacabal - MA',
+  'Timon - MA',
+  'Araguaína - TO',
+  'Palmas - TO',
+  'Marabá - PA',
+  'Parauapebas - PA',
+];
 
 function LeadSimulationModal({ isOpen, onClose }) {
   const [step, setStep] = useState(1);
@@ -59,10 +75,19 @@ function LeadSimulationModal({ isOpen, onClose }) {
       });
 
       const contentType = response.headers.get('content-type') || '';
-      const data = contentType.includes('application/json') ? await response.json() : null;
+      let data = null;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = text ? { message: text } : null;
+      }
 
       if (!response.ok) {
-        throw new Error(data?.message || 'Não foi possível gerar sua simulação agora.');
+        throw new Error(
+          data?.message
+          || `Não foi possível gerar sua simulação agora (erro ${response.status}).`
+        );
       }
 
       setResult(data?.resultado || null);
@@ -111,7 +136,20 @@ function LeadSimulationModal({ isOpen, onClose }) {
             </label>
             <label>
               Cidade
-              <input name="cidade" value={lead.cidade} onChange={handleLeadChange} required placeholder="Sua cidade" />
+              <input
+                name="cidade"
+                value={lead.cidade}
+                onChange={handleLeadChange}
+                required
+                placeholder="Sua cidade"
+                list="lead-city-suggestions"
+                autoComplete="address-level2"
+              />
+              <datalist id="lead-city-suggestions">
+                {citySuggestions.map((city) => (
+                  <option key={city} value={city} />
+                ))}
+              </datalist>
             </label>
             {error && <p className="lead-modal-error">{error}</p>}
             <button className="btn btn-primary w-full btn-simular" type="submit">Ver minha pré-economia</button>
@@ -140,6 +178,19 @@ function LeadSimulationModal({ isOpen, onClose }) {
             </label>
 
             {error && <p className="lead-modal-error">{error}</p>}
+            {error && (
+              <a
+                className="lead-error-help"
+                href={makeWhatsAppLink(
+                  'erro_simulacao_modal',
+                  `Olá! Tive erro ao gerar simulação no site. Nome: ${lead.nome || '-'}, Cidade: ${lead.cidade || '-'}, Conta: R$ ${simulation.contaEnergia || '-'}`
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Falar com especialista agora pelo WhatsApp
+              </a>
+            )}
 
             <div className="lead-modal-actions">
               <button className="btn btn-outline" type="button" onClick={() => setStep(1)}>Voltar</button>
