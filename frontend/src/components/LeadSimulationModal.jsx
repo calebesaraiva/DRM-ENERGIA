@@ -150,30 +150,54 @@ function LeadSimulationModal({ isOpen, onClose }) {
 
         {step === 3 && (
           <div className="lead-result">
+            <div className="lead-success-pill">
+              <span>ETAPA 3 DE 3</span>
+              <strong>Concluída</strong>
+            </div>
             <div className="lead-result-price">
-              <span>Valor aproximado do projeto</span>
-              <strong>{formatMoney(result?.financeiro?.preco_final_cliente_rs || preview?.projeto || 0)}</strong>
+              <div>
+                <span>Valor aproximado do projeto</span>
+                <strong>{formatMoney(result?.financeiro?.preco_final_cliente_rs || preview?.projeto || 0)}</strong>
+              </div>
+              <div className="lead-result-price-icon" aria-hidden="true">☀</div>
             </div>
 
             <div className="lead-result-grid">
-              <div>
+              <div className="lead-metric-card">
+                <div className="lead-metric-icon">⚡</div>
                 <span>Potência instalada</span>
                 <strong>{result?.dimensionamento?.potencia_real_instalada_kwp || '-'} kWp</strong>
               </div>
-              <div>
+              <div className="lead-metric-card">
+                <div className="lead-metric-icon">▦</div>
                 <span>Quantidade de painéis</span>
                 <strong>{result?.dimensionamento?.numero_paineis_necessarios || '-'}</strong>
               </div>
-              <div>
+              <div className="lead-metric-card">
+                <div className="lead-metric-icon">↗</div>
                 <span>Geração estimada</span>
                 <strong>{result?.dimensionamento?.geracao_estimada_kwh || '-'} kWh</strong>
               </div>
             </div>
 
             <div className="lead-result-actions">
-              <a className="btn btn-primary btn-simular" href={makeWhatsAppLink('resultado_modal', 'Olá, acabei de fazer a simulação e quero fechar meu projeto solar.')} target="_blank" rel="noopener noreferrer">Falar no WhatsApp</a>
+              <a
+                className="lead-whatsapp-cta"
+                href={makeWhatsAppLink('resultado_modal', 'Olá, acabei de fazer a simulação e quero fechar meu projeto solar.')}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className="lead-whatsapp-icon">◉</span>
+                <span className="lead-whatsapp-copy">
+                  <strong>Falar com um especialista</strong>
+                  <small>Receba sua proposta completa no WhatsApp</small>
+                </span>
+                <span className="lead-whatsapp-arrow">›</span>
+              </a>
               <button className="btn btn-outline" type="button" onClick={handleClose}>Fechar</button>
             </div>
+
+            <p className="lead-safe-note">Seus dados estão seguros conosco.</p>
           </div>
         )}
       </div>
