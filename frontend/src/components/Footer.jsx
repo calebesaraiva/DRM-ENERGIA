@@ -22,7 +22,7 @@ const Footer = () => {
                   @drm.energia.solar
                 </a>
               </p>
-              <p><span className="contact-icon">◌</span><strong>Endereço:</strong> Av Jacob, R. São Luís - Jardim Tropical, Imperatriz - MA, 65910-727</p>
+              <p><span className="contact-icon">◌</span><strong>Endereço:</strong> Av Jacob, Posto São Luís 2 - Jardim Tropical, Imperatriz - MA, 65910-727</p>
             </div>
           </div>
         </div>

@@ -14,6 +14,37 @@ const ProjectGallery = ({ onOpenSimulation }) => {
       .catch(() => setProjects([]));
   }, []);
 
+  const decoratedProjects = projects.map((project, index) => {
+    if (index === 0) {
+      return {
+        ...project,
+        imageUrl: '/assets/foto1.png',
+        title: 'Sistema Residencial',
+        description: 'Itaguatins - TO',
+      };
+    }
+
+    if (index === 1) {
+      return {
+        ...project,
+        imageUrl: '/assets/cliente2.jpeg',
+        title: 'Comércio do Araujo',
+        description: 'Barra do Corda - MA.',
+      };
+    }
+
+    if (index === 2) {
+      return {
+        ...project,
+        imageUrl: '/assets/foto3.png',
+        title: 'Igreja Batista',
+        description: 'Imperatriz - MA',
+      };
+    }
+    return project;
+  });
+  const displayedProjects = decoratedProjects.slice(0, 3);
+
   return (
     <section id="projetos" className="gallery-section">
       <div className="container">
@@ -26,10 +57,28 @@ const ProjectGallery = ({ onOpenSimulation }) => {
         <ImageSlider />
 
         <div className="gallery-grid">
-          {projects.map((project, index) => (
-            <div key={project.id} className="project-card" style={{ animationDelay: `${index * 0.1}s` }}>
+          {displayedProjects.map((project, index) => (
+            <div
+              key={project.id}
+              className="project-card"
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
               <div className="project-image-wrapper">
-                <img src={project.imageUrl} alt={project.title} className="project-image" />
+                <img
+                  src={project.imageUrl}
+                  alt={project.title}
+                  className="project-image"
+                  onError={(event) => {
+                    const current = event.currentTarget.getAttribute('src') || '';
+                    if (current.endsWith('.jpg')) {
+                      event.currentTarget.src = current.replace('.jpg', '.jpeg');
+                      return;
+                    }
+                    if (current.endsWith('.jpeg')) {
+                      event.currentTarget.src = current.replace('.jpeg', '.jpg');
+                    }
+                  }}
+                />
               </div>
               <div className="project-info">
                 <h3>{project.title}</h3>

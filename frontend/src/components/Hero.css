@@ -10,7 +10,7 @@
 .hero-bg-image {
   position: absolute;
   inset: 0;
-  background: url('/assets/cliente1.jpg') no-repeat center center/cover;
+  background: url('/assets/cliente6.jpeg') no-repeat center center/cover;
   transform: scale(1.04);
   animation: kenBurns 15s ease-in-out infinite alternate;
 }

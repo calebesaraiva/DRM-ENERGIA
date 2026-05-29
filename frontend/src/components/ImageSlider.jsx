@@ -3,8 +3,11 @@ import './ImageSlider.css';
 
 const images = [
   '/assets/cliente1.jpg',
-  '/assets/cliente2.jpg',
-  '/assets/cliente3.jpg'
+  '/assets/cliente2.jpeg',
+  '/assets/cliente3.jpeg',
+  '/assets/cliente4.jpeg',
+  '/assets/cliente5.jpeg',
+  '/assets/cliente6.jpeg'
 ];
 
 const ImageSlider = () => {
