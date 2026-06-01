@@ -4,7 +4,7 @@ import './LeadSimulationModal.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
 import { withApiBase } from '../utils/apiBase';
 
-const initialLead = { nome: '', telefone: '', email: '', cidade: '' };
+const initialLead = { nome: '', telefone: '', cidade: '' };
 const initialSimulation = { contaEnergia: '' };
 const citySuggestions = [
   'Imperatriz - MA',
@@ -32,6 +32,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isFallbackResult, setIsFallbackResult] = useState(false);
+  const [ctaVariant, setCtaVariant] = useState(() => (Math.random() > 0.5 ? 'A' : 'B'));
 
   if (!isOpen) return null;
 
@@ -43,23 +44,38 @@ function LeadSimulationModal({ isOpen, onClose }) {
 
   const buildFallbackResult = (contaEnergia) => {
     const conta = Number(contaEnergia || 0);
-    const geracaoEstimadaKwh = Math.max(0, Math.round(conta * 6.4));
-    const potenciaInstaladaKwp = Math.max(0.5, Number((geracaoEstimadaKwh / 120).toFixed(2)));
-    const numeroPaineis = Math.max(1, Math.round((potenciaInstaladaKwp * 1000) / 550));
-    const precoFinal = Math.round(conta * 100.61 * 100) / 100;
+    const Fm = 1.7;
+    const G = 120;
+    const Wp = 0.61;
+    const Fv = 15;
+    const Cf = 5750;
+
+    const consumoEstimadoKwh = Math.max(0, conta * Fm);
+    const potenciaNecessariaKwp = consumoEstimadoKwh / G;
+    const numeroPaineis = Math.max(1, Math.ceil(potenciaNecessariaKwp / Wp));
+    const potenciaInstaladaKwp = Number((numeroPaineis * Wp).toFixed(2));
+    const precoFinal = Math.round((consumoEstimadoKwh * Fv + Cf) * 100) / 100;
 
     return {
       financeiro: { preco_final_cliente_rs: precoFinal },
       dimensionamento: {
         potencia_real_instalada_kwp: potenciaInstaladaKwp,
         numero_paineis_necessarios: numeroPaineis,
-        geracao_estimada_kwh: geracaoEstimadaKwh,
+        geracao_estimada_kwh: Math.round(consumoEstimadoKwh),
       },
     };
   };
 
   const handleLeadChange = (event) => {
     const { name, value } = event.target;
+    if (name === 'telefone') {
+      const digits = value.replace(/\D/g, '').slice(0, 11);
+      const masked = digits
+        .replace(/^(\d{2})(\d)/, '($1) $2')
+        .replace(/(\d{5})(\d)/, '$1-$2');
+      setLead((prev) => ({ ...prev, [name]: masked }));
+      return;
+    }
     setLead((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -73,7 +89,8 @@ function LeadSimulationModal({ isOpen, onClose }) {
     const conta = Number(simulation.contaEnergia || 0);
     const economia = conta * 0.82;
     const novaConta = conta - economia;
-    const projeto = conta * 32;
+    const consumoEstimadoKwh = conta * 1.7;
+    const projeto = (consumoEstimadoKwh * 15) + 5750;
 
     if (!conta || conta < 1) {
       setError('Informe um valor válido para a conta de energia.');
@@ -111,7 +128,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
         const rawMessage = String(data?.message || '').trim();
         const isHtmlError = rawMessage.startsWith('<') || rawMessage.includes('<html');
 
-        if (response.status === 405 || response.status >= 500 || isHtmlError) {
+        if (response.status === 401 || response.status === 405 || response.status >= 500 || isHtmlError) {
           setResult(buildFallbackResult(simulation.contaEnergia));
           setIsFallbackResult(true);
           setStep(3);
@@ -139,16 +156,25 @@ function LeadSimulationModal({ isOpen, onClose }) {
     setResult(null);
     setError('');
     setIsFallbackResult(false);
+    setCtaVariant(Math.random() > 0.5 ? 'A' : 'B');
     onClose();
   };
 
+  const ctaPrimary = ctaVariant === 'A' ? 'Falar com um especialista agora' : 'Garantir proposta prioritária';
+  const ctaSecondary = ctaVariant === 'A' ? 'Receba sua proposta completa no WhatsApp' : 'Atendimento com prioridade ainda hoje';
+
   return createPortal(
     <div className="lead-modal-backdrop" role="presentation" onMouseDown={handleClose}>
-      <div className="lead-modal" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+      <div className={`lead-modal lead-step-${step}`} role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" onMouseDown={(event) => event.stopPropagation()}>
         <button className="lead-modal-close" type="button" onClick={handleClose} aria-label="Fechar">✕</button>
 
         <div className="lead-modal-header">
           <span className="lead-modal-step">Etapa {step} de 3</span>
+          <div className="lead-modal-progress" aria-hidden="true">
+            <span className={step >= 1 ? 'active' : ''}></span>
+            <span className={step >= 2 ? 'active' : ''}></span>
+            <span className={step >= 3 ? 'active' : ''}></span>
+          </div>
           <h2 id="lead-modal-title">
             {step === 1 && 'Descubra sua economia em 30 segundos'}
             {step === 2 && 'Agora libere seu estudo completo'}
@@ -203,13 +229,15 @@ function LeadSimulationModal({ isOpen, onClose }) {
             </label>
             <label>
               Telefone
-              <input name="telefone" value={lead.telefone} onChange={handleLeadChange} required placeholder="(00) 90000-0000" />
+              <input name="telefone" value={lead.telefone} onChange={handleLeadChange} required placeholder="(00) 90000-0000" inputMode="tel" autoComplete="tel" />
             </label>
-            <label>
-              E-mail
-              <input type="email" name="email" value={lead.email} onChange={handleLeadChange} required placeholder="seuemail@exemplo.com" />
-            </label>
-
+            <p className="lead-trust-copy">Sem spam. Usamos seus dados apenas para te enviar a proposta personalizada.</p>
+            <div className="lead-proof-strip">
+              <span>+300 clientes atendidos</span>
+              <span>Equipe própria credenciada</span>
+              <span>Retorno em poucos minutos</span>
+            </div>
+            <p className="lead-urgency-note">Agenda técnica com vagas limitadas para esta semana.</p>
             {error && <p className="lead-modal-error">{error}</p>}
             {error && (
               <a
@@ -234,6 +262,11 @@ function LeadSimulationModal({ isOpen, onClose }) {
 
         {step === 3 && (
           <div className="lead-result">
+            <div className="lead-proof-strip lead-proof-strip-final">
+              <span>+300 projetos aprovados</span>
+              <span>Garantia e suporte local</span>
+              <span>Atendimento regional imediato</span>
+            </div>
             <div className="lead-success-pill">
               <span>ETAPA 3 DE 3</span>
               <strong>Concluída</strong>
@@ -286,8 +319,8 @@ function LeadSimulationModal({ isOpen, onClose }) {
               >
                 <span className="lead-whatsapp-icon">◉</span>
                 <span className="lead-whatsapp-copy">
-                  <strong>Falar com um especialista</strong>
-                  <small>Receba sua proposta completa no WhatsApp</small>
+                  <strong>{ctaPrimary}</strong>
+                  <small>{ctaSecondary}</small>
                 </span>
                 <span className="lead-whatsapp-arrow">›</span>
               </a>

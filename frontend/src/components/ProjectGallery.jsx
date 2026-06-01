@@ -9,8 +9,14 @@ const ProjectGallery = ({ onOpenSimulation }) => {
 
   useEffect(() => {
     fetch(withApiBase('/api/portfolio'))
-      .then(res => res.json())
-      .then(data => setProjects(data))
+      .then(async (res) => {
+        if (!res.ok) {
+          return [];
+        }
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      })
+      .then((data) => setProjects(data))
       .catch(() => setProjects([]));
   }, []);
 
