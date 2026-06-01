@@ -478,17 +478,17 @@
 
 @media (max-width: 640px) {
   .lead-modal-backdrop {
-    align-items: flex-end;
-    padding: 0;
+    align-items: center;
+    padding: 0.7rem;
   }
 
   .lead-modal {
-    width: 100%;
-    max-height: 100dvh;
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    border-radius: 18px 18px 0 0;
+    width: min(560px, calc(100vw - 1.4rem));
+    max-height: min(92dvh, 840px);
+    border-right: 1px solid rgba(249, 115, 22, 0.34);
+    border-bottom: 1px solid rgba(249, 115, 22, 0.34);
+    border-left: 1px solid rgba(249, 115, 22, 0.34);
+    border-radius: 20px;
     padding: 0.95rem 0.95rem calc(1rem + env(safe-area-inset-bottom));
   }
 
@@ -623,18 +623,19 @@
   }
 
   .lead-result-actions {
-    position: sticky;
-    bottom: -1px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0), #ffffff 22%);
-    padding-top: 0.6rem;
-    margin-top: 0.2rem;
+    position: static;
+    background: transparent;
+    padding-top: 0;
+    margin-top: 0.6rem;
   }
 }
 
 @media (max-width: 380px), (max-height: 720px) {
   .lead-modal {
-    max-height: 96dvh;
-    padding: 0.85rem;
+    width: calc(100vw - 1rem);
+    max-height: 90dvh;
+    border-radius: 16px;
+    padding: 0.8rem;
   }
 
   .lead-modal-header {
@@ -656,7 +657,7 @@
   .lead-modal-form input,
   .lead-modal-form select,
   .lead-radio {
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .lead-result-grid div {
@@ -682,6 +683,17 @@
     width: 30px;
     height: 30px;
     font-size: 1.15rem;
+  }
+
+  .lead-proof-strip span {
+    min-height: 34px;
+    font-size: 0.74rem;
+    padding: 0.25rem 0.42rem;
+  }
+
+  .lead-result-price {
+    padding: 0.85rem 0.85rem 0.92rem;
+    border-radius: 16px;
   }
 }
 

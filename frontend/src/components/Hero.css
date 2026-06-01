@@ -271,7 +271,7 @@
 @media (max-width: 768px) {
   .hero {
     min-height: auto;
-    padding: 104px 0 88px;
+    padding: 96px 0 80px;
   }
 
   .hero-text-box {
@@ -279,12 +279,13 @@
   }
 
   .hero-title {
-    font-size: 2.1rem;
+    font-size: clamp(1.92rem, 8vw, 2.2rem);
+    line-height: 1.08;
   }
 
   .hero-description {
-    font-size: 0.98rem;
-    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    margin-bottom: 1.1rem;
     max-width: 34ch;
   }
 
@@ -312,6 +313,12 @@
   .hero-actions {
     gap: 0.7rem;
     flex-direction: column;
+  }
+
+  .hero-actions .btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
   }
 
   .solar-orbit-scene {
@@ -368,11 +375,11 @@
 
 @media (max-width: 420px) {
   .hero {
-    padding: 84px 0 72px;
+    padding: 82px 0 68px;
   }
 
   .hero-title {
-    font-size: 1.82rem;
+    font-size: clamp(1.62rem, 8.4vw, 1.9rem);
   }
 
   .hero-badge {
@@ -381,7 +388,7 @@
   }
 
   .hero-description {
-    font-size: 0.88rem;
+    font-size: 0.86rem;
     max-width: 34ch;
   }
 
