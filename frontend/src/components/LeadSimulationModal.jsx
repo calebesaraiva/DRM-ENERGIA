@@ -233,7 +233,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
             </label>
             <p className="lead-trust-copy">Sem spam. Usamos seus dados apenas para te enviar a proposta personalizada.</p>
             <div className="lead-proof-strip">
-              <span>+300 clientes atendidos</span>
+              <span>+1300 clientes atendidos</span>
               <span>Equipe própria credenciada</span>
               <span>Retorno em poucos minutos</span>
             </div>
@@ -263,7 +263,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
         {step === 3 && (
           <div className="lead-result">
             <div className="lead-proof-strip lead-proof-strip-final">
-              <span>+300 projetos aprovados</span>
+              <span>+1300 projetos aprovados</span>
               <span>Garantia e suporte local</span>
               <span>Atendimento regional imediato</span>
             </div>
