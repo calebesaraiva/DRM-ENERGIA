@@ -30,8 +30,15 @@ function ChangePassword() {
         },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Não foi possível alterar a senha.');
+      const contentType = response.headers.get('content-type') || '';
+      let data = null;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = text ? { message: text } : null;
+      }
+      if (!response.ok) throw new Error(data?.message || 'Não foi possível alterar a senha.');
 
       const user = JSON.parse(localStorage.getItem('user'));
       localStorage.setItem('user', JSON.stringify({ ...user, mustChangePassword: false }));

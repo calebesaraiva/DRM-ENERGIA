@@ -40,7 +40,7 @@ const Header = () => {
               <button onClick={handleLogout} className="btn btn-outline logout-btn">Sair</button>
             </div>
           ) : (
-            <Link to="/login" className="btn btn-primary login-btn">Login / Cadastro</Link>
+            <Link to="/login" className="btn btn-primary login-btn">Login</Link>
           )}
         </nav>
       </div>

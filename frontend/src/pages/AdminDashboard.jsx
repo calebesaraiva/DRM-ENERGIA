@@ -356,11 +356,6 @@ const AdminDashboard = () => {
       return;
     }
 
-    if (loggedInUser.mustChangePassword) {
-      navigate('/alterar-senha');
-      return;
-    }
-
     loadData(loggedInUser).catch(err => setError(err.message));
 
     const handleNewOrcamento = (novoOrcamento) => {

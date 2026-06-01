@@ -24,20 +24,28 @@ const Login = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: senha })
       });
-
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      let data = null;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = text ? { message: text } : null;
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Falha no login.');
+        throw new Error(data?.message || 'Falha no login.');
+      }
+
+      if (!data?.token || !data?.user) {
+        throw new Error('A API de login retornou resposta inválida. Verifique se o backend está online.');
       }
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.user.role);
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      if (data.user.mustChangePassword) {
-        navigate('/alterar-senha');
-      } else if (data.user.role === 'ADMIN' || data.user.role === 'ADM') {
+      if (data.user.role === 'ADMIN' || data.user.role === 'ADM') {
         navigate('/admin');
       } else {
         navigate(data.user.permissions?.dashboard ? '/admin' : '/dashboard');
@@ -99,7 +107,7 @@ const Login = () => {
           </form>
           
           <div className="login-footer">
-            <p>Ainda não tem conta? <Link to="/register">Criar uma conta</Link></p>
+            <p className="login-security-note">Acesso restrito ao painel DRM.</p>
             <Link to="/" className="btn-voltar">← Voltar para a página inicial</Link>
           </div>
         </div>

@@ -33,6 +33,11 @@ const corsOptions = {
     // Permite requisições sem 'origin' (ex: Postman, apps mobile)
     if (!origin) return callback(null, true);
 
+    // Permite desenvolvimento local em qualquer porta (ex: 4173, 5173)
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
     // Permite URLs do ngrok
     if (/\.ngrok-free\.app$/.test(origin)) {
       return callback(null, true);
@@ -237,9 +242,6 @@ const authRequired = async (req, res, next) => {
         userType: 'interno',
         permissions: parsePermissions(user.permissions),
       };
-      if (req.user.mustChangePassword && !['/api/change-password', '/api/me'].includes(req.path)) {
-        return res.status(403).json({ message: 'Troque a senha temporária antes de acessar o painel.' });
-      }
       return next();
     }
 
