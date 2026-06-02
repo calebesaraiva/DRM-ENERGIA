@@ -3424,8 +3424,9 @@
 @media (max-width: 480px) {
   .admin-topbar {
     gap: 0.5rem;
-    align-items: stretch;
+    align-items: center;
     flex-wrap: wrap;
+    padding: 0.55rem 0.65rem;
   }
 
   .admin-topbar h2 {
@@ -3443,16 +3444,17 @@
     width: 100%;
     margin-left: 0;
     padding-bottom: 0.25rem;
+    gap: 0.45rem;
   }
 
   .quick-action-btn {
-    min-height: 42px;
-    padding: 0.52rem 0.72rem;
-    font-size: 0.8rem;
+    min-height: 38px;
+    padding: 0.48rem 0.64rem;
+    font-size: 0.76rem;
   }
 
   .admin-body {
-    padding: 0.75rem;
+    padding: 0.62rem;
   }
 
   .system-status {
@@ -3470,7 +3472,20 @@
   }
 
   .admin-card {
-    padding: 1rem;
+    padding: 0.82rem;
+  }
+
+  .section-heading {
+    padding: 0.88rem;
+  }
+
+  .section-heading h3 {
+    font-size: 1.12rem;
+  }
+
+  .section-heading p {
+    font-size: 0.84rem;
+    line-height: 1.42;
   }
 
   .modern-table {
@@ -3478,7 +3493,7 @@
   }
 
   .client-create-panel {
-    padding: 0.9rem;
+    padding: 0.78rem;
     border-radius: 12px;
   }
 
@@ -3522,12 +3537,12 @@
   }
 
   .lead-toolbar {
-    padding: 0.75rem;
+    padding: 0.62rem;
     border-radius: 12px;
   }
 
   .ops-toolbar {
-    padding: 0.75rem;
+    padding: 0.62rem;
     border-radius: 12px;
   }
 
@@ -3541,9 +3556,9 @@
 
   .lead-filter-pills button {
     flex: 1 1 auto;
-    min-height: 36px;
-    padding: 0 0.7rem;
-    font-size: 0.8rem;
+    min-height: 34px;
+    padding: 0 0.58rem;
+    font-size: 0.76rem;
   }
 
   .section-stats {
@@ -3552,6 +3567,17 @@
 
   .permission-toggle {
     min-height: auto;
+  }
+
+  .table-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-sm-admin {
+    width: 100%;
+    min-height: 38px;
   }
 }
 
