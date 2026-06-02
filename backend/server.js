@@ -11,6 +11,7 @@ const fs = require('fs');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
+const DEFAULT_WHATSAPP_PHONE = '559985127056';
 
 // Configuração do Servidor HTTP para suportar o Socket.io
 const server = http.createServer(app);
@@ -99,6 +100,7 @@ const INTERNAL_USERS = [
     nome: 'Deivson DRM',
     username: 'deivson',
     email: 'deivson@drm.local',
+    whatsapp: process.env.WHATSAPP_DEIVSON || DEFAULT_WHATSAPP_PHONE,
     role: 'ADM',
     temporaryPassword: 'Deivson@DRM#2026',
     permissions: {
@@ -117,33 +119,12 @@ const INTERNAL_USERS = [
       gerenciarClientes: true,
     },
   },
-  {
-    nome: 'Nexus Teste',
-    username: 'nexus',
-    email: 'nexus@drm.local',
-    role: 'ADM',
-    temporaryPassword: '1234',
-    mustChangePassword: false,
-    permissions: {
-      dashboard: true,
-      clientes: true,
-      leads: true,
-      orcamentos: true,
-      contratos: true,
-      ordensServico: true,
-      precosSistemas: true,
-      financeiro: true,
-      equipeTecnica: true,
-      usuarios: true,
-      permissoes: true,
-      verTodosLeads: true,
-      gerenciarClientes: true,
-    },
-  },
+
   {
     nome: 'Rene Jr',
     username: 'renejr',
     email: 'renejr@drm.local',
+    whatsapp: process.env.WHATSAPP_RENEJR || '559985127056',
     role: 'EQUIPE_TECNICA_COMERCIAL',
     temporaryPassword: 'ReneJr@DRM#2026',
     permissions: {
@@ -160,6 +141,7 @@ const INTERNAL_USERS = [
     nome: 'Gleyson',
     username: 'gleyson',
     email: 'gleyson@drm.local',
+    whatsapp: process.env.WHATSAPP_GLEYSON || '559984632324',
     role: 'CONSULTOR',
     temporaryPassword: 'Gleyson@DRM#2026',
     permissions: {
@@ -170,9 +152,10 @@ const INTERNAL_USERS = [
     },
   },
   {
-    nome: 'Carlito',
+    nome: 'Carlito Lopes',
     username: 'carlito',
     email: 'carlito@drm.local',
+    whatsapp: process.env.WHATSAPP_CARLITO || '55992276744',
     role: 'CONSULTOR',
     temporaryPassword: 'Carlito@DRM#2026',
     permissions: {
@@ -186,6 +169,7 @@ const INTERNAL_USERS = [
     nome: 'Ivaldo',
     username: 'ivaldo',
     email: 'ivaldo@drm.local',
+    whatsapp: process.env.WHATSAPP_IVALDO || '',
     role: 'CONSULTOR',
     temporaryPassword: 'Ivaldo@DRM#2026',
     permissions: {
@@ -212,11 +196,26 @@ const parsePermissions = (value) => {
 
 const can = (user, permission) => user?.permissions?.[permission] === true;
 
+const normalizeWhatsAppPhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('55')) return digits;
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+  return digits;
+};
+
+const buildWhatsAppLink = (phone, text) => {
+  const normalizedPhone = normalizeWhatsAppPhone(phone) || DEFAULT_WHATSAPP_PHONE;
+  const encoded = encodeURIComponent(text || 'Ola, vim do site e quero uma proposta de energia solar.');
+  return `https://api.whatsapp.com/send?phone=${normalizedPhone}&text=${encoded}`;
+};
+
 const sanitizeUser = (user) => ({
   id: user.id,
   nome: user.nome,
   username: user.username,
   email: user.email,
+  whatsapp: user.whatsapp || '',
   role: user.role,
   permissions: user.permissions,
   mustChangePassword: Boolean(user.mustChangePassword),
@@ -305,7 +304,7 @@ const getLeadOwners = async () => {
   const users = await db.all('SELECT * FROM usuarios WHERE active = 1 ORDER BY id ASC');
   return users
     .map(user => ({ ...user, permissions: parsePermissions(user.permissions) }))
-    .filter(user => user.role !== 'ADM' && can(user, 'leads'));
+    .filter(user => user.role !== 'ADM' && can(user, 'leads') && normalizeWhatsAppPhone(user.whatsapp));
 };
 
 const normalizeLeadDistribution = async () => {
@@ -1051,6 +1050,7 @@ const buildContratoHtml = async (contrato) => {
       nome TEXT NOT NULL,
       username TEXT UNIQUE NOT NULL,
       email TEXT UNIQUE,
+      whatsapp TEXT,
       password TEXT NOT NULL,
       role TEXT NOT NULL,
       permissions TEXT,
@@ -1229,28 +1229,34 @@ const buildContratoHtml = async (contrato) => {
     await db.exec('ALTER TABLE contratos ADD COLUMN equipamentoDados TEXT');
   }
 
+  const usuarioColumns = await db.all('PRAGMA table_info(usuarios)');
+  const existingUsuarioColumns = usuarioColumns.map(column => column.name);
+  if (!existingUsuarioColumns.includes('whatsapp')) {
+    await db.exec('ALTER TABLE usuarios ADD COLUMN whatsapp TEXT');
+  }
+
   for (const user of INTERNAL_USERS) {
     const existingUser = await db.get('SELECT id FROM usuarios WHERE username = ?', user.username);
     if (!existingUser) {
       await db.run(
         `INSERT INTO usuarios
-          (nome, username, email, password, role, permissions, mustChangePassword, active, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+          (nome, username, email, whatsapp, password, role, permissions, mustChangePassword, active, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
         user.nome,
         user.username,
         user.email,
+        normalizeWhatsAppPhone(user.whatsapp),
         await bcrypt.hash(user.temporaryPassword, 10),
         user.role,
         JSON.stringify(mergePermissions(user.permissions)),
         user.mustChangePassword === false ? 0 : 1,
         new Date().toISOString()
       );
-    } else if (user.username === 'nexus') {
+    } else if (user.whatsapp) {
       await db.run(
-        'UPDATE usuarios SET password = ?, role = ?, permissions = ?, mustChangePassword = 0, active = 1 WHERE username = ?',
-        await bcrypt.hash(user.temporaryPassword, 10),
-        user.role,
-        JSON.stringify(mergePermissions(user.permissions)),
+        'UPDATE usuarios SET whatsapp = COALESCE(NULLIF(whatsapp, ?), ?) WHERE username = ?',
+        '',
+        normalizeWhatsAppPhone(user.whatsapp),
         user.username
       );
     }
@@ -1372,24 +1378,32 @@ app.post('/api/calcular', async (req, res) => {
 
 app.post('/api/simulacao-publica', async (req, res) => {
   const { lead, simulacao } = req.body;
+  const leadData = {
+    nome: String(lead?.nome || '').trim(),
+    telefone: String(lead?.telefone || '').trim(),
+    email: String(lead?.email || '').trim(),
+    cidade: String(lead?.cidade || '').trim(),
+  };
 
-  if (!lead?.nome || !lead?.telefone || !lead?.email || !lead?.cidade) {
-    return res.status(400).json({ message: 'Preencha nome, telefone, e-mail e cidade para continuar.' });
+  if (!leadData.nome || !leadData.telefone || !leadData.cidade) {
+    return res.status(400).json({ message: 'Preencha nome, telefone e cidade para continuar.' });
   }
 
   try {
     const resultadoCompleto = calcularSimulacaoSolar(simulacao);
     const dataCadastro = new Date().toISOString().split('T')[0];
     const owner = await getNextLeadOwner();
+    const whatsappMessage = `Olá ${owner?.nome || 'DRM Energia Solar'}, acabei de fazer a simulação no site e quero fechar meu projeto solar. Nome: ${leadData.nome}. Cidade: ${leadData.cidade}. Conta média: R$ ${simulacao?.contaEnergia || '-'}.`;
+    const whatsappUrl = buildWhatsAppLink(owner?.whatsapp, whatsappMessage);
 
     const leadResult = await db.run(
       `INSERT INTO leads
         (nome, telefone, email, cidade, origem, status, dataCadastro, assignedUserId, assignedUserName)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      lead.nome.trim(),
-      lead.telefone.trim(),
-      lead.email.trim(),
-      lead.cidade.trim(),
+      leadData.nome,
+      leadData.telefone,
+      leadData.email,
+      leadData.cidade,
       'Simulação do site',
       'Novo',
       dataCadastro,
@@ -1402,10 +1416,10 @@ app.post('/api/simulacao-publica', async (req, res) => {
         (leadId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, status, data, dimensionamento, financeiro, assignedUserId, assignedUserName)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       leadResult.lastID,
-      lead.nome.trim(),
-      lead.telefone.trim(),
-      lead.email.trim(),
-      lead.cidade.trim(),
+      leadData.nome,
+      leadData.telefone,
+      leadData.email,
+      leadData.cidade,
       'Lead novo',
       dataCadastro,
       JSON.stringify(resultadoCompleto.dimensionamento),
@@ -1417,10 +1431,10 @@ app.post('/api/simulacao-publica', async (req, res) => {
     const novoOrcamento = {
       id: orcamentoResult.lastID,
       leadId: leadResult.lastID,
-      clienteNome: lead.nome.trim(),
-      clienteTelefone: lead.telefone.trim(),
-      clienteEmail: lead.email.trim(),
-      clienteCidade: lead.cidade.trim(),
+      clienteNome: leadData.nome,
+      clienteTelefone: leadData.telefone,
+      clienteEmail: leadData.email,
+      clienteCidade: leadData.cidade,
       assignedUserId: owner?.id || null,
       assignedUserName: owner?.nome || null,
       status: 'Lead novo',
@@ -1431,10 +1445,10 @@ app.post('/api/simulacao-publica', async (req, res) => {
     io.emit('novo_orcamento', novoOrcamento);
     io.emit('novo_lead', {
       id: leadResult.lastID,
-      nome: lead.nome.trim(),
-      telefone: lead.telefone.trim(),
-      email: lead.email.trim(),
-      cidade: lead.cidade.trim(),
+      nome: leadData.nome,
+      telefone: leadData.telefone,
+      email: leadData.email,
+      cidade: leadData.cidade,
       origem: 'Simulação do site',
       status: 'Novo',
       dataCadastro,
@@ -1446,7 +1460,16 @@ app.post('/api/simulacao-publica', async (req, res) => {
       message: 'Simulação salva com sucesso!',
       leadId: leadResult.lastID,
       orcamento: novoOrcamento,
-      resultado: resultadoCompleto
+      resultado: resultadoCompleto,
+      assignedOwner: owner ? {
+        id: owner.id,
+        nome: owner.nome,
+        whatsapp: normalizeWhatsAppPhone(owner.whatsapp),
+      } : null,
+      whatsapp: {
+        phone: normalizeWhatsAppPhone(owner?.whatsapp) || DEFAULT_WHATSAPP_PHONE,
+        url: whatsappUrl,
+      },
     });
   } catch (error) {
     console.error('ERRO NA SIMULAÇÃO PÚBLICA:', error);
@@ -1637,28 +1660,29 @@ app.post('/api/change-password', authRequired, async (req, res) => {
 
 // Rotas do Admin
 app.get('/api/admin/clientes', authRequired, requirePermission('clientes'), async (req, res) => {
-  const clientes = await db.all('SELECT id, nome, whatsapp, cidade, dataCadastro FROM clientes ORDER BY id DESC');
+  const clientes = await db.all('SELECT id, nome, whatsapp, cidade, email, dataCadastro FROM clientes ORDER BY id DESC');
   res.json(clientes);
 });
 
 app.post('/api/admin/clientes', authRequired, requirePermission('gerenciarClientes'), async (req, res) => {
   const { nome, whatsapp, cidade, email, password } = req.body;
-  if (!nome || !whatsapp || !cidade || !email) {
-    return res.status(400).json({ message: 'Nome, WhatsApp, cidade e e-mail são obrigatórios.' });
+  if (!nome || !whatsapp || !cidade) {
+    return res.status(400).json({ message: 'Nome, WhatsApp e cidade são obrigatórios.' });
   }
 
   try {
+    const normalizedEmail = String(email || '').trim() || null;
     const hashedPassword = await bcrypt.hash(password || 'Cliente@DRM#2026', 10);
     const result = await db.run(
       'INSERT INTO clientes (nome, whatsapp, cidade, email, password, dataCadastro) VALUES (?, ?, ?, ?, ?, ?)',
-      nome,
-      whatsapp,
-      cidade,
-      email,
+      String(nome).trim(),
+      String(whatsapp).trim(),
+      String(cidade).trim(),
+      normalizedEmail,
       hashedPassword,
       new Date().toISOString().split('T')[0]
     );
-    res.status(201).json({ id: result.lastID, nome, whatsapp, cidade, email, dataCadastro: new Date().toISOString().split('T')[0] });
+    res.status(201).json({ id: result.lastID, nome: String(nome).trim(), whatsapp: String(whatsapp).trim(), cidade: String(cidade).trim(), email: normalizedEmail, dataCadastro: new Date().toISOString().split('T')[0] });
   } catch (error) {
     if (error.code === 'SQLITE_CONSTRAINT') {
       return res.status(400).json({ message: 'Este e-mail já está cadastrado.' });
@@ -1897,19 +1921,75 @@ app.get('/api/admin/contratos/:id/download', authRequired, requirePermission('co
 });
 
 app.get('/api/admin/usuarios', authRequired, requirePermission('usuarios'), async (req, res) => {
-  const usuarios = await db.all('SELECT id, nome, username, email, role, permissions, mustChangePassword, active, createdAt FROM usuarios ORDER BY id ASC');
+  const usuarios = await db.all('SELECT id, nome, username, email, whatsapp, role, permissions, mustChangePassword, active, createdAt FROM usuarios ORDER BY id ASC');
   res.json(usuarios.map(user => ({ ...user, permissions: parsePermissions(user.permissions), mustChangePassword: Boolean(user.mustChangePassword), active: Boolean(user.active) })));
 });
 
+app.post('/api/admin/usuarios', authRequired, requirePermission('usuarios'), async (req, res) => {
+  const { nome, username, email, whatsapp, role, permissions, temporaryPassword } = req.body;
+  const normalizedName = String(nome || '').trim();
+  const normalizedUsername = String(username || '').trim().toLowerCase();
+  const normalizedEmail = String(email || `${normalizedUsername}@drm.local`).trim().toLowerCase();
+  const normalizedWhatsApp = normalizeWhatsAppPhone(whatsapp);
+  const normalizedRole = ['ADM', 'EQUIPE_TECNICA_COMERCIAL', 'CONSULTOR'].includes(role) ? role : 'CONSULTOR';
+  const password = String(temporaryPassword || `${normalizedUsername}@DRM#2026`).trim();
+  const mergedPermissions = mergePermissions(permissions || {
+    dashboard: true,
+    leads: true,
+    orcamentos: true,
+    contratos: true,
+  });
+
+  if (!normalizedName || !normalizedUsername || !normalizedWhatsApp) {
+    return res.status(400).json({ message: 'Informe nome, usuário e WhatsApp para cadastrar no rodízio.' });
+  }
+
+  const exists = await db.get('SELECT id FROM usuarios WHERE username = ? OR email = ?', normalizedUsername, normalizedEmail);
+  if (exists) {
+    return res.status(409).json({ message: 'Já existe um usuário com este usuário ou e-mail.' });
+  }
+
+  const result = await db.run(
+    `INSERT INTO usuarios
+      (nome, username, email, whatsapp, password, role, permissions, mustChangePassword, active, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`,
+    normalizedName,
+    normalizedUsername,
+    normalizedEmail,
+    normalizedWhatsApp,
+    await bcrypt.hash(password, 10),
+    normalizedRole,
+    JSON.stringify(mergedPermissions),
+    new Date().toISOString()
+  );
+
+  res.status(201).json({
+    id: result.lastID,
+    nome: normalizedName,
+    username: normalizedUsername,
+    email: normalizedEmail,
+    whatsapp: normalizedWhatsApp,
+    role: normalizedRole,
+    permissions: mergedPermissions,
+    mustChangePassword: true,
+    active: true,
+    temporaryPassword: password,
+  });
+});
+
 app.put('/api/admin/usuarios/:id/permissoes', authRequired, requirePermission('permissoes'), async (req, res) => {
-  const { permissions, active } = req.body;
+  const { permissions, active, whatsapp, nome, role } = req.body;
   const user = await db.get('SELECT * FROM usuarios WHERE id = ?', req.params.id);
   if (!user) return res.status(404).json({ message: 'Usuário não encontrado.' });
+  const nextRole = ['ADM', 'EQUIPE_TECNICA_COMERCIAL', 'CONSULTOR'].includes(role) ? role : user.role;
 
   await db.run(
-    'UPDATE usuarios SET permissions = ?, active = ? WHERE id = ?',
+    'UPDATE usuarios SET nome = ?, role = ?, permissions = ?, active = ?, whatsapp = ? WHERE id = ?',
+    String(nome || user.nome).trim(),
+    nextRole,
     JSON.stringify(mergePermissions(permissions)),
     active === false ? 0 : 1,
+    typeof whatsapp === 'undefined' ? user.whatsapp : normalizeWhatsAppPhone(whatsapp),
     req.params.id
   );
 

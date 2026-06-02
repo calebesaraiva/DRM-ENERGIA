@@ -132,6 +132,15 @@ const emptyPriceForm = {
   comissaoPercentual: '',
 };
 
+const emptyUserForm = {
+  nome: '',
+  username: '',
+  email: '',
+  whatsapp: '',
+  role: 'CONSULTOR',
+  temporaryPassword: '',
+};
+
 const getInitialAdminUser = () => {
   try {
     return JSON.parse(localStorage.getItem('user') || 'null') || { nome: 'DRM', email: '' };
@@ -152,7 +161,16 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(initialUser));
   const [clientes, setClientes] = useState([]);
+  const [clientSearch, setClientSearch] = useState('');
   const [leads, setLeads] = useState([]);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [leadOwnerFilter, setLeadOwnerFilter] = useState('todos');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('todos');
+  const [orcamentoSearch, setOrcamentoSearch] = useState('');
+  const [contratoStatusFilter, setContratoStatusFilter] = useState('todos');
+  const [osStatusFilter, setOsStatusFilter] = useState('todos');
+  const [userSearch, setUserSearch] = useState('');
+  const [newUserForm, setNewUserForm] = useState(emptyUserForm);
   const [usuarios, setUsuarios] = useState([]);
   const [financeiro, setFinanceiro] = useState(null);
   const [resumo, setResumo] = useState(null);
@@ -252,6 +270,45 @@ const AdminDashboard = () => {
     };
   }, [leads, usuarios]);
 
+  const leadStatusOptions = useMemo(() => {
+    const statuses = Array.from(new Set(leads.map(lead => lead.status || 'Sem status')));
+    return statuses.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [leads]);
+
+  const filteredLeads = useMemo(() => {
+    const search = leadSearch.trim().toLowerCase();
+    const canSeeAllLeads = hasPermission('verTodosLeads');
+
+    return leads.filter(lead => {
+      if (canSeeAllLeads && leadOwnerFilter !== 'todos' && String(lead.assignedUserId || lead.assignedUserName || '') !== String(leadOwnerFilter)) {
+        return false;
+      }
+
+      if (leadStatusFilter !== 'todos' && String(lead.status || 'Sem status') !== leadStatusFilter) {
+        return false;
+      }
+
+      if (!search) return true;
+
+      return [lead.nome, lead.telefone, lead.email, lead.cidade, lead.assignedUserName, lead.status]
+        .some(value => String(value || '').toLowerCase().includes(search));
+    });
+  }, [leadOwnerFilter, leadSearch, leadStatusFilter, leads, adminUser]);
+
+  const clientSummary = useMemo(() => {
+    const search = clientSearch.trim().toLowerCase();
+    const filtered = clientes.filter(cliente => {
+      if (!search) return true;
+      return [cliente.nome, cliente.whatsapp, cliente.cidade, cliente.email]
+        .some(value => String(value || '').toLowerCase().includes(search));
+    });
+
+    const withWhatsApp = clientes.filter(cliente => String(cliente.whatsapp || '').replace(/\D/g, '').length >= 10).length;
+    const withCity = clientes.filter(cliente => String(cliente.cidade || '').trim()).length;
+
+    return { filtered, withWhatsApp, withCity };
+  }, [clientes, clientSearch]);
+
   const activeUsersTotal = useMemo(
     () => usuarios.filter(user => user.active).length,
     [usuarios]
@@ -268,6 +325,28 @@ const AdminDashboard = () => {
     aprovados: contratos.filter(contrato => contrato.status === 'Aprovado').length,
     recusados: contratos.filter(contrato => contrato.status === 'Recusado').length,
   }), [contratos]);
+
+  const filteredOrcamentos = useMemo(() => {
+    const search = orcamentoSearch.trim().toLowerCase();
+    if (!search) return orcamentos;
+
+    return orcamentos.filter(orcamento => [
+      orcamento.clienteNome,
+      orcamento.clienteTelefone,
+      orcamento.clienteEmail,
+      orcamento.clienteCidade,
+      orcamento.assignedUserName,
+      orcamento.id,
+    ].some(value => String(value || '').toLowerCase().includes(search)));
+  }, [orcamentoSearch, orcamentos]);
+
+  const filteredContratos = useMemo(() => {
+    const filteredByStatus = contratoStatusFilter === 'todos'
+      ? contratos
+      : contratos.filter(contrato => contrato.status === contratoStatusFilter);
+
+    return filteredByStatus;
+  }, [contratoStatusFilter, contratos]);
 
   const filteredProjetos = useMemo(() => {
     const term = projectSearch.trim().toLowerCase();
@@ -291,6 +370,24 @@ const AdminDashboard = () => {
     andamento: ordensServico.filter(item => item.status === 'Em atendimento').length,
     resolvidas: ordensServico.filter(item => item.status === 'Resolvida').length,
   }), [ordensServico]);
+
+  const filteredOrdensServico = useMemo(() => {
+    if (osStatusFilter === 'todos') return ordensServico;
+    return ordensServico.filter(os => os.status === osStatusFilter);
+  }, [ordensServico, osStatusFilter]);
+
+  const filteredUsuarios = useMemo(() => {
+    const search = userSearch.trim().toLowerCase();
+    if (!search) return usuarios;
+
+    return usuarios.filter(user => [
+      user.nome,
+      user.username,
+      user.email,
+      user.whatsapp,
+      roleLabels[user.role] || user.role,
+    ].some(value => String(value || '').toLowerCase().includes(search)));
+  }, [userSearch, usuarios]);
 
   const request = useCallback(async (path, options = {}) => {
     const response = await fetch(withApiBase(path), {
@@ -558,12 +655,46 @@ const AdminDashboard = () => {
     setPriceError('');
   };
 
-  const updatePermissions = async (userId, permissions, active) => {
+  const updatePermissions = async (userId, permissions, active, extra = {}) => {
     await request(`/api/admin/usuarios/${userId}/permissoes`, {
       method: 'PUT',
-      body: JSON.stringify({ permissions, active }),
+      body: JSON.stringify({ permissions, active, ...extra }),
     });
-    setUsuarios(prev => prev.map(user => user.id === userId ? { ...user, permissions, active } : user));
+    setUsuarios(prev => prev.map(user => user.id === userId ? { ...user, permissions, active, ...extra } : user));
+  };
+
+  const createUsuario = async (event) => {
+    event.preventDefault();
+    const user = await request('/api/admin/usuarios', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...newUserForm,
+        permissions: {
+          dashboard: true,
+          leads: true,
+          orcamentos: true,
+          contratos: true,
+          ...(newUserForm.role === 'EQUIPE_TECNICA_COMERCIAL' ? {
+            ordensServico: true,
+            precosSistemas: true,
+            equipeTecnica: true,
+          } : {}),
+          ...(newUserForm.role === 'ADM' ? {
+            clientes: true,
+            ordensServico: true,
+            precosSistemas: true,
+            financeiro: true,
+            equipeTecnica: true,
+            usuarios: true,
+            permissoes: true,
+            verTodosLeads: true,
+            gerenciarClientes: true,
+          } : {}),
+        },
+      }),
+    });
+    setUsuarios(prev => [...prev, user]);
+    setNewUserForm(emptyUserForm);
   };
 
   const createCliente = async (event) => {
@@ -684,7 +815,10 @@ const AdminDashboard = () => {
             <button
               key={tab.id}
               className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setIsSidebarOpen(false);
+              }}
             >
               <span className="icon"><SidebarIcon name={tab.id} /></span> {tab.label}
             </button>
@@ -738,8 +872,8 @@ const AdminDashboard = () => {
               <div className="section-heading">
                 <div>
                   <span className="section-kicker">Controle geral</span>
-                  <h3>Visão do dono da empresa</h3>
-                  <p>Tudo que precisa de atenção hoje: vendas, contratos, projetos, retornos e equipe.</p>
+                  <h3>Painel de ação</h3>
+                  <p>Comece pelo que exige resposta hoje: leads novos, retornos, contratos pendentes e projetos críticos.</p>
                 </div>
                 <div className="section-stats">
                   <div><strong>{money(resumo.kpis?.valorAprovadoMes)}</strong><span>vendido no mês</span></div>
@@ -748,11 +882,34 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              <div className="dashboard-action-strip">
+                <button type="button" className="dashboard-action-card urgent" onClick={() => setActiveTab('leads')}>
+                  <span>Atender agora</span>
+                  <strong>{resumo.kpis?.novos || 0}</strong>
+                  <small>lead{(resumo.kpis?.novos || 0) === 1 ? '' : 's'} novo{(resumo.kpis?.novos || 0) === 1 ? '' : 's'}</small>
+                </button>
+                <button type="button" className="dashboard-action-card" onClick={() => setActiveTab('leads')}>
+                  <span>Retornos</span>
+                  <strong>{resumo.proximosRetornos?.length || 0}</strong>
+                  <small>agendado{(resumo.proximosRetornos?.length || 0) === 1 ? '' : 's'}</small>
+                </button>
+                <button type="button" className="dashboard-action-card warning" onClick={() => setActiveTab('contratos')}>
+                  <span>Aprovar contratos</span>
+                  <strong>{resumo.kpis?.contratosPendentes || 0}</strong>
+                  <small>pendente{(resumo.kpis?.contratosPendentes || 0) === 1 ? '' : 's'}</small>
+                </button>
+                <button type="button" className="dashboard-action-card" onClick={() => setActiveTab('projetos')}>
+                  <span>Projetos críticos</span>
+                  <strong>{resumo.projetosCriticos?.length || 0}</strong>
+                  <small>com atenção</small>
+                </button>
+              </div>
+
               <div className="crm-kpi-grid">
-                <div className="crm-kpi-card primary"><span>Leads captados</span><strong>{resumo.kpis?.leads || 0}</strong><p>{resumo.kpis?.novos || 0} aguardando primeiro atendimento.</p></div>
-                <div className="crm-kpi-card"><span>Orçamentos</span><strong>{resumo.kpis?.orcamentos || 0}</strong><p>Simulações registradas no sistema.</p></div>
-                <div className="crm-kpi-card"><span>Contratos pendentes</span><strong>{resumo.kpis?.contratosPendentes || 0}</strong><p>Precisam de aprovação do ADM.</p></div>
-                <div className="crm-kpi-card"><span>Contratos aprovados</span><strong>{resumo.kpis?.contratosAprovados || 0}</strong><p>Viraram projeto de execução.</p></div>
+                <button type="button" className="crm-kpi-card primary" onClick={() => setActiveTab('leads')}><span>Leads captados</span><strong>{resumo.kpis?.leads || 0}</strong><p>{resumo.kpis?.novos || 0} aguardando primeiro atendimento.</p></button>
+                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('orcamentos')}><span>Orçamentos</span><strong>{resumo.kpis?.orcamentos || 0}</strong><p>Simulações registradas no sistema.</p></button>
+                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('contratos')}><span>Contratos pendentes</span><strong>{resumo.kpis?.contratosPendentes || 0}</strong><p>Precisam de aprovação do ADM.</p></button>
+                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('projetos')}><span>Contratos aprovados</span><strong>{resumo.kpis?.contratosAprovados || 0}</strong><p>Viraram projeto de execução.</p></button>
               </div>
 
               <div className="crm-grid">
@@ -794,13 +951,14 @@ const AdminDashboard = () => {
                     <span className="status-badge success">{resumo.proximosRetornos?.length || 0}</span>
                   </div>
                   <div className="mobile-list">
-                    {(resumo.proximosRetornos || []).map(lead => (
+                    {(resumo.proximosRetornos || []).slice(0, 5).map(lead => (
                       <div className="mobile-list-item" key={lead.id}>
                         <div><strong>{lead.nome}</strong><span>{lead.cidade || 'Cidade não informada'} • {getResponsibleName(lead.assignedUserName)}</span></div>
                         <em>{dateBr(lead.proximoRetorno)}</em>
                       </div>
                     ))}
                     {(resumo.proximosRetornos || []).length === 0 && <p className="muted-text">Nenhum retorno agendado.</p>}
+                    {(resumo.proximosRetornos || []).length > 5 && <button type="button" className="btn btn-outline btn-sm-admin dashboard-list-action" onClick={() => setActiveTab('leads')}>Ver todos os retornos</button>}
                   </div>
                 </div>
 
@@ -810,13 +968,14 @@ const AdminDashboard = () => {
                     <span className="status-badge warning">prazos</span>
                   </div>
                   <div className="mobile-list">
-                    {(resumo.projetosCriticos || []).map(projeto => (
+                    {(resumo.projetosCriticos || []).slice(0, 5).map(projeto => (
                       <div className="mobile-list-item" key={projeto.id}>
                         <div><strong>{projeto.clienteNome}</strong><span>{projeto.etapa} • {getResponsibleName(projeto.responsavelNome)}</span></div>
                         <em>{dateBr(projeto.prazoPrevisto)}</em>
                       </div>
                     ))}
                     {(resumo.projetosCriticos || []).length === 0 && <p className="muted-text">Nenhum projeto crítico.</p>}
+                    {(resumo.projetosCriticos || []).length > 5 && <button type="button" className="btn btn-outline btn-sm-admin dashboard-list-action" onClick={() => setActiveTab('projetos')}>Ver todos os projetos</button>}
                   </div>
                 </div>
               </div>
@@ -841,45 +1000,93 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'clientes' && (
-            <div className="admin-card">
-              <div className="card-header-flex">
-                <h3>Clientes cadastrados</h3>
-                <span className="status-badge success">{clientes.length} clientes</span>
+            <div className="admin-section client-screen">
+              <div className="section-heading">
+                <div>
+                  <span className="section-kicker">Base comercial</span>
+                  <h3>Clientes</h3>
+                  <p>Cadastre, encontre e fale com clientes sem sair da tela.</p>
+                </div>
+                <div className="section-stats">
+                  <div><strong>{clientes.length}</strong><span>clientes</span></div>
+                  <div><strong>{clientSummary.withWhatsApp}</strong><span>com WhatsApp</span></div>
+                  <div><strong>{clientSummary.withCity}</strong><span>com cidade</span></div>
+                </div>
               </div>
+
               {hasPermission('gerenciarClientes') && (
-                <form className="admin-inline-form" onSubmit={createCliente}>
-                  <input placeholder="Nome" value={novoCliente.nome} onChange={(e) => setNovoCliente(prev => ({ ...prev, nome: e.target.value }))} required />
+                <form className="client-create-panel" onSubmit={createCliente}>
+                  <div>
+                    <span className="section-kicker">Novo cliente</span>
+                    <h4>Cadastro rápido</h4>
+                    <p>Nome, WhatsApp e cidade já deixam o cliente pronto para atendimento.</p>
+                  </div>
+                  <input placeholder="Nome do cliente" value={novoCliente.nome} onChange={(e) => setNovoCliente(prev => ({ ...prev, nome: e.target.value }))} required />
                   <input placeholder="WhatsApp" value={novoCliente.whatsapp} onChange={(e) => setNovoCliente(prev => ({ ...prev, whatsapp: e.target.value }))} required />
                   <input placeholder="Cidade" value={novoCliente.cidade} onChange={(e) => setNovoCliente(prev => ({ ...prev, cidade: e.target.value }))} required />
-                  <input placeholder="E-mail" type="email" value={novoCliente.email} onChange={(e) => setNovoCliente(prev => ({ ...prev, email: e.target.value }))} required />
+                  <input placeholder="E-mail (opcional)" type="email" value={novoCliente.email} onChange={(e) => setNovoCliente(prev => ({ ...prev, email: e.target.value }))} />
                   <button className="btn btn-primary" type="submit">Cadastrar cliente</button>
                 </form>
               )}
-              <div className="table-container">
-                <table className="modern-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Cliente</th>
-                      <th>Whatsapp</th>
-                      <th>Localização</th>
-                      <th>Cadastro</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {clientes.map(c => (
-                      <tr key={c.id}>
-                        <td data-label="ID">#{c.id}</td>
-                        <td data-label="Cliente" className="font-medium">{c.nome}</td>
-                        <td data-label="WhatsApp">{c.whatsapp}</td>
-                        <td data-label="Localização">{c.cidade}</td>
-                        <td data-label="Cadastro">{c.dataCadastro}</td>
-                        <td data-label="Status"><span className="status-badge success">Ativo</span></td>
+
+              <div className="admin-card">
+                <div className="card-header-flex">
+                  <div>
+                    <h3>Clientes cadastrados</h3>
+                    <p className="muted-text">{clientSummary.filtered.length} encontrado{clientSummary.filtered.length === 1 ? '' : 's'} na busca atual.</p>
+                  </div>
+                  <div className="client-search-box">
+                    <input
+                      placeholder="Buscar por nome, WhatsApp, cidade ou e-mail"
+                      value={clientSearch}
+                      onChange={(event) => setClientSearch(event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="table-container">
+                  <table className="modern-table client-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Whatsapp</th>
+                        <th>Localização</th>
+                        <th>Cadastro</th>
+                        <th>Status</th>
+                        <th>Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {clientSummary.filtered.map(c => {
+                        const whatsappDigits = String(c.whatsapp || '').replace(/\D/g, '');
+                        const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}` : '';
+                        return (
+                          <tr key={c.id}>
+                            <td data-label="ID">#{c.id}</td>
+                            <td data-label="Cliente" className="font-medium">{c.nome}</td>
+                            <td data-label="WhatsApp">{c.whatsapp || 'Não informado'}</td>
+                            <td data-label="Localização">{c.cidade || 'Não informada'}</td>
+                            <td data-label="Cadastro">{c.dataCadastro || 'Sem data'}</td>
+                            <td data-label="Status"><span className="status-badge success">Ativo</span></td>
+                            <td data-label="Ações">
+                              <div className="table-actions">
+                                {whatsappHref && <a className="btn btn-primary btn-sm-admin" href={whatsappHref} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setNovoCliente({ nome: c.nome || '', whatsapp: c.whatsapp || '', cidade: c.cidade || '', email: c.email || '' })}>Usar dados</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {clientSummary.filtered.length === 0 && (
+                    <div className="empty-state-orcamento client-empty-state">
+                      <div className="icon">CL</div>
+                      <h4>Nenhum cliente encontrado</h4>
+                      <p>Ajuste a busca ou cadastre um novo cliente acima.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -911,20 +1118,44 @@ const AdminDashboard = () => {
               {hasPermission('verTodosLeads') && (
                 <div className="consultant-summary">
                   <div className="consultant-summary-header">
-                    <h4>Distribuição por consultor</h4>
-                    <p>O sistema divide os novos leads em rodízio para manter a distribuição justa.</p>
+                    <div>
+                      <h4>Distribuição por consultor</h4>
+                      <p>Clique em um consultor para ver somente os leads atribuídos a ele.</p>
+                    </div>
+                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Ver todos os leads</button>
                   </div>
                   <div className="consultant-summary-grid">
                     {leadSummary.porResponsavel.map(user => (
-                      <div key={user.id} className="consultant-card">
+                      <button
+                        type="button"
+                        key={user.id}
+                        className={`consultant-card ${String(leadOwnerFilter) === String(user.id) || String(leadOwnerFilter) === String(user.nome) ? 'active' : ''}`}
+                        onClick={() => setLeadOwnerFilter(user.id)}
+                      >
                         <span>{user.role === 'EQUIPE_TECNICA_COMERCIAL' ? 'Equipe técnica/comercial' : 'Consultor'}</span>
                         <strong>{user.nome}</strong>
                         <p>{user.total} lead{user.total === 1 ? '' : 's'} recebido{user.total === 1 ? '' : 's'}</p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
               )}
+
+              <div className="lead-toolbar">
+                <div className="lead-search-box">
+                  <input
+                    placeholder="Buscar lead por nome, telefone, cidade, status ou responsável"
+                    value={leadSearch}
+                    onChange={(event) => setLeadSearch(event.target.value)}
+                  />
+                </div>
+                <div className="lead-filter-pills" aria-label="Filtros de status">
+                  <button type="button" className={leadStatusFilter === 'todos' ? 'active' : ''} onClick={() => setLeadStatusFilter('todos')}>Todos</button>
+                  {leadStatusOptions.map(status => (
+                    <button type="button" key={status} className={leadStatusFilter === status ? 'active' : ''} onClick={() => setLeadStatusFilter(status)}>{status}</button>
+                  ))}
+                </div>
+              </div>
 
               <form className="activity-panel" onSubmit={registrarAtividade}>
                 <div>
@@ -933,7 +1164,7 @@ const AdminDashboard = () => {
                 </div>
                 <select value={activityForm.leadId} onChange={(event) => setActivityForm(prev => ({ ...prev, leadId: event.target.value }))} required>
                   <option value="">Escolha o lead</option>
-                  {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.nome} - {lead.telefone}</option>)}
+                  {filteredLeads.map(lead => <option key={lead.id} value={lead.id}>{lead.nome} - {lead.telefone}</option>)}
                 </select>
                 <select value={activityForm.tipo} onChange={(event) => setActivityForm(prev => ({ ...prev, tipo: event.target.value }))}>
                   <option>Ligação</option>
@@ -951,7 +1182,7 @@ const AdminDashboard = () => {
               <div className="list-section-header">
                 <div>
                   <h4>Lista de atendimento</h4>
-                  <p>Contatos captados pelo simulador, com responsável e ação rápida.</p>
+                  <p>{filteredLeads.length} lead{filteredLeads.length === 1 ? '' : 's'} na visão atual. Consultores veem apenas os próprios leads.</p>
                 </div>
               </div>
               <div className="table-container leads-table-container">
@@ -970,7 +1201,7 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {leads.map(lead => (
+                    {filteredLeads.map(lead => (
                       <tr key={lead.id}>
                         <td data-label="ID">#{lead.id}</td>
                         <td data-label="Nome" className="font-medium">{lead.nome}</td>
@@ -991,6 +1222,13 @@ const AdminDashboard = () => {
                     ))}
                   </tbody>
                 </table>
+                {filteredLeads.length === 0 && (
+                  <div className="empty-state-orcamento lead-empty-state">
+                    <div className="icon">LD</div>
+                    <h4>Nenhum lead encontrado</h4>
+                    <p>Ajuste a busca, mude o status ou volte para todos os leads.</p>
+                  </div>
+                )}
               </div>
               <div className="activity-feed compact-feed">
                 {atividades.slice(0, 5).map(atividade => (
@@ -1007,9 +1245,23 @@ const AdminDashboard = () => {
           {activeTab === 'orcamentos' && (
             <div className="orcamentos-view-grid">
               <div className="admin-card list-orcamentos">
-                <h3>Simulações</h3>
+                <div className="card-header-flex compact">
+                  <div>
+                    <h3>Simulações</h3>
+                    <p className="muted-text">{filteredOrcamentos.length} de {orcamentos.length} orçamento{orcamentos.length === 1 ? '' : 's'} na lista.</p>
+                  </div>
+                </div>
+                <div className="ops-toolbar single">
+                  <div className="lead-search-box">
+                    <input
+                      placeholder="Buscar por cliente, telefone, cidade ou responsável"
+                      value={orcamentoSearch}
+                      onChange={(event) => setOrcamentoSearch(event.target.value)}
+                    />
+                  </div>
+                </div>
                 <div className="orcamentos-scroll">
-                  {orcamentos.map(orc => (
+                  {filteredOrcamentos.map(orc => (
                     <div
                       key={orc.id}
                       className={`orcamento-item ${selectedOrcamento?.id === orc.id ? 'active' : ''}`}
@@ -1022,6 +1274,12 @@ const AdminDashboard = () => {
                       <span className="orc-date">{orc.data}</span>
                     </div>
                   ))}
+                  {filteredOrcamentos.length === 0 && (
+                    <div className="empty-inline">
+                      <strong>Nenhuma simulação encontrada</strong>
+                      <span>Limpe a busca para voltar a ver todos os orçamentos.</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1112,8 +1370,22 @@ const AdminDashboard = () => {
                     <h3>Fila de análise</h3>
                     <span className="status-badge warning">{contratoSummary.pendentes} pendentes</span>
                   </div>
+                  <div className="ops-toolbar single">
+                    <div className="lead-filter-pills" aria-label="Filtros de contrato">
+                      {['todos', 'Pendente', 'Aprovado', 'Recusado'].map(status => (
+                        <button
+                          type="button"
+                          key={status}
+                          className={contratoStatusFilter === status ? 'active' : ''}
+                          onClick={() => setContratoStatusFilter(status)}
+                        >
+                          {status === 'todos' ? 'Todos' : status}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="orcamentos-scroll contratos-scroll">
-                    {contratos.map(contrato => (
+                    {filteredContratos.map(contrato => (
                       <button
                         key={contrato.id}
                         className={`contrato-item ${selectedContrato?.id === contrato.id ? 'active' : ''}`}
@@ -1128,10 +1400,10 @@ const AdminDashboard = () => {
                         </span>
                       </button>
                     ))}
-                    {contratos.length === 0 && (
+                    {filteredContratos.length === 0 && (
                       <div className="empty-inline">
-                        <strong>Nenhum contrato gerado</strong>
-                        <span>Abra uma simulação e clique em “Gerar contrato”.</span>
+                        <strong>Nenhum contrato nesta visão</strong>
+                        <span>Mude o filtro ou abra uma simulação para gerar contrato.</span>
                       </div>
                     )}
                   </div>
@@ -1707,14 +1979,33 @@ const AdminDashboard = () => {
                 <button className="btn btn-primary" type="submit">Abrir O.S</button>
               </form>
 
+              <div className="ops-toolbar">
+                <div>
+                  <strong>Visão da operação</strong>
+                  <span>{filteredOrdensServico.length} chamado{filteredOrdensServico.length === 1 ? '' : 's'} na visão atual.</span>
+                </div>
+                <div className="lead-filter-pills" aria-label="Filtros de O.S">
+                  {['todos', 'Aberta', 'Em atendimento', 'Aguardando cliente', 'Resolvida'].map(status => (
+                    <button
+                      type="button"
+                      key={status}
+                      className={osStatusFilter === status ? 'active' : ''}
+                      onClick={() => setOsStatusFilter(status)}
+                    >
+                      {status === 'todos' ? 'Todos' : status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="os-grid">
                 {['Aberta', 'Em atendimento', 'Aguardando cliente', 'Resolvida'].map(status => (
                   <div className="os-column" key={status}>
                     <div className="project-column-header">
                       <strong>{status}</strong>
-                      <span>{ordensServico.filter(os => os.status === status).length}</span>
+                      <span>{filteredOrdensServico.filter(os => os.status === status).length}</span>
                     </div>
-                    {ordensServico.filter(os => os.status === status).map(os => (
+                    {filteredOrdensServico.filter(os => os.status === status).map(os => (
                       <div className="os-card" key={os.id}>
                         <div className="project-card-top">
                           <strong>O.S #{os.id}</strong>
@@ -1749,7 +2040,7 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     ))}
-                    {ordensServico.filter(os => os.status === status).length === 0 && (
+                    {filteredOrdensServico.filter(os => os.status === status).length === 0 && (
                       <div className="empty-inline">
                         <strong>Sem O.S</strong>
                         <span>Nenhum chamado aqui.</span>
@@ -1785,8 +2076,57 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              <form className="user-create-panel" onSubmit={createUsuario}>
+                <div>
+                  <h4>Adicionar consultor ao rodízio</h4>
+                  <p>Informe nome e WhatsApp. Se tiver permissão de leads e estiver ativo, já entra automaticamente na distribuição.</p>
+                </div>
+                <input
+                  placeholder="Nome do consultor"
+                  value={newUserForm.nome}
+                  onChange={(event) => setNewUserForm(prev => ({ ...prev, nome: event.target.value }))}
+                  required
+                />
+                <input
+                  placeholder="Usuário. Ex: joao"
+                  value={newUserForm.username}
+                  onChange={(event) => setNewUserForm(prev => ({ ...prev, username: event.target.value }))}
+                  required
+                />
+                <input
+                  placeholder="WhatsApp com DDD"
+                  value={newUserForm.whatsapp}
+                  onChange={(event) => setNewUserForm(prev => ({ ...prev, whatsapp: event.target.value }))}
+                  required
+                />
+                <select value={newUserForm.role} onChange={(event) => setNewUserForm(prev => ({ ...prev, role: event.target.value }))}>
+                  <option value="CONSULTOR">Consultor</option>
+                  <option value="EQUIPE_TECNICA_COMERCIAL">Equipe técnica/comercial</option>
+                  <option value="ADM">Administrador</option>
+                </select>
+                <input
+                  placeholder="Senha temporária opcional"
+                  value={newUserForm.temporaryPassword}
+                  onChange={(event) => setNewUserForm(prev => ({ ...prev, temporaryPassword: event.target.value }))}
+                />
+                <button className="btn btn-primary" type="submit">Adicionar ao rodízio</button>
+              </form>
+
               <div className="user-permissions-list">
-                {usuarios.map(user => (
+                <div className="ops-toolbar">
+                  <div>
+                    <strong>Equipe cadastrada</strong>
+                    <span>{filteredUsuarios.length} de {usuarios.length} usuário{usuarios.length === 1 ? '' : 's'} exibido{usuarios.length === 1 ? '' : 's'}.</span>
+                  </div>
+                  <div className="lead-search-box">
+                    <input
+                      placeholder="Buscar por nome, usuário, e-mail, WhatsApp ou perfil"
+                      value={userSearch}
+                      onChange={(event) => setUserSearch(event.target.value)}
+                    />
+                  </div>
+                </div>
+                {filteredUsuarios.map(user => (
                   <div key={user.id} className="permission-card">
                     <div className="permission-card-header">
                       <div className="permission-user-main">
@@ -1797,7 +2137,15 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                       <div className="permission-meta">
-                        <span className="role-chip">{roleLabels[user.role] || user.role}</span>
+                        <select
+                          className="role-select"
+                          value={user.role}
+                          onChange={(event) => updatePermissions(user.id, user.permissions, user.active, { role: event.target.value })}
+                        >
+                          <option value="ADM">Administrador</option>
+                          <option value="EQUIPE_TECNICA_COMERCIAL">Equipe técnica/comercial</option>
+                          <option value="CONSULTOR">Consultor</option>
+                        </select>
                         {user.mustChangePassword && <span className="pending-chip">Troca pendente</span>}
                         <label className="permission-toggle status-toggle">
                           <input
@@ -1808,6 +2156,18 @@ const AdminDashboard = () => {
                           Ativo
                         </label>
                       </div>
+                    </div>
+                    <div className="permission-contact-row">
+                      <label>
+                        <span>WhatsApp para rodízio</span>
+                        <input
+                          value={user.whatsapp || ''}
+                          placeholder="Ex: 559999999999"
+                          onChange={(event) => setUsuarios(prev => prev.map(item => item.id === user.id ? { ...item, whatsapp: event.target.value } : item))}
+                          onBlur={(event) => updatePermissions(user.id, user.permissions, user.active, { whatsapp: event.target.value, role: user.role, nome: user.nome })}
+                        />
+                      </label>
+                      <small>{user.role !== 'ADM' && user.permissions?.leads && user.active && user.whatsapp ? 'Participando do rodízio de leads.' : 'Não participa do rodízio sem WhatsApp, permissão de leads e usuário ativo.'}</small>
                     </div>
                     <div className="permissions-grid">
                       {Object.entries(permissionLabels).map(([key, label]) => (
@@ -1826,6 +2186,13 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                 ))}
+                {filteredUsuarios.length === 0 && (
+                  <div className="empty-state-orcamento lead-empty-state">
+                    <div className="icon">AC</div>
+                    <h4>Nenhum usuário encontrado</h4>
+                    <p>Limpe a busca para voltar a ver todos os acessos.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

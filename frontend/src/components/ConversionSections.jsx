@@ -1,4 +1,5 @@
 import { makeWhatsAppLink } from '../utils/whatsapp';
+import WhatsAppIcon from './WhatsAppIcon';
 import './ConversionSections.css';
 
 export const TrustBar = () => (
@@ -25,7 +26,10 @@ export const OfferBanner = ({ onOpenSimulation }) => {
         <p><strong>Condição especial:</strong> projeto + homologação com atendimento prioritário até <strong>{deadline}</strong>.</p>
         <div className="offer-actions">
           <button type="button" className="btn btn-primary" onClick={() => onOpenSimulation?.()}>Quero minha condição</button>
-          <a className="btn btn-outline" href={makeWhatsAppLink('oferta_prazo')} target="_blank" rel="noopener noreferrer">Falar com consultor</a>
+          <a className="btn btn-outline btn-whatsapp" href={makeWhatsAppLink('oferta_prazo')} target="_blank" rel="noopener noreferrer">
+            <WhatsAppIcon />
+            Falar com consultor
+          </a>
         </div>
       </div>
     </section>
@@ -56,7 +60,10 @@ export const SocialProof = () => (
           <strong>Economia média: R$ 1.044/mês</strong>
         </article>
       </div>
-      <a className="btn btn-primary" href={makeWhatsAppLink('prova_social')} target="_blank" rel="noopener noreferrer">Quero resultado assim</a>
+      <a className="btn btn-primary btn-whatsapp btn-whatsapp-primary" href={makeWhatsAppLink('prova_social')} target="_blank" rel="noopener noreferrer">
+        <WhatsAppIcon />
+        Quero resultado assim
+      </a>
     </div>
   </section>
 );

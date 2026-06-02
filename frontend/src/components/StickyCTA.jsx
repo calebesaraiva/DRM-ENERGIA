@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { makeWhatsAppLink } from '../utils/whatsapp';
+import WhatsAppIcon from './WhatsAppIcon';
 import './StickyCTA.css';
 
 const StickyCTA = ({ onOpenSimulation }) => {
@@ -38,7 +39,8 @@ const StickyCTA = ({ onOpenSimulation }) => {
         <button className="btn btn-primary sticky-btn btn-simular" type="button" onClick={handleOpenSimulation}>
           Simular economia
         </button>
-        <a className="btn btn-outline sticky-btn" href={makeWhatsAppLink('cta_fixo')} target="_blank" rel="noopener noreferrer">
+        <a className="btn btn-outline btn-whatsapp sticky-btn" href={makeWhatsAppLink('cta_fixo')} target="_blank" rel="noopener noreferrer">
+          <WhatsAppIcon />
           WhatsApp agora
         </a>
       </div>
@@ -56,7 +58,8 @@ const StickyCTA = ({ onOpenSimulation }) => {
             <button className="btn btn-primary btn-simular sticky-btn" type="button" onClick={() => { handleOpenSimulation(); setMobileOpen(false); }}>
               Simular economia
             </button>
-            <a className="btn btn-outline sticky-btn mobile-wa-btn" href={makeWhatsAppLink('popup_mobile')} target="_blank" rel="noopener noreferrer" onClick={() => setMobileOpen(false)}>
+            <a className="btn btn-outline btn-whatsapp sticky-btn mobile-wa-btn" href={makeWhatsAppLink('popup_mobile')} target="_blank" rel="noopener noreferrer" onClick={() => setMobileOpen(false)}>
+              <WhatsAppIcon />
               WhatsApp agora
             </a>
           </div>

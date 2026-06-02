@@ -1,5 +1,6 @@
 import './HowItWorks.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
+import WhatsAppIcon from './WhatsAppIcon';
 
 const HowItWorks = ({ onOpenSimulation }) => {
   const steps = [
@@ -18,7 +19,10 @@ const HowItWorks = ({ onOpenSimulation }) => {
             <p className="section-desc text-left">Nós cuidamos de tudo, do projeto à homologação.</p>
             <div className="section-cta-row">
               <button type="button" className="btn btn-primary mt-4" onClick={() => onOpenSimulation?.()}>Receber estudo gratuito</button>
-              <a href={makeWhatsAppLink('secao_como_funciona')} className="btn btn-outline mt-4" target="_blank" rel="noopener noreferrer">Falar com especialista</a>
+              <a href={makeWhatsAppLink('secao_como_funciona')} className="btn btn-outline btn-whatsapp mt-4" target="_blank" rel="noopener noreferrer">
+                <WhatsAppIcon />
+                Falar com especialista
+              </a>
             </div>
           </div>
 

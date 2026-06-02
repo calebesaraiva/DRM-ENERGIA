@@ -3,6 +3,7 @@ import ImageSlider from './ImageSlider';
 import './ProjectGallery.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
 import { withApiBase } from '../utils/apiBase';
+import WhatsAppIcon from './WhatsAppIcon';
 
 const ProjectGallery = ({ onOpenSimulation }) => {
   const [projects, setProjects] = useState([]);
@@ -96,7 +97,10 @@ const ProjectGallery = ({ onOpenSimulation }) => {
 
         <div className="section-cta-row">
           <button className="btn btn-primary" type="button" onClick={() => onOpenSimulation?.()}>Quero um projeto assim</button>
-          <a className="btn btn-outline" href={makeWhatsAppLink('secao_projetos')} target="_blank" rel="noopener noreferrer">Ver condições no WhatsApp</a>
+          <a className="btn btn-outline btn-whatsapp" href={makeWhatsAppLink('secao_projetos')} target="_blank" rel="noopener noreferrer">
+            <WhatsAppIcon />
+            Ver condições no WhatsApp
+          </a>
         </div>
       </div>
     </section>

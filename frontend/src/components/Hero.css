@@ -271,7 +271,7 @@
 @media (max-width: 768px) {
   .hero {
     min-height: auto;
-    padding: 96px 0 80px;
+    padding: 92px 0 72px;
   }
 
   .hero-text-box {
@@ -286,7 +286,7 @@
   .hero-description {
     font-size: 0.95rem;
     margin-bottom: 1.1rem;
-    max-width: 34ch;
+    max-width: 100%;
   }
 
   .hero-proof {
@@ -296,7 +296,8 @@
   }
 
   .hero-proof article {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr;
     gap: 0.55rem;
     align-items: baseline;
     padding: 0.6rem 0.75rem;
@@ -375,7 +376,7 @@
 
 @media (max-width: 420px) {
   .hero {
-    padding: 82px 0 68px;
+    padding: 78px 0 64px;
   }
 
   .hero-title {
@@ -389,7 +390,7 @@
 
   .hero-description {
     font-size: 0.86rem;
-    max-width: 34ch;
+    max-width: 100%;
   }
 
   .solar-orbit-scene {

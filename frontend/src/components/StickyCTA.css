@@ -21,6 +21,12 @@
   min-height: 44px;
 }
 
+.sticky-cta .btn-whatsapp {
+  border: 0;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 64%, #4ade80 100%);
+  color: #fff;
+}
+
 .mobile-cta-trigger,
 .mobile-cta-popup-backdrop {
   display: none;
@@ -60,7 +66,7 @@
     letter-spacing: 0.01em;
     border-radius: 999px;
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.18) inset;
-    animation: mobileFabPop 0.35s ease;
+    animation: mobileFabPop 0.35s ease, mobileFabBreathe 2.6s ease-in-out infinite 0.4s;
   }
 
   .mobile-cta-popup-backdrop {
@@ -133,7 +139,9 @@
   }
 
   .mobile-wa-btn {
-    color: #1f2937;
+    border: 0;
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 64%, #4ade80 100%);
+    color: #fff;
   }
 }
 
@@ -145,4 +153,15 @@
 @keyframes mobileFabPop {
   from { opacity: 0; transform: translateY(8px) scale(0.94); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mobileFabBreathe {
+  0%, 100% { box-shadow: 0 12px 24px rgba(15, 23, 42, 0.28), 0 0 0 0 rgba(234, 122, 31, 0.2); }
+  50% { box-shadow: 0 16px 32px rgba(15, 23, 42, 0.34), 0 0 0 7px rgba(234, 122, 31, 0.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-cta-trigger {
+    animation: none;
+  }
 }

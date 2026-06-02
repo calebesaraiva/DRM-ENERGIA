@@ -1,5 +1,6 @@
 import './Benefits.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
+import WhatsAppIcon from './WhatsAppIcon';
 
 const Benefits = ({ onOpenSimulation }) => {
   const benefitsList = [
@@ -34,7 +35,10 @@ const Benefits = ({ onOpenSimulation }) => {
 
         <div className="section-cta-row">
           <button className="btn btn-primary" type="button" onClick={() => onOpenSimulation?.()}>Quero reduzir minha conta</button>
-          <a className="btn btn-outline" href={makeWhatsAppLink('secao_beneficios')} target="_blank" rel="noopener noreferrer">Tirar dúvidas no WhatsApp</a>
+          <a className="btn btn-outline btn-whatsapp" href={makeWhatsAppLink('secao_beneficios')} target="_blank" rel="noopener noreferrer">
+            <WhatsAppIcon />
+            Tirar dúvidas no WhatsApp
+          </a>
         </div>
       </div>
     </section>

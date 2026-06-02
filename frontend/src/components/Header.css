@@ -23,6 +23,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.8rem;
+  min-width: 0;
 }
 
 .logo-img {
@@ -41,6 +42,7 @@
   display: flex;
   align-items: center;
   gap: 1.2rem;
+  min-width: 0;
 }
 
 .nav-links {
@@ -63,6 +65,7 @@
   display: flex;
   gap: 0.55rem;
   align-items: center;
+  min-width: 0;
 }
 
 .login-btn,
@@ -89,6 +92,8 @@
 
   .main-nav {
     gap: 0.55rem;
+    flex: 1;
+    justify-content: flex-end;
   }
 
   .nav-links {
@@ -112,13 +117,14 @@
 
   .user-actions {
     gap: 0.4rem;
+    flex-shrink: 0;
   }
 }
 
 @media (max-width: 420px) {
   .logo-img {
     max-height: 56px;
-    max-width: 142px;
+    max-width: 128px;
   }
 
   .login-btn,
