@@ -9,7 +9,7 @@
   background:
     radial-gradient(circle at 20% 20%, rgba(249, 115, 22, 0.24), transparent 30%),
     rgba(0, 0, 0, 0.76);
-  overflow: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
 
@@ -17,7 +17,7 @@
   position: relative;
   width: min(760px, 100%);
   max-height: min(90vh, 820px);
-  overflow: hidden;
+  overflow-y: auto;
   overflow-x: hidden;
   background: var(--cor-secundaria);
   border: 1px solid rgba(249, 115, 22, 0.34);
