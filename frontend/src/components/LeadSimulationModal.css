@@ -1004,11 +1004,15 @@
   .lead-modal-backdrop {
     align-items: center;
     padding: 0.55rem;
+    overflow: hidden;
   }
 
   .lead-modal {
+    display: flex;
+    flex-direction: column;
     width: min(560px, calc(100vw - 1.1rem));
     max-height: min(95dvh, 840px);
+    overflow: hidden;
     border-right: 1px solid rgba(249, 115, 22, 0.34);
     border-bottom: 1px solid rgba(249, 115, 22, 0.34);
     border-left: 1px solid rgba(249, 115, 22, 0.34);
@@ -1024,6 +1028,7 @@
   }
 
   .lead-modal-header {
+    flex: 0 0 auto;
     margin-bottom: 0.78rem;
     padding-right: 2.55rem;
   }
@@ -1050,6 +1055,11 @@
   }
 
   .lead-modal-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     gap: 0.7rem;
   }
 
@@ -1072,8 +1082,8 @@
   }
 
   .lead-result-grid {
-    grid-template-columns: 1fr;
-    gap: 0.48rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.42rem;
   }
 
   .lead-radio-grid {
@@ -1082,8 +1092,9 @@
 
   .lead-modal-actions,
   .lead-result-actions {
+    flex: 0 0 auto;
     flex-direction: column;
-    margin-top: 0.75rem;
+    margin-top: auto;
     padding-bottom: env(safe-area-inset-bottom);
   }
 
@@ -1101,7 +1112,12 @@
   }
 
   .lead-result {
-    gap: 0.68rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.58rem;
   }
 
   .lead-final-hero {
@@ -1161,6 +1177,7 @@
   }
 
   .lead-conversion-stage {
+    flex: 0 0 auto;
     grid-template-columns: 1fr;
     gap: 0.48rem;
     padding: 0.52rem;
@@ -1237,6 +1254,18 @@
     text-align: center;
   }
 
+  .lead-step-2 .lead-trust-copy,
+  .lead-step-2 .lead-proof-strip {
+    display: none;
+  }
+
+  .lead-step-2 .lead-urgency-note {
+    margin-top: -0.12rem;
+    padding: 0.42rem 0.58rem;
+    font-size: 0.74rem;
+    line-height: 1.22;
+  }
+
   .lead-result-price strong {
     max-width: 100%;
     white-space: nowrap;
@@ -1269,24 +1298,28 @@
 
   .lead-result-grid div {
     min-height: 0;
-    padding: 0.72rem 0.78rem;
-    border-radius: 14px;
+    padding: 0.55rem 0.42rem;
+    border-radius: 12px;
+    align-items: center;
+    text-align: center;
   }
 
   .lead-result-grid strong {
-    font-size: clamp(1.38rem, 6.3vw, 1.75rem);
+    font-size: clamp(0.98rem, 4.6vw, 1.28rem);
     margin-top: 0.28rem;
+    word-break: normal;
   }
 
   .lead-metric-icon {
-    width: 34px;
-    height: 34px;
-    margin-bottom: 0.42rem;
+    width: 28px;
+    height: 28px;
+    margin-bottom: 0.3rem;
   }
 
   .lead-result-grid span {
     margin-bottom: 0.18rem;
-    font-size: 0.82rem;
+    font-size: 0.68rem;
+    line-height: 1.15;
   }
 
   .lead-proof-strip {
@@ -1338,7 +1371,8 @@
 @media (max-width: 380px), (max-height: 720px) {
   .lead-modal {
     width: calc(100vw - 1rem);
-    max-height: 94dvh;
+    max-height: 95dvh;
+    overflow: hidden;
     border-radius: 16px;
     padding: 0.68rem;
   }
@@ -1424,12 +1458,12 @@
   }
 
   .lead-result-grid strong {
-    font-size: clamp(1.42rem, 7.5vw, 1.86rem);
+    font-size: clamp(0.86rem, 4.2vw, 1.08rem);
   }
 
   .lead-modal-actions,
   .lead-result-actions {
-    margin-top: 0.6rem;
+    margin-top: auto;
   }
 
   .lead-whatsapp-icon {
@@ -1455,13 +1489,11 @@
   }
 
   .lead-trust-copy {
-    font-size: 0.68rem;
-    line-height: 1.32;
+    display: none;
   }
 
   .lead-urgency-note {
-    font-size: 0.68rem;
-    padding: 0.34rem 0.46rem;
+    display: none;
   }
 
   .lead-result-price {
@@ -1470,11 +1502,25 @@
   }
 
   .lead-final-visual {
-    min-height: 84px;
+    display: none;
   }
 
   .lead-proof-strip-final {
     display: none;
+  }
+
+  .lead-result-grid {
+    gap: 0.34rem;
+  }
+
+  .lead-result-grid div {
+    padding: 0.42rem 0.28rem;
+  }
+
+  .lead-metric-icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 0.18rem;
   }
 }
 

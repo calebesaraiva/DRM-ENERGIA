@@ -2255,6 +2255,9 @@
 }
 
 .contract-modal {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   width: min(780px, 100%);
   max-height: 92dvh;
   overflow-y: auto;
@@ -2268,6 +2271,9 @@
 }
 
 .quick-modal {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   width: min(760px, 100%);
   max-height: 88dvh;
   overflow-y: auto;
@@ -2421,6 +2427,9 @@
 }
 
 .contract-modal-header {
+  position: sticky;
+  top: -1.35rem;
+  z-index: 3;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -2428,6 +2437,7 @@
   margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid #e6eaf0;
+  background: linear-gradient(180deg, #fff 78%, rgba(255, 255, 255, 0.92));
 }
 
 .lead-modal-close {
@@ -2515,12 +2525,16 @@
 }
 
 .contract-modal-actions {
+  position: sticky;
+  bottom: -1.35rem;
+  z-index: 3;
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #e6eaf0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), #fff 42%);
 }
 
 .finance-dashboard {
