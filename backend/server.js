@@ -1433,7 +1433,15 @@ app.post('/api/simulacao-publica', async (req, res) => {
     const resultadoCompleto = calcularSimulacaoSolar(simulacao);
     const dataCadastro = new Date().toISOString().split('T')[0];
     const owner = await getNextLeadOwner();
-    const whatsappMessage = `Olá ${owner?.nome || 'DRM Energia Solar'}, acabei de fazer a simulação no site e quero fechar meu projeto solar. Nome: ${leadData.nome}. Cidade: ${leadData.cidade}. Conta média: R$ ${simulacao?.contaEnergia || '-'}.`;
+    const whatsappMessage = [
+      `Olá ${owner?.nome || 'DRM Energia Solar'}! Acabei de fazer minha simulação no site da DRM Energia Solar e quero receber minha proposta completa.`,
+      '',
+      `Meu nome: ${leadData.nome}`,
+      `Cidade: ${leadData.cidade}`,
+      `Conta média de energia: R$ ${simulacao?.contaEnergia || '-'}`,
+      '',
+      'Pode me atender agora e me explicar as melhores condições para instalar energia solar?'
+    ].join('\n');
     const whatsappUrl = buildWhatsAppLink(owner?.whatsapp, whatsappMessage);
 
     const leadResult = await db.run(

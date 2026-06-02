@@ -101,6 +101,12 @@ const getResponsibleName = (name) => name || 'Aguardando distribuição';
 const dateBr = (value) => value ? new Date(value).toLocaleDateString('pt-BR') : 'Sem data';
 const currencyToNumber = (value) => Number(String(value || '').replace(/\D/g, '')) / 100;
 const maskCurrency = (value) => money(currencyToNumber(value));
+const whatsappLeadMessage = (lead = {}) => encodeURIComponent(
+  `Olá ${lead.nome || ''}! Sou da DRM Energia Solar. Vi sua simulação no nosso site e quero te passar as melhores condições para você economizar na conta de energia. Podemos conversar agora?`
+);
+const whatsappClientMessage = (cliente = {}) => encodeURIComponent(
+  `Olá ${cliente.nome || ''}! Sou da DRM Energia Solar. Quero falar com você sobre sua proposta de energia solar e te ajudar com as próximas etapas.`
+);
 
 const emptyContractManual = {
   geracaoKwh: '',
@@ -1096,7 +1102,7 @@ const AdminDashboard = () => {
                     <tbody>
                       {clientSummary.filtered.map(c => {
                         const whatsappDigits = String(c.whatsapp || '').replace(/\D/g, '');
-                        const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}` : '';
+                        const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}?text=${whatsappClientMessage(c)}` : '';
                         return (
                           <tr key={c.id}>
                             <td data-label="ID">#{c.id}</td>
@@ -1252,7 +1258,7 @@ const AdminDashboard = () => {
                           <div className="table-actions">
                             <button className="btn btn-outline btn-sm-admin" onClick={() => updateLeadStatus(lead.id, 'Em atendimento')}>Atender</button>
                             <button className="btn btn-outline btn-sm-admin" onClick={() => updateLeadStatus(lead.id, 'Proposta enviada')}>Proposta</button>
-                            <a className="btn btn-primary btn-sm-admin" href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                            <a className="btn btn-primary btn-sm-admin" href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
                           </div>
                         </td>
                       </tr>
@@ -1517,7 +1523,7 @@ const AdminDashboard = () => {
                             </a>
                             <a
                               className="btn btn-primary"
-                              href={`https://wa.me/55${String(selectedContrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato DRM Solar foi aprovado. Vou te enviar o arquivo para conferência.')}`}
+                              href={`https://wa.me/55${String(selectedContrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência e te orientar nos próximos passos da instalação.')}`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >
@@ -2071,7 +2077,7 @@ const AdminDashboard = () => {
                         />
                         <div className="table-actions">
                           {os.clienteTelefone && (
-                            <a className="btn btn-outline btn-sm-admin" href={`https://wa.me/55${String(os.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Estamos acompanhando sua O.S #${os.id} na DRM Solar.`)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                            <a className="btn btn-outline btn-sm-admin" href={`https://wa.me/55${String(os.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Sou da DRM Energia Solar. Estamos acompanhando sua O.S #${os.id} e vou te atualizar sobre o atendimento.`)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
                           )}
                           <button className="btn btn-primary btn-sm-admin" onClick={() => updateOrdemServico(os.id, { status: 'Resolvida' })}>Resolver</button>
                         </div>
@@ -2258,7 +2264,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="table-actions">
                       <button className="btn btn-outline btn-sm-admin" onClick={() => updateLeadStatus(lead.id, 'Em atendimento')}>Atender</button>
-                      {lead.telefone && <a className="btn btn-primary btn-sm-admin" href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                      {lead.telefone && <a className="btn btn-primary btn-sm-admin" href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
                     </div>
                   </div>
                 ))}
@@ -2350,7 +2356,7 @@ const AdminDashboard = () => {
                           <strong>O.S #{os.id} • {os.clienteNome}</strong>
                           <span>{os.status} • {os.prioridade} • {os.problema}</span>
                         </div>
-                        {os.clienteTelefone && <a className="btn btn-outline btn-sm-admin" href={`https://wa.me/55${String(os.clienteTelefone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                        {os.clienteTelefone && <a className="btn btn-outline btn-sm-admin" href={`https://wa.me/55${String(os.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Sou da DRM Energia Solar. Estou entrando em contato sobre sua O.S #${os.id} para dar continuidade ao atendimento.`)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
                       </div>
                       <div className="quick-project-actions">
                         <button type="button" onClick={() => updateOrdemServico(os.id, { status: 'Em atendimento' })}>Atender</button>
