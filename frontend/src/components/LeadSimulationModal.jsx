@@ -135,6 +135,8 @@ function LeadSimulationModal({ isOpen, onClose }) {
           setAssignedWhatsAppUrl(makeWhatsAppLink('resultado_modal_fallback', 'Olá, acabei de fazer a simulação e quero fechar meu projeto solar.'));
           setAssignedOwnerName('');
           setIsFallbackResult(true);
+          localStorage.setItem('leadSimulationCompleted', '1');
+          window.dispatchEvent(new Event('lead-simulation-completed'));
           setStep(3);
           return;
         }
@@ -146,6 +148,8 @@ function LeadSimulationModal({ isOpen, onClose }) {
       setAssignedWhatsAppUrl(data?.whatsapp?.url || makeWhatsAppLink('resultado_modal', 'Olá, acabei de fazer a simulação e quero fechar meu projeto solar.'));
       setAssignedOwnerName(data?.assignedOwner?.nome || '');
       setIsFallbackResult(false);
+      localStorage.setItem('leadSimulationCompleted', '1');
+      window.dispatchEvent(new Event('lead-simulation-completed'));
       setStep(3);
     } catch (err) {
       setError(err.message);
