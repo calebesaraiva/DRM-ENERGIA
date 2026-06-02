@@ -327,12 +327,12 @@ function LeadSimulationModal({ isOpen, onClose }) {
                 <span>Valor aproximado do projeto</span>
                 <strong>{formatMoney(result?.financeiro?.preco_final_cliente_rs || preview?.projeto || 0)}</strong>
               </div>
-              <div className="lead-result-price-icon lead-final-price-icon" aria-hidden="true">☀</div>
+              <div className="lead-result-price-icon lead-final-price-icon lead-icon-sun" aria-hidden="true"></div>
             </div>
 
             <div className="lead-result-grid">
               <div className="lead-metric-card">
-                <div className="lead-metric-icon">⚡</div>
+                <div className="lead-metric-icon lead-icon-bolt" aria-hidden="true"></div>
                 <span>Potência instalada</span>
                 <strong>
                   {result?.dimensionamento?.potencia_real_instalada_kwp
@@ -341,12 +341,12 @@ function LeadSimulationModal({ isOpen, onClose }) {
                 </strong>
               </div>
               <div className="lead-metric-card">
-                <div className="lead-metric-icon">▦</div>
+                <div className="lead-metric-icon lead-icon-panels" aria-hidden="true"></div>
                 <span>Quantidade de painéis</span>
                 <strong>{result?.dimensionamento?.numero_paineis_necessarios ? formatNumber(result.dimensionamento.numero_paineis_necessarios) : '-'}</strong>
               </div>
               <div className="lead-metric-card">
-                <div className="lead-metric-icon">↗</div>
+                <div className="lead-metric-icon lead-icon-generation" aria-hidden="true"></div>
                 <span>Geração estimada</span>
                 <strong>
                   {result?.dimensionamento?.geracao_estimada_kwh
