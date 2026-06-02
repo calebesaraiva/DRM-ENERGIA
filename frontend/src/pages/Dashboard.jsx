@@ -63,11 +63,18 @@ function Dashboard() {
       <header className="dash-header">
         <div className="container dash-header-content">
           <Link to="/">
-            <img src="/assets/logo.png" alt="Logo" className="logo-img" style={{ height: '40px' }} />
+            <img
+              src="/assets/logo.png"
+              alt="Logo"
+              className="logo-img"
+              style={{ height: '40px' }}
+            />
           </Link>
           <div className="dash-user-actions">
             <div className="user-avatar">{user ? user.nome.charAt(0).toUpperCase() : '?'}</div>
-            <button onClick={handleLogout} className="btn btn-outline btn-sm">Sair</button>
+            <button onClick={handleLogout} className="btn btn-outline btn-sm">
+              Sair
+            </button>
           </div>
         </div>
       </header>
@@ -78,7 +85,9 @@ function Dashboard() {
           <div className="dash-card">
             <div className="card-header">
               <h2>Simule sua Economia</h2>
-              <p>Preencha os dados abaixo para obter uma estimativa do seu sistema de energia solar.</p>
+              <p>
+                Preencha os dados abaixo para obter uma estimativa do seu sistema de energia solar.
+              </p>
             </div>
             <SimulationForm onResults={handleSetResults} />
           </div>
@@ -92,22 +101,37 @@ function Dashboard() {
                   <div className="metric-box highlight">
                     <span className="metric-title">Valor do Projeto</span>
                     <div className="metric-value">
-                      R$ {simulationResults.financeiro.preco_final_cliente_rs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      R${' '}
+                      {simulationResults.financeiro.preco_final_cliente_rs.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </div>
                   </div>
                   <div className="metric-box">
                     <span className="metric-title">Potência Instalada</span>
-                    <div className="metric-value">{simulationResults.dimensionamento.potencia_real_instalada_kwp} <span>kWp</span></div>
+                    <div className="metric-value">
+                      {simulationResults.dimensionamento.potencia_real_instalada_kwp}{' '}
+                      <span>kWp</span>
+                    </div>
                   </div>
                   <div className="metric-box">
                     <span className="metric-title">Nº de Painéis</span>
-                    <div className="metric-value">{simulationResults.dimensionamento.numero_paineis_necessarios}</div>
+                    <div className="metric-value">
+                      {simulationResults.dimensionamento.numero_paineis_necessarios}
+                    </div>
                   </div>
                 </div>
                 <div className="chat-teaser">
                   <h4>O que fazer agora?</h4>
-                  <p>Salve seu orçamento para que nossos consultores possam analisá-lo ou entre em contato agora mesmo.</p>
-                  <div className="results-actions" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                  <p>
+                    Salve seu orçamento para que nossos consultores possam analisá-lo ou entre em
+                    contato agora mesmo.
+                  </p>
+                  <div
+                    className="results-actions"
+                    style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}
+                  >
                     <button
                       onClick={handleSaveOrcamento}
                       className="btn btn-outline"
@@ -124,15 +148,35 @@ function Dashboard() {
                       Falar com Consultor
                     </a>
                   </div>
-                  {saveMessage && <p className="save-message" style={{ marginTop: '1rem', fontSize: '0.9rem', color: 'var(--cor-texto-mutado)' }}>{saveMessage}</p>}
+                  {saveMessage && (
+                    <p
+                      className="save-message"
+                      style={{
+                        marginTop: '1rem',
+                        fontSize: '0.9rem',
+                        color: 'var(--cor-texto-mutado)',
+                      }}
+                    >
+                      {saveMessage}
+                    </p>
+                  )}
                 </div>
-                <button onClick={handleNewSimulation} className="btn-voltar" style={{ marginTop: '1.5rem' }}>Fazer nova simulação</button>
+                <button
+                  onClick={handleNewSimulation}
+                  className="btn-voltar"
+                  style={{ marginTop: '1.5rem' }}
+                >
+                  Fazer nova simulação
+                </button>
               </div>
             ) : (
               <div className="empty-state">
                 <div className="empty-icon">☀️</div>
                 <h3>Aguardando sua simulação</h3>
-                <p>Os resultados da sua economia aparecerão aqui assim que você preencher o formulário ao lado.</p>
+                <p>
+                  Os resultados da sua economia aparecerão aqui assim que você preencher o
+                  formulário ao lado.
+                </p>
               </div>
             )}
           </div>
