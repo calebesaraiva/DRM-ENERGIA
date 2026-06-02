@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 
 // Import de componentes e helpers
@@ -7,6 +7,7 @@ import Footer from './components/Footer.jsx';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import StickyCTA from './components/StickyCTA.jsx';
+import { initSiteAnalytics, trackSiteEvent } from './utils/analytics';
 
 // Lazy loading das páginas para melhor performance
 const Home = React.lazy(() => import('./pages/Home'));
@@ -26,6 +27,16 @@ const LoadingFallback = () => (
 function AppShell() {
   const location = useLocation();
   const isSystemRoute = ['/admin', '/dashboard', '/orcamento', '/alterar-senha'].some(path => location.pathname.startsWith(path));
+
+  useEffect(() => {
+    initSiteAnalytics();
+  }, []);
+
+  useEffect(() => {
+    if (!isSystemRoute) {
+      trackSiteEvent('page_view', 'route_change', { path: location.pathname });
+    }
+  }, [isSystemRoute, location.pathname]);
 
   return (
     <>

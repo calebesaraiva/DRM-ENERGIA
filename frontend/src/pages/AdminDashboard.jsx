@@ -92,6 +92,10 @@ const money = (value) => Number(value || 0).toLocaleString('pt-BR', {
   style: 'currency',
   currency: 'BRL',
 });
+const percent = (value) => `${((Number(value || 0)) * 100).toLocaleString('pt-BR', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})}%`;
 
 const getResponsibleName = (name) => name || 'Aguardando distribuição';
 const dateBr = (value) => value ? new Date(value).toLocaleDateString('pt-BR') : 'Sem data';
@@ -912,6 +916,30 @@ const AdminDashboard = () => {
                 <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('projetos')}><span>Contratos aprovados</span><strong>{resumo.kpis?.contratosAprovados || 0}</strong><p>Viraram projeto de execução.</p></button>
               </div>
 
+              {adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM' ? (
+                <>
+                  <div className="section-heading analytics-heading">
+                    <div>
+                      <span className="section-kicker">Métricas do site</span>
+                      <h3>Cliques e conversão da LP</h3>
+                      <p>Acompanhe visitas, intenção de simular e procura pelo WhatsApp nos últimos 30 dias.</p>
+                    </div>
+                    <div className="section-stats">
+                      <div><strong>{resumo.siteAnalytics?.visitas7d || 0}</strong><span>visitas 7 dias</span></div>
+                      <div><strong>{resumo.siteAnalytics?.whatsapp7d || 0}</strong><span>WhatsApp 7 dias</span></div>
+                      <div><strong>{resumo.siteAnalytics?.concluidas7d || 0}</strong><span>simulações 7 dias</span></div>
+                    </div>
+                  </div>
+
+                  <div className="crm-kpi-grid analytics-kpi-grid">
+                    <div className="crm-kpi-card analytics-card"><span>Visitas no site</span><strong>{resumo.kpis?.visitasSite30d || 0}</strong><p>Total de páginas abertas nos últimos 30 dias.</p></div>
+                    <div className="crm-kpi-card analytics-card"><span>Cliques no WhatsApp</span><strong>{resumo.kpis?.clicksWhatsApp30d || 0}</strong><p>{percent(resumo.siteAnalytics?.conversaoWhatsApp30d)} de conversão por visita.</p></div>
+                    <div className="crm-kpi-card analytics-card"><span>Cliques em simular</span><strong>{resumo.kpis?.clicksSimular30d || 0}</strong><p>Pessoas que abriram intenção de calcular economia.</p></div>
+                    <div className="crm-kpi-card analytics-card"><span>Simulações concluídas</span><strong>{resumo.kpis?.simulacoesConcluidas30d || 0}</strong><p>{percent(resumo.siteAnalytics?.conversaoSimulacao30d)} concluem após clicar em simular.</p></div>
+                  </div>
+                </>
+              ) : null}
+
               <div className="crm-grid">
                 <div className="admin-card">
                   <div className="card-header-flex compact">
@@ -930,16 +958,25 @@ const AdminDashboard = () => {
 
                 <div className="admin-card">
                   <div className="card-header-flex compact">
-                    <h3>Projetos por etapa</h3>
-                    <button className="btn btn-outline btn-sm-admin" onClick={() => setActiveTab('projetos')}>Abrir projetos</button>
+                    <h3>{adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM' ? 'Origem dos cliques' : 'Projetos por etapa'}</h3>
+                    {adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM'
+                      ? <span className="status-badge success">30 dias</span>
+                      : <button className="btn btn-outline btn-sm-admin" onClick={() => setActiveTab('projetos')}>Abrir projetos</button>}
                   </div>
                   <div className="pipeline-list">
-                    {(resumo.projetosPorEtapa || []).map(item => (
-                      <div className="pipeline-item" key={item.etapa}>
-                        <div><strong>{item.etapa}</strong><span>{item.total} projeto{item.total === 1 ? '' : 's'}</span></div>
-                        <div className="pipeline-bar orange"><span style={{ width: `${Math.min((item.total / Math.max(resumo.kpis?.projetosAtivos || 1, 1)) * 100, 100)}%` }}></span></div>
+                    {(adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM'
+                      ? (resumo.siteAnalytics?.topSources || [])
+                      : (resumo.projetosPorEtapa || [])
+                    ).map(item => (
+                      <div className="pipeline-item" key={item.source || item.etapa}>
+                        <div>
+                          <strong>{item.source || item.etapa}</strong>
+                          <span>{item.total} {item.source ? 'evento' : 'projeto'}{item.total === 1 ? '' : 's'}</span>
+                        </div>
+                        <div className="pipeline-bar orange"><span style={{ width: `${Math.min((item.total / Math.max(resumo.siteAnalytics?.totalEventos30d || resumo.kpis?.projetosAtivos || 1, 1)) * 100, 100)}%` }}></span></div>
                       </div>
                     ))}
+                    {(adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM') && (resumo.siteAnalytics?.topSources || []).length === 0 && <p className="muted-text">As métricas começam a aparecer após os primeiros acessos.</p>}
                   </div>
                 </div>
               </div>

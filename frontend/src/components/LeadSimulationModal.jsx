@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import './LeadSimulationModal.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
 import { withApiBase } from '../utils/apiBase';
+import { trackSiteEvent } from '../utils/analytics';
 
 const initialLead = { nome: '', telefone: '', cidade: '' };
 const initialSimulation = { contaEnergia: '' };
@@ -137,6 +138,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
           setIsFallbackResult(true);
           localStorage.setItem('leadSimulationCompleted', '1');
           window.dispatchEvent(new Event('lead-simulation-completed'));
+          trackSiteEvent('simulation_completed', 'modal_fallback', { cidade: lead.cidade, conta: simulation.contaEnergia });
           setStep(3);
           return;
         }
@@ -150,6 +152,11 @@ function LeadSimulationModal({ isOpen, onClose }) {
       setIsFallbackResult(false);
       localStorage.setItem('leadSimulationCompleted', '1');
       window.dispatchEvent(new Event('lead-simulation-completed'));
+      trackSiteEvent('simulation_completed', 'modal_success', {
+        cidade: lead.cidade,
+        conta: simulation.contaEnergia,
+        consultor: data?.assignedOwner?.nome || '',
+      });
       setStep(3);
     } catch (err) {
       setError(err.message);

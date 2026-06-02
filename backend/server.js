@@ -124,7 +124,7 @@ const INTERNAL_USERS = [
     nome: 'Rene Jr',
     username: 'renejr',
     email: 'renejr@drm.local',
-    whatsapp: process.env.WHATSAPP_RENEJR || '559985127056',
+    whatsapp: process.env.WHATSAPP_RENEJR || '5599985127056',
     role: 'EQUIPE_TECNICA_COMERCIAL',
     temporaryPassword: 'ReneJr@DRM#2026',
     permissions: {
@@ -141,7 +141,7 @@ const INTERNAL_USERS = [
     nome: 'Gleyson',
     username: 'gleyson',
     email: 'gleyson@drm.local',
-    whatsapp: process.env.WHATSAPP_GLEYSON || '559984632324',
+    whatsapp: process.env.WHATSAPP_GLEYSON || '5599984632324',
     role: 'CONSULTOR',
     temporaryPassword: 'Gleyson@DRM#2026',
     permissions: {
@@ -155,7 +155,7 @@ const INTERNAL_USERS = [
     nome: 'Carlito Lopes',
     username: 'carlito',
     email: 'carlito@drm.local',
-    whatsapp: process.env.WHATSAPP_CARLITO || '55992276744',
+    whatsapp: process.env.WHATSAPP_CARLITO || '559992276744',
     role: 'CONSULTOR',
     temporaryPassword: 'Carlito@DRM#2026',
     permissions: {
@@ -1173,6 +1173,17 @@ const buildContratoHtml = async (contrato) => {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS site_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      source TEXT,
+      path TEXT,
+      metadata TEXT,
+      userAgent TEXT,
+      ip TEXT,
+      createdAt TEXT
+    );
   `);
 
   const orcamentoColumns = await db.all('PRAGMA table_info(orcamentos)');
@@ -1254,8 +1265,7 @@ const buildContratoHtml = async (contrato) => {
       );
     } else if (user.whatsapp) {
       await db.run(
-        'UPDATE usuarios SET whatsapp = COALESCE(NULLIF(whatsapp, ?), ?) WHERE username = ?',
-        '',
+        'UPDATE usuarios SET whatsapp = ? WHERE username = ?',
         normalizeWhatsAppPhone(user.whatsapp),
         user.username
       );
@@ -1373,6 +1383,36 @@ app.post('/api/calcular', async (req, res) => {
   } catch (error) {
     console.error('ERRO NO CÁLCULO DA SIMULAÇÃO:', error);
     res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Ocorreu um erro interno no servidor ao processar a simulação.' });
+  }
+});
+
+app.post('/api/site-events', async (req, res) => {
+  try {
+    const type = String(req.body?.type || '').trim().slice(0, 60);
+    const source = String(req.body?.source || 'site').trim().slice(0, 120);
+    const path = String(req.body?.path || '').trim().slice(0, 220);
+    const metadata = JSON.stringify(req.body?.metadata || {});
+
+    if (!type) {
+      return res.status(400).json({ message: 'Tipo do evento é obrigatório.' });
+    }
+
+    await db.run(
+      `INSERT INTO site_events (type, source, path, metadata, userAgent, ip, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      type,
+      source,
+      path,
+      metadata.slice(0, 2000),
+      String(req.headers['user-agent'] || '').slice(0, 300),
+      String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim().slice(0, 80),
+      new Date().toISOString()
+    );
+
+    res.status(204).end();
+  } catch (error) {
+    console.error('ERRO AO REGISTRAR EVENTO DO SITE:', error);
+    res.status(500).json({ message: 'Não foi possível registrar evento.' });
   }
 });
 
@@ -2284,12 +2324,20 @@ app.put('/api/admin/ordens-servico/:id', authRequired, requirePermission('ordens
 
 app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async (req, res) => {
   const canSeeAll = can(req.user, 'verTodosLeads');
-  const [leads, orcamentos, contratos, projetos, atividades] = await Promise.all([
+  const [leads, orcamentos, contratos, projetos, atividades, siteEvents] = await Promise.all([
     canSeeAll ? db.all('SELECT * FROM leads') : db.all('SELECT * FROM leads WHERE assignedUserId = ?', req.user.id),
     canSeeAll ? db.all('SELECT * FROM orcamentos') : db.all('SELECT * FROM orcamentos WHERE assignedUserId = ?', req.user.id),
     canSeeAll ? db.all('SELECT * FROM contratos') : db.all('SELECT * FROM contratos WHERE assignedUserId = ? OR criadoPorId = ?', req.user.id, req.user.id),
     canSeeAll ? db.all('SELECT * FROM projetos') : db.all('SELECT * FROM projetos WHERE responsavelId = ?', req.user.id),
     canSeeAll ? db.all('SELECT * FROM atividades ORDER BY id DESC LIMIT 8') : db.all('SELECT * FROM atividades WHERE criadoPorId = ? ORDER BY id DESC LIMIT 8', req.user.id),
+    canSeeAll
+      ? db.all(`
+          SELECT type, source, path, createdAt
+          FROM site_events
+          WHERE datetime(createdAt) >= datetime('now', '-30 days')
+          ORDER BY id DESC
+        `)
+      : Promise.resolve([]),
   ]);
 
   const hoje = new Date();
@@ -2316,6 +2364,25 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
     etapa,
     total: projetos.filter(projeto => projeto.etapa === etapa).length,
   }));
+  const analyticsByType = siteEvents.reduce((acc, event) => {
+    acc[event.type] = (acc[event.type] || 0) + 1;
+    return acc;
+  }, {});
+  const analyticsBySource = siteEvents.reduce((acc, event) => {
+    const source = event.source || 'site';
+    acc[source] = (acc[source] || 0) + 1;
+    return acc;
+  }, {});
+  const last7DaysEvents = siteEvents.filter(event => {
+    const date = new Date(event.createdAt);
+    const start = new Date(hoje);
+    start.setDate(start.getDate() - 7);
+    return date >= start;
+  });
+  const topSources = Object.entries(analyticsBySource)
+    .map(([source, total]) => ({ source, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
 
   res.json({
     kpis: {
@@ -2327,6 +2394,22 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
       projetosAtivos: projetos.filter(projeto => projeto.etapa !== 'Concluído').length,
       valorAprovadoMes,
       retornosSemana: leads.filter(lead => isBetween(lead.proximoRetorno, fimSemana)).length,
+      visitasSite30d: analyticsByType.page_view || 0,
+      clicksWhatsApp30d: analyticsByType.whatsapp_click || 0,
+      clicksSimular30d: analyticsByType.simulation_click || 0,
+      simulacoesConcluidas30d: analyticsByType.simulation_completed || 0,
+    },
+    siteAnalytics: {
+      totalEventos30d: siteEvents.length,
+      visitas7d: last7DaysEvents.filter(event => event.type === 'page_view').length,
+      whatsapp7d: last7DaysEvents.filter(event => event.type === 'whatsapp_click').length,
+      simular7d: last7DaysEvents.filter(event => event.type === 'simulation_click').length,
+      concluidas7d: last7DaysEvents.filter(event => event.type === 'simulation_completed').length,
+      conversaoWhatsApp30d: (analyticsByType.page_view || 0) ? ((analyticsByType.whatsapp_click || 0) / analyticsByType.page_view) : 0,
+      conversaoSimulacao30d: (analyticsByType.simulation_click || 0) ? ((analyticsByType.simulation_completed || 0) / analyticsByType.simulation_click) : 0,
+      porTipo: analyticsByType,
+      topSources,
+      eventosRecentes: siteEvents.slice(0, 8),
     },
     leadsPorStatus,
     projetosPorEtapa,
