@@ -1587,9 +1587,11 @@
 }
 
 .project-detail-modal {
+  display: flex;
+  flex-direction: column;
   width: min(960px, calc(100vw - 2rem));
   max-height: 92dvh;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 1.35rem;
   border-radius: 18px;
   background: #fff;
@@ -2251,7 +2253,7 @@
   padding: 1rem;
   background: rgba(15, 23, 42, 0.72);
   backdrop-filter: blur(8px);
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .contract-modal {
@@ -2260,7 +2262,7 @@
   min-height: 0;
   width: min(780px, 100%);
   max-height: 92dvh;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 1.35rem;
   border: 1px solid #e6eaf0;
   border-radius: 22px;
@@ -2276,7 +2278,7 @@
   min-height: 0;
   width: min(760px, 100%);
   max-height: 88dvh;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 1.35rem;
   border: 1px solid #e6eaf0;
   border-radius: 24px;
@@ -2290,6 +2292,8 @@
   display: grid;
   gap: 0.75rem;
   margin-top: 1rem;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .quick-modal-item {
@@ -3798,14 +3802,85 @@
     padding: 0;
   }
 
+  .project-detail-modal,
   .contract-modal {
+    height: min(90dvh, 720px);
     max-height: 90dvh;
+    overflow: hidden;
     border-radius: 16px 16px 0 0;
+    padding: 0.9rem;
   }
 
   .quick-modal {
-    max-height: 90dvh;
+    height: min(88dvh, 680px);
+    max-height: 88dvh;
+    overflow: hidden;
     border-radius: 16px 16px 0 0;
+    padding: 0.9rem;
+  }
+
+  .contract-modal-header {
+    flex: 0 0 auto;
+    top: 0;
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+
+  .contract-modal-header h3 {
+    font-size: 1.08rem;
+  }
+
+  .contract-modal-header p {
+    display: none;
+  }
+
+  .contract-modal-grid,
+  .quick-os-form,
+  .quick-modal-list,
+  .project-modal-controls,
+  .project-modal-section {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .contract-modal-grid {
+    gap: 0.55rem;
+    overflow: hidden;
+  }
+
+  .contract-modal-grid label {
+    gap: 0.25rem;
+    font-size: 0.78rem;
+  }
+
+  .contract-modal-grid input,
+  .contract-modal-grid select,
+  .contract-modal-grid textarea,
+  .quick-os-form input,
+  .quick-os-form select,
+  .quick-os-form textarea {
+    min-height: 38px;
+    padding: 0.55rem 0.65rem;
+    border-radius: 9px;
+  }
+
+  .contract-modal-grid textarea,
+  .quick-os-form textarea {
+    min-height: 62px;
+  }
+
+  .quick-modal-list {
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+  }
+
+  .quick-modal-list .quick-modal-item:nth-child(n+5) {
+    display: none;
+  }
+
+  .quick-modal-item {
+    padding: 0.68rem;
+    border-radius: 12px;
   }
 
   .quick-modal-item {
@@ -3828,7 +3903,12 @@
   }
 
   .contract-modal-actions {
+    flex: 0 0 auto;
+    bottom: 0;
     flex-direction: column;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: 0.65rem;
   }
 
   .quick-metrics {
