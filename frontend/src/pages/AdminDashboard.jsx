@@ -110,13 +110,43 @@ const whatsappClientMessage = (cliente = {}) => encodeURIComponent(
 
 const emptyContractManual = {
   geracaoKwh: '',
+  geracaoAnualKwh: '',
   potenciaKwp: '',
+  numeroPaineis: '',
   painel: '',
   inversor: '',
   quantidadeCabo: '',
   valorSistema: '',
+  valorEntrada: '',
+  valorSaldo: '',
+  prazoExecucao: '40',
   formaPagamentoTipo: 'avista',
   formaPagamento: '',
+};
+
+const emptyClientForm = {
+  tipoPessoa: 'Pessoa física',
+  nome: '',
+  cpfCnpj: '',
+  rgIe: '',
+  whatsapp: '',
+  email: '',
+  endereco: '',
+  numero: '',
+  bairro: '',
+  cep: '',
+  cidade: '',
+  estado: '',
+  complemento: '',
+  unidadeConsumidora: '',
+  distribuidora: '',
+  enderecoInstalacao: '',
+  numeroInstalacao: '',
+  bairroInstalacao: '',
+  cepInstalacao: '',
+  cidadeInstalacao: '',
+  estadoInstalacao: '',
+  observacoes: '',
 };
 
 const projectStages = ['Documentação', 'Vistoria', 'Projeto técnico', 'Homologação', 'Instalação', 'Vistoria final', 'Concluído'];
@@ -189,7 +219,7 @@ const AdminDashboard = () => {
   const [projectSearch, setProjectSearch] = useState('');
   const [selectedProjeto, setSelectedProjeto] = useState(null);
   const [atividades, setAtividades] = useState([]);
-  const [novoCliente, setNovoCliente] = useState({ nome: '', whatsapp: '', cidade: '', email: '' });
+  const [novoCliente, setNovoCliente] = useState(emptyClientForm);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [orcamentos, setOrcamentos] = useState([]);
   const [selectedOrcamento, setSelectedOrcamento] = useState(null);
@@ -236,6 +266,7 @@ const AdminDashboard = () => {
   const quickActions = [
     { id: 'qa-leads', label: 'Atender lead', tab: 'leads', permission: 'leads' },
     { id: 'qa-orcamentos', label: 'Ver orçamentos', tab: 'orcamentos', permission: 'orcamentos' },
+    { id: 'qa-novo-contrato', label: 'Gerar contrato', tab: 'novoContrato', permission: 'contratos', badge: clientes.length },
     { id: 'qa-contratos', label: 'Aprovar contrato', tab: 'contratos', permission: 'contratos', badge: contratos.filter(item => item.status === 'Pendente').length },
     { id: 'qa-projetos', label: 'Projeto/visita', tab: 'projetos', permission: 'equipeTecnica', badge: projetos.filter(item => item.etapa !== 'Concluído').length },
     { id: 'qa-os', label: 'Abrir O.S', tab: 'ordensServico', permission: 'ordensServico', badge: ordensServico.filter(item => item.status === 'Aberta').length },
@@ -309,7 +340,7 @@ const AdminDashboard = () => {
     const search = clientSearch.trim().toLowerCase();
     const filtered = clientes.filter(cliente => {
       if (!search) return true;
-      return [cliente.nome, cliente.whatsapp, cliente.cidade, cliente.email]
+      return [cliente.nome, cliente.whatsapp, cliente.cidade, cliente.email, cliente.cpfCnpj, cliente.unidadeConsumidora, cliente.distribuidora]
         .some(value => String(value || '').toLowerCase().includes(search));
     });
 
@@ -460,6 +491,11 @@ const AdminDashboard = () => {
 
     if (!loggedInUser || !token) {
       navigate('/login');
+      return;
+    }
+
+    if (loggedInUser.requiresEmailVerification) {
+      navigate('/verificar-email');
       return;
     }
 
@@ -714,7 +750,7 @@ const AdminDashboard = () => {
       body: JSON.stringify(novoCliente),
     });
     setClientes(prev => [cliente, ...prev]);
-    setNovoCliente({ nome: '', whatsapp: '', cidade: '', email: '' });
+    setNovoCliente(emptyClientForm);
   };
 
   const openContractModal = (orcamento) => {
@@ -726,10 +762,37 @@ const AdminDashboard = () => {
       manual: {
         ...emptyContractManual,
         geracaoKwh: orcamento.dimensionamento?.geracao_estimada_kwh || '',
+        geracaoAnualKwh: orcamento.dimensionamento?.geracao_estimada_kwh ? Number(orcamento.dimensionamento.geracao_estimada_kwh) * 12 : '',
         potenciaKwp: orcamento.dimensionamento?.potencia_real_instalada_kwp || '',
+        numeroPaineis: orcamento.dimensionamento?.numero_paineis_necessarios || '',
         painel: equipamento?.placaModelo || '',
         inversor: equipamento?.inversorModelo || '',
         valorSistema: orcamento.financeiro?.preco_final_cliente_rs || '',
+        formaPagamentoTipo: 'avista',
+      },
+    });
+  };
+
+  const openClientContractModal = (cliente) => {
+    const equipamento = equipamentos.find(item => item.active);
+    setQuickModal(null);
+    setContractModal({
+      open: true,
+      orcamento: {
+        id: cliente.id,
+        source: 'cliente',
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+        clienteTelefone: cliente.whatsapp,
+        clienteEmail: cliente.email,
+        clienteCidade: cliente.cidade,
+        clienteData: cliente,
+      },
+      equipamentoId: equipamento?.id || '',
+      manual: {
+        ...emptyContractManual,
+        painel: equipamento?.placaModelo || '',
+        inversor: equipamento?.inversorModelo || '',
         formaPagamentoTipo: 'avista',
       },
     });
@@ -744,9 +807,12 @@ const AdminDashboard = () => {
     const { orcamento, equipamentoId, manual } = contractModal;
     if (!orcamento) return;
 
-    const contrato = await request('/api/admin/contratos', {
+    const isClientContract = orcamento.source === 'cliente';
+    const contrato = await request(isClientContract ? '/api/admin/contratos-direto' : '/api/admin/contratos', {
       method: 'POST',
-      body: JSON.stringify({ orcamentoId: orcamento.id, equipamentoId, manual }),
+      body: JSON.stringify(isClientContract
+        ? { clienteId: orcamento.clienteId, equipamentoId, manual }
+        : { orcamentoId: orcamento.id, equipamentoId, manual }),
     });
     setContratos(prev => {
       const exists = prev.some(item => item.id === contrato.id);
@@ -913,13 +979,46 @@ const AdminDashboard = () => {
                   <strong>{resumo.projetosCriticos?.length || 0}</strong>
                   <small>com atenção</small>
                 </button>
+                <button type="button" className="dashboard-action-card warning" onClick={() => setActiveTab('ordensServico')}>
+                  <span>O.S abertas</span>
+                  <strong>{resumo.kpis?.osAbertas || 0}</strong>
+                  <small>{resumo.kpis?.osEmAtendimento || 0} em atendimento</small>
+                </button>
+                <button type="button" className="dashboard-action-card urgent" onClick={() => setActiveTab('usuarios')}>
+                  <span>E-mails pendentes</span>
+                  <strong>{resumo.kpis?.acessosSemRecuperacao || 0}</strong>
+                  <small>sem recuperação segura</small>
+                </button>
               </div>
 
               <div className="crm-kpi-grid">
                 <button type="button" className="crm-kpi-card primary" onClick={() => setActiveTab('leads')}><span>Leads captados</span><strong>{resumo.kpis?.leads || 0}</strong><p>{resumo.kpis?.novos || 0} aguardando primeiro atendimento.</p></button>
                 <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('orcamentos')}><span>Orçamentos</span><strong>{resumo.kpis?.orcamentos || 0}</strong><p>Simulações registradas no sistema.</p></button>
-                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('contratos')}><span>Contratos pendentes</span><strong>{resumo.kpis?.contratosPendentes || 0}</strong><p>Precisam de aprovação do ADM.</p></button>
-                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('projetos')}><span>Contratos aprovados</span><strong>{resumo.kpis?.contratosAprovados || 0}</strong><p>Viraram projeto de execução.</p></button>
+                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('contratos')}><span>Contratos</span><strong>{resumo.kpis?.contratos || 0}</strong><p>{resumo.kpis?.contratosPendentes || 0} pendentes, {resumo.kpis?.contratosAprovados || 0} aprovados.</p></button>
+                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('contratos')}><span>Valor pendente</span><strong>{money(resumo.kpis?.valorPendenteContratos)}</strong><p>Em contratos aguardando aprovação.</p></button>
+              </div>
+
+              <div className="ops-insight-grid">
+                <button type="button" className="ops-insight-card" onClick={() => setActiveTab('contratos')}>
+                  <span>Contratos por status</span>
+                  <strong>{resumo.operacao?.contratosTotal || 0} totais</strong>
+                  <p>{resumo.operacao?.contratosPendentes || 0} pendentes • {resumo.operacao?.contratosAprovados || 0} aprovados • {resumo.operacao?.contratosRecusados || 0} recusados</p>
+                </button>
+                <button type="button" className="ops-insight-card" onClick={() => setActiveTab('ordensServico')}>
+                  <span>Pendências técnicas</span>
+                  <strong>{resumo.operacao?.ordensServicoAbertas || 0} O.S abertas</strong>
+                  <p>{resumo.operacao?.ordensServicoEmAtendimento || 0} já em atendimento pela equipe.</p>
+                </button>
+                <button type="button" className="ops-insight-card" onClick={() => setActiveTab('usuarios')}>
+                  <span>Recuperação de senha</span>
+                  <strong>{resumo.operacao?.acessosComRecuperacao || 0} liberados</strong>
+                  <p>{resumo.operacao?.acessosSemRecuperacao || 0} acessos ainda precisam confirmar e-mail.</p>
+                </button>
+                <button type="button" className="ops-insight-card" onClick={() => setActiveTab('usuarios')}>
+                  <span>Primeiro acesso</span>
+                  <strong>{resumo.operacao?.senhasTemporarias || 0}</strong>
+                  <p>Usuários com senha temporária pendente de troca.</p>
+                </button>
               </div>
 
               {adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM' ? (
@@ -1058,16 +1157,37 @@ const AdminDashboard = () => {
               </div>
 
               {hasPermission('gerenciarClientes') && (
-                <form className="client-create-panel" onSubmit={createCliente}>
+                <form className="client-create-panel client-create-panel-full" onSubmit={createCliente}>
                   <div>
                     <span className="section-kicker">Novo cliente</span>
-                    <h4>Cadastro rápido</h4>
-                    <p>Nome, WhatsApp e cidade já deixam o cliente pronto para atendimento.</p>
+                    <h4>Cadastro completo</h4>
+                    <p>Esses dados entram automaticamente no contrato e ficam salvos no histórico.</p>
                   </div>
+                  <select value={novoCliente.tipoPessoa} onChange={(e) => setNovoCliente(prev => ({ ...prev, tipoPessoa: e.target.value }))}>
+                    <option>Pessoa física</option>
+                    <option>Pessoa jurídica</option>
+                  </select>
                   <input placeholder="Nome do cliente" value={novoCliente.nome} onChange={(e) => setNovoCliente(prev => ({ ...prev, nome: e.target.value }))} required />
+                  <input placeholder="CPF/CNPJ" value={novoCliente.cpfCnpj} onChange={(e) => setNovoCliente(prev => ({ ...prev, cpfCnpj: e.target.value }))} />
+                  <input placeholder="RG/IE" value={novoCliente.rgIe} onChange={(e) => setNovoCliente(prev => ({ ...prev, rgIe: e.target.value }))} />
                   <input placeholder="WhatsApp" value={novoCliente.whatsapp} onChange={(e) => setNovoCliente(prev => ({ ...prev, whatsapp: e.target.value }))} required />
-                  <input placeholder="Cidade" value={novoCliente.cidade} onChange={(e) => setNovoCliente(prev => ({ ...prev, cidade: e.target.value }))} required />
                   <input placeholder="E-mail (opcional)" type="email" value={novoCliente.email} onChange={(e) => setNovoCliente(prev => ({ ...prev, email: e.target.value }))} />
+                  <input placeholder="Endereço" value={novoCliente.endereco} onChange={(e) => setNovoCliente(prev => ({ ...prev, endereco: e.target.value }))} />
+                  <input placeholder="Número" value={novoCliente.numero} onChange={(e) => setNovoCliente(prev => ({ ...prev, numero: e.target.value }))} />
+                  <input placeholder="Bairro" value={novoCliente.bairro} onChange={(e) => setNovoCliente(prev => ({ ...prev, bairro: e.target.value }))} />
+                  <input placeholder="CEP" value={novoCliente.cep} onChange={(e) => setNovoCliente(prev => ({ ...prev, cep: e.target.value }))} />
+                  <input placeholder="Cidade" value={novoCliente.cidade} onChange={(e) => setNovoCliente(prev => ({ ...prev, cidade: e.target.value }))} required />
+                  <input placeholder="UF" value={novoCliente.estado} onChange={(e) => setNovoCliente(prev => ({ ...prev, estado: e.target.value.toUpperCase() }))} maxLength="2" />
+                  <input placeholder="Complemento" value={novoCliente.complemento} onChange={(e) => setNovoCliente(prev => ({ ...prev, complemento: e.target.value }))} />
+                  <input placeholder="Unidade consumidora" value={novoCliente.unidadeConsumidora} onChange={(e) => setNovoCliente(prev => ({ ...prev, unidadeConsumidora: e.target.value }))} />
+                  <input placeholder="Distribuidora" value={novoCliente.distribuidora} onChange={(e) => setNovoCliente(prev => ({ ...prev, distribuidora: e.target.value }))} />
+                  <input placeholder="Endereço de instalação" value={novoCliente.enderecoInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, enderecoInstalacao: e.target.value }))} />
+                  <input placeholder="Nº instalação" value={novoCliente.numeroInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, numeroInstalacao: e.target.value }))} />
+                  <input placeholder="Bairro instalação" value={novoCliente.bairroInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, bairroInstalacao: e.target.value }))} />
+                  <input placeholder="CEP instalação" value={novoCliente.cepInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, cepInstalacao: e.target.value }))} />
+                  <input placeholder="Cidade instalação" value={novoCliente.cidadeInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, cidadeInstalacao: e.target.value }))} />
+                  <input placeholder="UF instalação" value={novoCliente.estadoInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, estadoInstalacao: e.target.value.toUpperCase() }))} maxLength="2" />
+                  <textarea placeholder="Observações do cliente, documentação ou condições especiais" value={novoCliente.observacoes} onChange={(e) => setNovoCliente(prev => ({ ...prev, observacoes: e.target.value }))} />
                   <button className="btn btn-primary" type="submit">Cadastrar cliente</button>
                 </form>
               )}
@@ -1108,13 +1228,14 @@ const AdminDashboard = () => {
                             <td data-label="ID">#{c.id}</td>
                             <td data-label="Cliente" className="font-medium">{c.nome}</td>
                             <td data-label="WhatsApp">{c.whatsapp || 'Não informado'}</td>
-                            <td data-label="Localização">{c.cidade || 'Não informada'}</td>
+                            <td data-label="Localização">{[c.cidade, c.estado].filter(Boolean).join(' / ') || 'Não informada'}</td>
                             <td data-label="Cadastro">{c.dataCadastro || 'Sem data'}</td>
                             <td data-label="Status"><span className="status-badge success">Ativo</span></td>
                             <td data-label="Ações">
                               <div className="table-actions">
                                 {whatsappHref && <a className="btn btn-primary btn-sm-admin" href={whatsappHref} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
-                                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setNovoCliente({ nome: c.nome || '', whatsapp: c.whatsapp || '', cidade: c.cidade || '', email: c.email || '' })}>Usar dados</button>
+                                {hasPermission('contratos') && <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openClientContractModal(c)}>Gerar contrato</button>}
+                                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setNovoCliente({ ...emptyClientForm, ...c, password: '' })}>Usar dados</button>
                               </div>
                             </td>
                           </tr>
@@ -2137,6 +2258,13 @@ const AdminDashboard = () => {
                   required
                 />
                 <input
+                  type="email"
+                  placeholder="E-mail de recuperação"
+                  value={newUserForm.email}
+                  onChange={(event) => setNewUserForm(prev => ({ ...prev, email: event.target.value }))}
+                  required
+                />
+                <input
                   placeholder="WhatsApp com DDD"
                   value={newUserForm.whatsapp}
                   onChange={(event) => setNewUserForm(prev => ({ ...prev, whatsapp: event.target.value }))}
@@ -2190,6 +2318,7 @@ const AdminDashboard = () => {
                           <option value="CONSULTOR">Consultor</option>
                         </select>
                         {user.mustChangePassword && <span className="pending-chip">Troca pendente</span>}
+                        {!user.emailVerified && <span className="pending-chip">E-mail pendente</span>}
                         <label className="permission-toggle status-toggle">
                           <input
                             type="checkbox"
@@ -2282,6 +2411,27 @@ const AdminDashboard = () => {
                     {hasPermission('contratos') && <button className="btn btn-primary btn-sm-admin" onClick={() => { setQuickModal(null); openContractModal(orc); }}>Gerar contrato</button>}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {quickModal === 'novoContrato' && (
+              <div className="quick-modal-list">
+                {clientes.slice(0, 10).map(cliente => (
+                  <div className="quick-modal-item" key={cliente.id}>
+                    <div>
+                      <strong>{cliente.nome}</strong>
+                      <span>{cliente.cpfCnpj || 'Sem CPF/CNPJ'} • {cliente.cidade || 'Sem cidade'}</span>
+                    </div>
+                    <button className="btn btn-primary btn-sm-admin" onClick={() => openClientContractModal(cliente)}>Gerar contrato</button>
+                  </div>
+                ))}
+                {clientes.length === 0 && (
+                  <div className="empty-state-orcamento client-empty-state">
+                    <div className="icon">CT</div>
+                    <h4>Nenhum cliente cadastrado</h4>
+                    <p>Cadastre o cliente completo para gerar o contrato sem digitar dados manuais.</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2434,8 +2584,16 @@ const AdminDashboard = () => {
                 <input value={contractModal.manual.geracaoKwh} onChange={(event) => updateContractManual('geracaoKwh', event.target.value)} placeholder="Ex: 660" required />
               </label>
               <label>
+                Geração anual em kWh
+                <input value={contractModal.manual.geracaoAnualKwh} onChange={(event) => updateContractManual('geracaoAnualKwh', event.target.value)} placeholder="Ex: 7920" />
+              </label>
+              <label>
                 Potência em kWp
                 <input value={contractModal.manual.potenciaKwp} onChange={(event) => updateContractManual('potenciaKwp', event.target.value)} placeholder="Ex: 5.49" required />
+              </label>
+              <label>
+                Quantidade de placas
+                <input value={contractModal.manual.numeroPaineis} onChange={(event) => updateContractManual('numeroPaineis', event.target.value)} placeholder="Ex: 10" />
               </label>
               <label>
                 Banco de placa/inversor
@@ -2475,6 +2633,18 @@ const AdminDashboard = () => {
               <label>
                 Valor do sistema
                 <input type="number" step="0.01" value={contractModal.manual.valorSistema} onChange={(event) => updateContractManual('valorSistema', event.target.value)} placeholder="Ex: 14675" required />
+              </label>
+              <label>
+                Entrada
+                <input type="number" step="0.01" value={contractModal.manual.valorEntrada} onChange={(event) => updateContractManual('valorEntrada', event.target.value)} placeholder="Ex: 2000" />
+              </label>
+              <label>
+                Saldo
+                <input type="number" step="0.01" value={contractModal.manual.valorSaldo} onChange={(event) => updateContractManual('valorSaldo', event.target.value)} placeholder="Ex: 12675" />
+              </label>
+              <label>
+                Prazo de execução
+                <input type="number" min="1" step="1" value={contractModal.manual.prazoExecucao} onChange={(event) => updateContractManual('prazoExecucao', event.target.value)} placeholder="40" required />
               </label>
               <label>
                 Tipo de pagamento

@@ -45,6 +45,11 @@ const Login = () => {
       localStorage.setItem('role', data.user.role);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      if (data.user.requiresEmailVerification) {
+        navigate('/verificar-email');
+        return;
+      }
+
       if (data.user.role === 'ADMIN' || data.user.role === 'ADM') {
         navigate('/admin');
       } else {
@@ -100,7 +105,7 @@ const Login = () => {
               <label className="remember-me">
                 <input type="checkbox" /> Lembrar de mim
               </label>
-              <a href="#" className="forgot-password">Esqueceu a senha?</a>
+              <Link to="/recuperar-senha" className="forgot-password">Esqueceu a senha?</Link>
             </div>
 
             <button type="submit" className="btn btn-primary btn-block">Entrar no Painel</button>

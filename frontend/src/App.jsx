@@ -13,6 +13,9 @@ import { initSiteAnalytics, trackSiteEvent } from './utils/analytics';
 const Home = React.lazy(() => import('./pages/Home'));
 const Login = React.lazy(() => import('./pages/Login'));
 const Register = React.lazy(() => import('./pages/Register'));
+const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
+const VerifyEmail = React.lazy(() => import('./pages/VerifyEmail'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
 const ChangePassword = React.lazy(() => import('./pages/ChangePassword'));
@@ -26,7 +29,7 @@ const LoadingFallback = () => (
 
 function AppShell() {
   const location = useLocation();
-  const isSystemRoute = ['/admin', '/dashboard', '/orcamento', '/alterar-senha'].some(path => location.pathname.startsWith(path));
+  const isSystemRoute = ['/admin', '/dashboard', '/orcamento', '/alterar-senha', '/verificar-email'].some(path => location.pathname.startsWith(path));
 
   useEffect(() => {
     initSiteAnalytics();
@@ -46,6 +49,9 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/recuperar-senha" element={<ForgotPassword />} />
+          <Route path="/redefinir-senha" element={<ResetPassword />} />
+          <Route path="/verificar-email" element={<VerifyEmail />} />
           <Route path="/register" element={<Register />} />
           <Route path="/alterar-senha" element={<ChangePassword />} />
           <Route path="/orcamento" element={<Dashboard />} />

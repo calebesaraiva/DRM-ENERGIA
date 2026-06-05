@@ -796,6 +796,17 @@
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.045);
 }
 
+.client-create-panel-full {
+  grid-template-columns: minmax(220px, 1.1fr) repeat(5, minmax(130px, 1fr));
+  align-items: stretch;
+}
+
+.client-create-panel-full > div,
+.client-create-panel-full textarea,
+.client-create-panel-full .btn {
+  grid-column: span 2;
+}
+
 .client-create-panel h4,
 .client-create-panel p {
   margin: 0;
@@ -809,6 +820,8 @@
 }
 
 .client-create-panel input,
+.client-create-panel select,
+.client-create-panel textarea,
 .client-search-box input {
   width: 100%;
   min-height: 48px;
@@ -820,7 +833,14 @@
   font: inherit;
 }
 
+.client-create-panel textarea {
+  min-height: 48px;
+  resize: vertical;
+}
+
 .client-create-panel input:focus,
+.client-create-panel select:focus,
+.client-create-panel textarea:focus,
 .client-search-box input:focus {
   outline: none;
   border-color: var(--cor-primaria);
@@ -1059,7 +1079,7 @@
 
 .dashboard-action-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 0.85rem;
 }
 
@@ -1114,6 +1134,55 @@
 .dashboard-list-action {
   margin-top: 0.25rem;
   width: 100%;
+}
+
+.ops-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ops-insight-card {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #e6eaf0;
+  border-radius: 14px;
+  background: #fff;
+  color: #111827;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.ops-insight-card:hover {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: #fff7ed;
+}
+
+.ops-insight-card span,
+.ops-insight-card p {
+  display: block;
+  color: #64748b;
+}
+
+.ops-insight-card span {
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ops-insight-card strong {
+  display: block;
+  margin: 0.34rem 0;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.ops-insight-card p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.35;
 }
 
 .crm-kpi-grid {
@@ -3225,6 +3294,10 @@
     gap: 0.65rem;
   }
 
+  .ops-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-action-card {
     min-height: 0;
     display: grid;
@@ -3513,6 +3586,12 @@
   .client-create-panel {
     padding: 0.78rem;
     border-radius: 12px;
+  }
+
+  .client-create-panel-full > div,
+  .client-create-panel-full textarea,
+  .client-create-panel-full .btn {
+    grid-column: auto;
   }
 
   .client-create-panel .btn {

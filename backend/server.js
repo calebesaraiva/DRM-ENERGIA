@@ -1,3 +1,4 @@
+require('dotenv').config({ quiet: true });
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
@@ -6,6 +7,8 @@ const sqlite3 = require('sqlite3').verbose();
 const { open } = require('sqlite');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
 
@@ -73,6 +76,8 @@ app.use('/assets', express.static(path.join(__dirname, '../frontend/public/asset
 
 // Chave secreta para o JWT. Em produção, isso DEVE estar em uma variável de ambiente.
 const JWT_SECRET = 'seu-segredo-super-secreto-e-dificil-de-adivinhar';
+const RESET_TOKEN_TTL_MINUTES = 24 * 60;
+const EMAIL_VERIFICATION_TTL_MINUTES = 15;
 
 // --- CONFIGURAÇÃO DO BANCO DE DADOS SQLITE ---
 let db;
@@ -94,6 +99,10 @@ const DEFAULT_PERMISSIONS = {
   verTodosLeads: false,
   gerenciarClientes: false,
 };
+
+const ADMIN_PERMISSIONS = Object.fromEntries(
+  Object.keys(DEFAULT_PERMISSIONS).map((permission) => [permission, true])
+);
 
 const INTERNAL_USERS = [
   {
@@ -210,6 +219,222 @@ const buildWhatsAppLink = (phone, text) => {
   return `https://api.whatsapp.com/send?phone=${normalizedPhone}&text=${encoded}`;
 };
 
+const getAppUrl = () => String(process.env.APP_URL || 'http://127.0.0.1:5173').replace(/\/+$/, '');
+
+const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const createResetToken = () => crypto.randomBytes(32).toString('hex');
+
+const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
+
+const isRealEmail = (value = '') => {
+  const email = normalizeEmail(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !email.endsWith('@drm.local');
+};
+
+const hasVerifiedEmail = (user = {}) => isRealEmail(user.email) && Boolean(user.emailVerified);
+
+const requiresEmailVerification = (user = {}) => !hasVerifiedEmail(user);
+
+const createEmailCode = () => String(crypto.randomInt(100000, 1000000));
+
+const hashEmailCode = (code) => crypto.createHash('sha256').update(String(code || '')).digest('hex');
+
+const getMailTransporter = () => {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) {
+    throw new Error('SMTP não configurado. Defina SMTP_HOST, SMTP_USER e SMTP_PASS.');
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: String(process.env.SMTP_SECURE || 'true') === 'true',
+    auth: { user, pass },
+  });
+};
+
+const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
+  const from = process.env.SMTP_FROM || `DRM ENERGIA SOLAR <${process.env.SMTP_USER}>`;
+  const safeName = String(name || '').trim() || 'cliente';
+  const htmlName = escapeHtml(safeName);
+  const htmlResetUrl = escapeHtml(resetUrl);
+
+  await getMailTransporter().sendMail({
+    from,
+    to,
+    subject: 'Redefinição de senha - DRM ENERGIA SOLAR',
+    text: [
+      `Olá, ${safeName}.`,
+      '',
+      'Recebemos uma solicitação para redefinir sua senha no painel DRM ENERGIA SOLAR.',
+      `Acesse o link abaixo para criar uma nova senha. O link expira em ${RESET_TOKEN_TTL_MINUTES} minutos:`,
+      resetUrl,
+      '',
+      'Se você não solicitou essa alteração, ignore este e-mail.',
+      '',
+      'DRM ENERGIA SOLAR',
+    ].join('\n'),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
+        <h2 style="color:#f97316;margin-bottom:8px">DRM ENERGIA SOLAR</h2>
+        <p>Olá, <strong>${htmlName}</strong>.</p>
+        <p>Recebemos uma solicitação para redefinir sua senha no painel DRM ENERGIA SOLAR.</p>
+        <p>Use o botão abaixo para criar uma nova senha. O link expira em <strong>${RESET_TOKEN_TTL_MINUTES} minutos</strong>.</p>
+        <p style="margin:28px 0">
+          <a href="${htmlResetUrl}" style="background:#f97316;color:#111827;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">Redefinir senha</a>
+        </p>
+        <p style="font-size:13px;color:#64748b">Se o botão não abrir, copie este link:</p>
+        <p style="font-size:13px;word-break:break-all;color:#334155">${htmlResetUrl}</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
+        <p style="font-size:13px;color:#64748b">Se você não solicitou essa alteração, ignore este e-mail.</p>
+      </div>
+    `,
+  });
+};
+
+const sendEmailVerificationCode = async ({ to, name, code }) => {
+  const from = process.env.SMTP_FROM || `DRM ENERGIA SOLAR <${process.env.SMTP_USER}>`;
+  const safeName = String(name || '').trim() || 'usuário';
+  const htmlName = escapeHtml(safeName);
+  const htmlCode = escapeHtml(code);
+
+  await getMailTransporter().sendMail({
+    from,
+    to,
+    subject: 'Código de verificação - DRM ENERGIA SOLAR',
+    text: [
+      `Olá, ${safeName}.`,
+      '',
+      'Use o código abaixo para confirmar seu e-mail no painel DRM ENERGIA SOLAR:',
+      code,
+      '',
+      `O código expira em ${EMAIL_VERIFICATION_TTL_MINUTES} minutos.`,
+      '',
+      'Se você não solicitou essa verificação, ignore este e-mail.',
+      '',
+      'DRM ENERGIA SOLAR',
+    ].join('\n'),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
+        <h2 style="color:#f97316;margin-bottom:8px">DRM ENERGIA SOLAR</h2>
+        <p>Olá, <strong>${htmlName}</strong>.</p>
+        <p>Use o código abaixo para confirmar seu e-mail no painel:</p>
+        <p style="font-size:30px;letter-spacing:8px;font-weight:900;margin:22px 0;color:#111827">${htmlCode}</p>
+        <p>O código expira em <strong>${EMAIL_VERIFICATION_TTL_MINUTES} minutos</strong>.</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
+        <p style="font-size:13px;color:#64748b">Se você não solicitou essa verificação, ignore este e-mail.</p>
+      </div>
+    `,
+  });
+};
+
+const findPasswordResetUser = async (identifier) => {
+  const value = String(identifier || '').trim();
+  if (!value) return null;
+
+  const internalUser = await db.get(
+    'SELECT id, nome, username, email, emailVerified FROM usuarios WHERE (email = ? OR username = ?) AND active = 1',
+    normalizeEmail(value),
+    normalizeEmail(value)
+  );
+  if (internalUser?.email && hasVerifiedEmail(internalUser)) {
+    return { userType: 'interno', id: internalUser.id, name: internalUser.nome, email: internalUser.email };
+  }
+
+  const client = await db.get('SELECT id, nome, email, emailVerified FROM clientes WHERE email = ?', normalizeEmail(value));
+  if (client?.email && hasVerifiedEmail(client)) {
+    return { userType: 'cliente', id: client.id, name: client.nome, email: client.email };
+  }
+
+  return null;
+};
+
+const CLIENT_EXTRA_FIELDS = [
+  'tipoPessoa',
+  'cpfCnpj',
+  'rgIe',
+  'endereco',
+  'numero',
+  'bairro',
+  'cep',
+  'estado',
+  'complemento',
+  'unidadeConsumidora',
+  'distribuidora',
+  'enderecoInstalacao',
+  'numeroInstalacao',
+  'bairroInstalacao',
+  'cepInstalacao',
+  'cidadeInstalacao',
+  'estadoInstalacao',
+  'observacoes',
+];
+
+const normalizeClientPayload = (body = {}) => {
+  const data = {
+    nome: String(body.nome || '').trim(),
+    whatsapp: String(body.whatsapp || '').trim(),
+    cidade: String(body.cidade || '').trim(),
+    email: String(body.email || '').trim() || null,
+  };
+
+  for (const field of CLIENT_EXTRA_FIELDS) {
+    data[field] = String(body[field] || '').trim() || null;
+  }
+
+  return data;
+};
+
+const buildClientAddress = (client = {}) => (
+  [
+    client.endereco,
+    client.numero ? `nº ${client.numero}` : '',
+    client.bairro,
+    client.cep ? `CEP ${client.cep}` : '',
+    client.cidade,
+    client.estado,
+  ].filter(Boolean).join(', ') || 'Não informado'
+);
+
+const buildInstallAddress = (client = {}) => (
+  [
+    client.enderecoInstalacao || client.endereco,
+    (client.numeroInstalacao || client.numero) ? `nº ${client.numeroInstalacao || client.numero}` : '',
+    client.bairroInstalacao || client.bairro,
+    (client.cepInstalacao || client.cep) ? `CEP ${client.cepInstalacao || client.cep}` : '',
+    client.cidadeInstalacao || client.cidade,
+    client.estadoInstalacao || client.estado,
+  ].filter(Boolean).join(', ') || buildClientAddress(client)
+);
+
+const publicClient = (client = {}) => {
+  const sanitized = { ...client };
+  delete sanitized.password;
+  return sanitized;
+};
+
+const getAuthUserRecord = async (user) => {
+  if (user.userType === 'interno') {
+    return db.get('SELECT * FROM usuarios WHERE id = ?', user.id);
+  }
+  return db.get('SELECT * FROM clientes WHERE id = ?', user.id);
+};
+
+const updateAuthUserEmailVerification = async (user, fields = {}) => {
+  const table = user.userType === 'interno' ? 'usuarios' : 'clientes';
+  const keys = Object.keys(fields);
+  if (keys.length === 0) return;
+  await db.run(
+    `UPDATE ${table} SET ${keys.map(key => `${key} = ?`).join(', ')} WHERE id = ?`,
+    ...keys.map(key => fields[key]),
+    user.id
+  );
+};
+
 const sanitizeUser = (user) => ({
   id: user.id,
   nome: user.nome,
@@ -219,6 +444,8 @@ const sanitizeUser = (user) => ({
   role: user.role,
   permissions: user.permissions,
   mustChangePassword: Boolean(user.mustChangePassword),
+  emailVerified: hasVerifiedEmail(user),
+  requiresEmailVerification: requiresEmailVerification(user),
 });
 
 const authRequired = async (req, res, next) => {
@@ -231,6 +458,7 @@ const authRequired = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    const isEmailVerificationRoute = req.path.startsWith('/api/email-verification');
 
     if (decoded.userType === 'interno') {
       const user = await db.get('SELECT * FROM usuarios WHERE id = ? AND active = 1', decoded.id);
@@ -241,10 +469,27 @@ const authRequired = async (req, res, next) => {
         userType: 'interno',
         permissions: parsePermissions(user.permissions),
       };
+      if (requiresEmailVerification(req.user) && !isEmailVerificationRoute) {
+        return res.status(403).json({ message: 'Confirme um e-mail válido para liberar o painel.', requiresEmailVerification: true });
+      }
       return next();
     }
 
-    req.user = { ...decoded, userType: decoded.userType || 'cliente', permissions: mergePermissions() };
+    const client = await db.get('SELECT * FROM clientes WHERE id = ?', decoded.id);
+    if (!client) return res.status(401).json({ message: 'Usuário inválido.' });
+
+    const permissions = decoded.role === 'ADM' ? ADMIN_PERMISSIONS : mergePermissions(decoded.permissions);
+    req.user = {
+      ...client,
+      ...decoded,
+      email: client.email,
+      nome: client.nome,
+      userType: decoded.userType || 'cliente',
+      permissions,
+    };
+    if (requiresEmailVerification(req.user) && !isEmailVerificationRoute) {
+      return res.status(403).json({ message: 'Confirme um e-mail válido para liberar o painel.', requiresEmailVerification: true });
+    }
     return next();
   } catch {
     return res.status(401).json({ message: 'Sessão inválida ou expirada.' });
@@ -606,38 +851,63 @@ const parseProjeto = (projeto) => ({
 });
 
 const DEFAULT_CONTRACT_TEMPLATE = {
-  version: 'drm-pdf-standard-v2',
+  version: 'drm-service-materials-v3',
   empresa: {
-    nome: 'DRM Energia Solar',
-    cnpj: '',
+    nome: 'DRM ENERGIA SOLAR LTDA',
+    cnpj: '48.518.202/0001-56',
     telefone: '(99) 99167-5608',
-    email: '',
-    endereco: 'Av Jacob, R. São Luís - Jardim Tropical, Imperatriz - MA, 65910-727',
+    email: 'drmengenhariaeenergiasolar@gmail.com',
+    endereco: 'Rua Gonçalves Dias, nº 1661, Bairro Centro, CEP 65900-545, Imperatriz/MA',
   },
   visual: {
     logoPosition: 'right',
     logoWidth: 86,
     primaryColor: '#F97316',
   },
-  titulo: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS',
+  titulo: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS COM FORNECIMENTO DE MATERIAIS E INSTALAÇÃO DE SISTEMA SOLAR FOTOVOLTAICO',
   corpo: `
 <h2>CLÁUSULA PRIMEIRA - DO OBJETO</h2>
-<p>O presente contrato tem por objeto o fornecimento, instalação e comissionamento de sistema solar fotovoltaico, composto por módulos, inversor, estruturas, cabos e demais itens necessários à execução do projeto aprovado.</p>
-<p>A CONTRATADA executará o sistema conforme os dados técnicos descritos neste instrumento e conforme disponibilidade dos modelos cadastrados no sistema.</p>
+<p>O presente contrato tem por objeto o fornecimento, instalação e comissionamento de sistema solar fotovoltaico com potência de <strong>{{projeto.potencia}}</strong> kWp, destinado à geração média mensal aproximada de <strong>{{projeto.geracao}}</strong> kWh, no imóvel do CONTRATANTE situado em <strong>{{cliente.enderecoInstalacao}}</strong>, conforme projeto técnico elaborado nos termos da Lei nº 14.300/2022 e da Resolução Normativa ANEEL nº 1.000/2021.</p>
+<p>A instalação compreenderá fornecimento de módulos fotovoltaicos, inversor, estrutura adequada ao telhado, cabos, conectores, material elétrico, serviço de instalação, projeto solar, ART, acompanhamento junto à distribuidora e monitoramento do sistema via web, conforme quadro técnico deste contrato.</p>
 
-<h2>CLÁUSULA SEGUNDA - DAS CONDIÇÕES DE PAGAMENTO</h2>
-<p>O valor total do sistema será de <strong>{{contrato.valor}}</strong>, conforme condição comercial informada a seguir: <strong>{{contrato.formaPagamento}}</strong>.</p>
-<p>Havendo financiamento, cartão de crédito, pagamento à vista ou condição mista, prevalecerá a forma detalhada no quadro de condições comerciais deste contrato.</p>
+<h2>CLÁUSULA SEGUNDA - DAS OBRIGAÇÕES DA CONTRATADA</h2>
+<p>São obrigações da CONTRATADA: cumprir integralmente este contrato; responsabilizar-se pela execução técnica, qualidade, segurança e prazos; designar profissionais habilitados; obter, quando necessário, aprovações e protocolos junto à concessionária; observar as normas ABNT NBR 5410, NBR 16690, Lei nº 14.300/2022 e REN ANEEL nº 1.000/2021.</p>
 
-<h2>CLÁUSULA TERCEIRA - DAS RESPONSABILIDADES</h2>
-<p>A CONTRATADA fica responsável pela instalação do sistema fotovoltaico, observando as normas técnicas aplicáveis, condições de segurança e viabilidade do local de instalação.</p>
-<p>O CONTRATANTE deverá fornecer as informações necessárias, permitir o acesso ao imóvel e disponibilizar documentação quando solicitada pela equipe técnica/comercial.</p>
+<h2>CLÁUSULA TERCEIRA - DAS OBRIGAÇÕES DO CONTRATANTE</h2>
+<p>Compete ao CONTRATANTE permitir acesso dos técnicos ao local, efetuar pagamentos nas condições ajustadas, fornecer dados e documentos necessários à execução e homologação, realizar adequações estruturais ou elétricas quando necessárias, não alterar o sistema sem autorização técnica e manter limpeza/manutenção preventiva conforme orientações da CONTRATADA.</p>
 
-<h2>CLÁUSULA QUARTA - DOS PRAZOS E GARANTIAS</h2>
-<p>Os prazos de execução serão definidos conforme aprovação técnica, disponibilidade dos equipamentos e confirmação das condições de pagamento. Os equipamentos seguirão as garantias fornecidas pelos fabricantes.</p>
+<h2>CLÁUSULA QUARTA - DO PREÇO E CONDIÇÕES DE PAGAMENTO</h2>
+<p>Pelos serviços ora contratados, o CONTRATANTE pagará à CONTRATADA o valor total de <strong>{{contrato.valor}}</strong>, nas seguintes condições: <strong>{{contrato.formaPagamento}}</strong>.</p>
+<p>O pagamento poderá ser realizado via PIX para o PIX/CNPJ nº 48.518.202/0001-56 (DRM ENERGIA SOLAR LTDA), transferência, financiamento ou outra condição expressamente registrada neste contrato.</p>
 
-<h2>CLÁUSULA QUINTA - DA APROVAÇÃO INTERNA</h2>
-<p>Este contrato foi gerado pelo sistema DRM Solar e aprovado por <strong>{{contrato.aprovadoPor}}</strong> em <strong>{{contrato.dataAprovacao}}</strong>.</p>
+<h2>CLÁUSULA QUINTA - DO PRAZO DE EXECUÇÃO</h2>
+<p>O prazo para conclusão dos serviços será de até <strong>{{contrato.prazoExecucao}}</strong> dias úteis, contados da assinatura deste contrato e do pagamento da primeira parcela. Caso haja necessidade de adequações elétricas, aumento de carga, pendências junto à concessionária ou terceiros, o prazo será suspenso até a solução do impedimento.</p>
+
+<h2>CLÁUSULA SEXTA - DA GARANTIA</h2>
+<p>A CONTRATADA garante os serviços de instalação pelo prazo de 5 (cinco) anos, conforme art. 618 do Código Civil. Os equipamentos seguirão a garantia de fábrica informada no quadro técnico, incluindo módulos e inversor. A geração média admitirá variação técnica de até ±10%.</p>
+<p>Perderá a garantia o CONTRATANTE que modificar o sistema sem autorização, deixar de realizar limpeza/manutenção, alterar condições de sombreamento ou estrutura física do local.</p>
+
+<h2>CLÁUSULA SÉTIMA - DA RESCISÃO</h2>
+<p>O contrato poderá ser rescindido por comum acordo, inadimplemento mediante notificação prévia de 10 dias úteis, ou impossibilidade técnica comprovada. Em caso de rescisão por culpa do CONTRATANTE, este arcará com multa compensatória de 10% sobre o valor total, além de eventuais despesas comprovadas.</p>
+
+<h2>CLÁUSULA OITAVA - DAS PENALIDADES E MORA</h2>
+<p>O atraso injustificado no cumprimento de obrigações sujeitará a parte inadimplente ao pagamento de multa de 2% sobre o valor devido, juros moratórios de 1% ao mês e correção monetária pelo INPC.</p>
+
+<h2>CLÁUSULA NONA - DA RESPONSABILIDADE CIVIL</h2>
+<p>A CONTRATADA responderá por danos materiais diretos causados à estrutura do imóvel ou equipamentos existentes, desde que comprovada culpa ou dolo. Não responderá por danos indiretos, lucros cessantes ou fatores externos como quedas de energia, falhas da concessionária, intempéries, vandalismo ou furtos.</p>
+
+<h2>CLÁUSULA DÉCIMA - DO RECEBIMENTO E ENCERRAMENTO</h2>
+<p>Após a conclusão dos serviços, será realizada vistoria conjunta e emitido Termo de Entrega e Aceitação, que marcará o início dos prazos de garantia.</p>
+
+<h2>CLÁUSULA DÉCIMA PRIMEIRA - DA NÃO HOMOLOGAÇÃO OU INVERSÃO DE FLUXO</h2>
+<p>A homologação e conexão do sistema à rede são atos administrativos privativos da concessionária. A CONTRATADA acompanhará o processo, apresentará informações técnicas complementares e comunicará formalmente exigências ou impedimentos, mas não responderá por indeferimentos, atrasos, suspensões ou exigências decorrentes de insuficiência da rede, reforço de transformador, inversão de fluxo, alterações normativas ou morosidade da concessionária.</p>
+<p>Caso haja exigência de adequações técnicas adicionais, caberá ao CONTRATANTE autorizar e custear as obras necessárias para atendimento aos padrões da distribuidora.</p>
+
+<h2>CLÁUSULA DÉCIMA SEGUNDA - DO FORO</h2>
+<p>Fica eleito o foro do domicílio do CONTRATANTE, nos termos do art. 101, I, do Código de Defesa do Consumidor, para dirimir controvérsias decorrentes deste contrato.</p>
+
+<h2>CLÁUSULA DÉCIMA TERCEIRA - DA APROVAÇÃO INTERNA E HISTÓRICO</h2>
+<p>Este contrato foi gerado no sistema DRM Solar, com snapshot dos dados do cliente, equipamentos, condições comerciais e responsável pela geração. A aprovação interna foi registrada por <strong>{{contrato.aprovadoPor}}</strong> em <strong>{{contrato.dataAprovacao}}</strong>.</p>
 `,
 };
 
@@ -688,8 +958,11 @@ const buildContratoHtml = async (contrato) => {
   const parsed = parseContrato(contrato);
   const dimensionamento = parsed.dados?.dimensionamento || {};
   const manual = parsed.dados?.manual || {};
+  const clienteSnapshot = parsed.dados?.cliente || {};
   const template = await getContractTemplate();
   const equipamento = parsed.equipamentoDados || {};
+  const clientAddress = clienteSnapshot.enderecoCompleto || buildClientAddress(clienteSnapshot);
+  const installAddress = clienteSnapshot.enderecoInstalacaoCompleto || buildInstallAddress(clienteSnapshot);
   const variables = {
     empresa: template.empresa,
     cliente: {
@@ -697,11 +970,18 @@ const buildContratoHtml = async (contrato) => {
       telefone: parsed.clienteTelefone || 'Não informado',
       email: parsed.clienteEmail || 'Não informado',
       cidade: parsed.clienteCidade || 'Não informado',
+      cpfCnpj: clienteSnapshot.cpfCnpj || manual.cpfCnpj || 'Não informado',
+      rgIe: clienteSnapshot.rgIe || 'Não informado',
+      endereco: clientAddress,
+      enderecoInstalacao: installAddress,
+      unidadeConsumidora: clienteSnapshot.unidadeConsumidora || 'Não informado',
+      distribuidora: clienteSnapshot.distribuidora || 'Não informado',
     },
     projeto: {
       potencia: manual.potenciaKwp || dimensionamento.potencia_real_instalada_kwp || 0,
-      paineis: dimensionamento.numero_paineis_necessarios || 0,
+      paineis: manual.numeroPaineis || dimensionamento.numero_paineis_necessarios || 0,
       geracao: manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0,
+      geracaoAnual: manual.geracaoAnualKwh || (Number(manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0) * 12),
       quantidadeCabo: manual.quantidadeCabo || 'Não informado',
     },
     equipamento: {
@@ -715,6 +995,9 @@ const buildContratoHtml = async (contrato) => {
       id: parsed.id,
       valor: formatCurrency(manual.valorSistema || parsed.valorProjeto),
       formaPagamento: manual.formaPagamento || 'Não informado',
+      entrada: manual.valorEntrada ? formatCurrency(manual.valorEntrada) : 'Não informado',
+      saldo: manual.valorSaldo ? formatCurrency(manual.valorSaldo) : 'Não informado',
+      prazoExecucao: manual.prazoExecucao || 40,
       status: parsed.status,
       aprovadoPor: parsed.analisadoPorNome || 'Administrador',
       dataAprovacao: parsed.dataAnalise ? new Date(parsed.dataAnalise).toLocaleDateString('pt-BR') : '',
@@ -725,6 +1008,7 @@ const buildContratoHtml = async (contrato) => {
   const primaryColor = template.visual.primaryColor || '#F97316';
   const projectRows = [
     ['Geração em KWh', `${variables.projeto.geracao} kWh`],
+    ['Geração anual estimada', `${variables.projeto.geracaoAnual} kWh`],
     ['Potência em KWp', `${variables.projeto.potencia} kWp`],
     ['Painel', variables.equipamento.placaModelo],
     ['Inversor', variables.equipamento.inversorModelo],
@@ -936,8 +1220,9 @@ const buildContratoHtml = async (contrato) => {
     <section class="intro">
       Pelo presente instrumento particular, de um lado <strong>${escapeHtml(template.empresa.nome)}</strong>, inscrita no CNPJ
       <strong>${escapeHtml(template.empresa.cnpj || 'não informado')}</strong>, doravante denominada CONTRATADA, e de outro lado
-      <strong>${escapeHtml(parsed.clienteNome)}</strong>, telefone <strong>${escapeHtml(parsed.clienteTelefone || 'não informado')}</strong>,
-      e-mail <strong>${escapeHtml(parsed.clienteEmail || 'não informado')}</strong>, cidade <strong>${escapeHtml(parsed.clienteCidade || 'não informado')}</strong>,
+      <strong>${escapeHtml(parsed.clienteNome)}</strong>, CPF/CNPJ <strong>${escapeHtml(variables.cliente.cpfCnpj)}</strong>,
+      residente/sediado em <strong>${escapeHtml(variables.cliente.endereco)}</strong>, telefone <strong>${escapeHtml(parsed.clienteTelefone || 'não informado')}</strong>,
+      e-mail <strong>${escapeHtml(parsed.clienteEmail || 'não informado')}</strong>,
       doravante denominado CONTRATANTE, firmam o presente contrato.
     </section>
 
@@ -947,9 +1232,15 @@ const buildContratoHtml = async (contrato) => {
         <table class="info-table">
           ${renderInfoRows([
             ['Nome', variables.cliente.nome],
+            ['CPF/CNPJ', variables.cliente.cpfCnpj],
+            ['RG/IE', variables.cliente.rgIe],
             ['Telefone', variables.cliente.telefone],
             ['E-mail', variables.cliente.email],
             ['Cidade', variables.cliente.cidade],
+            ['Endereço', variables.cliente.endereco],
+            ['Instalação', variables.cliente.enderecoInstalacao],
+            ['Unidade consumidora', variables.cliente.unidadeConsumidora],
+            ['Distribuidora', variables.cliente.distribuidora],
           ])}
         </table>
       </section>
@@ -958,7 +1249,10 @@ const buildContratoHtml = async (contrato) => {
         <table class="info-table">
           ${renderInfoRows([
             ['Valor do sistema', variables.contrato.valor],
+            ['Entrada', variables.contrato.entrada],
+            ['Saldo', variables.contrato.saldo],
             ['Forma de pagamento', variables.contrato.formaPagamento],
+            ['Prazo de execução', `${variables.contrato.prazoExecucao} dias úteis`],
             ['Aprovado por', variables.contrato.aprovadoPor],
             ['Data de aprovação', variables.contrato.dataAprovacao || formatDateBr()],
           ])}
@@ -984,6 +1278,8 @@ const buildContratoHtml = async (contrato) => {
     <div class="signatures">
       <div class="line">${escapeHtml(template.empresa.nome)}<br />CONTRATADA</div>
       <div class="line">${escapeHtml(parsed.clienteNome)}<br />CONTRATANTE</div>
+      <div class="line">Testemunha 1<br />CPF:</div>
+      <div class="line">Testemunha 2<br />CPF:</div>
     </div>
 
     <footer class="footer">
@@ -1184,7 +1480,38 @@ const buildContratoHtml = async (contrato) => {
       ip TEXT,
       createdAt TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userType TEXT NOT NULL,
+      userId INTEGER NOT NULL,
+      email TEXT NOT NULL,
+      tokenHash TEXT NOT NULL UNIQUE,
+      expiresAt TEXT NOT NULL,
+      usedAt TEXT,
+      createdAt TEXT NOT NULL
+    );
   `);
+
+  const clienteColumns = await db.all('PRAGMA table_info(clientes)');
+  const existingClienteColumns = clienteColumns.map(column => column.name);
+  for (const field of CLIENT_EXTRA_FIELDS) {
+    if (!existingClienteColumns.includes(field)) {
+      await db.exec(`ALTER TABLE clientes ADD COLUMN ${field} TEXT`);
+    }
+  }
+  const emailVerificationColumns = [
+    ['emailVerified', 'INTEGER DEFAULT 0'],
+    ['emailVerifiedAt', 'TEXT'],
+    ['pendingEmail', 'TEXT'],
+    ['emailVerificationCodeHash', 'TEXT'],
+    ['emailVerificationExpiresAt', 'TEXT'],
+  ];
+  for (const [field, definition] of emailVerificationColumns) {
+    if (!existingClienteColumns.includes(field)) {
+      await db.exec(`ALTER TABLE clientes ADD COLUMN ${field} ${definition}`);
+    }
+  }
 
   const orcamentoColumns = await db.all('PRAGMA table_info(orcamentos)');
   const existingOrcamentoColumns = orcamentoColumns.map(column => column.name);
@@ -1244,6 +1571,11 @@ const buildContratoHtml = async (contrato) => {
   const existingUsuarioColumns = usuarioColumns.map(column => column.name);
   if (!existingUsuarioColumns.includes('whatsapp')) {
     await db.exec('ALTER TABLE usuarios ADD COLUMN whatsapp TEXT');
+  }
+  for (const [field, definition] of emailVerificationColumns) {
+    if (!existingUsuarioColumns.includes(field)) {
+      await db.exec(`ALTER TABLE usuarios ADD COLUMN ${field} ${definition}`);
+    }
   }
 
   for (const user of INTERNAL_USERS) {
@@ -1350,7 +1682,7 @@ const buildContratoHtml = async (contrato) => {
   const adminEmail = 'SOLAR@';
   const adminPassword = 'solar610';
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
-  const adminUser = await db.get('SELECT id FROM clientes WHERE email = ?', adminEmail);
+  const adminUser = await db.get('SELECT id FROM clientes WHERE email = ? OR nome = ?', adminEmail, 'SOLAR@');
 
   if (!adminUser) {
     console.log('Usuário admin não encontrado, criando...');
@@ -1361,7 +1693,7 @@ const buildContratoHtml = async (contrato) => {
     console.log('Usuário admin criado com sucesso.');
   } else {
     console.log('Usuário admin encontrado. Garantindo que a senha esteja atualizada.');
-    await db.run('UPDATE clientes SET password = ? WHERE email = ?', hashedPassword, adminEmail);
+    await db.run('UPDATE clientes SET password = ? WHERE id = ?', hashedPassword, adminUser.id);
     console.log('Senha do admin atualizada.');
   }
 })();
@@ -1608,16 +1940,17 @@ app.post('/api/register', async (req, res) => {
 // Rota de Login
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
+  const identifier = String(email || '').trim();
 
-  if (!email || !password) {
+  if (!identifier || !password) {
     return res.status(400).json({ message: 'E-mail e senha são obrigatórios.' });
   }
 
   try {
     const internalUser = await db.get(
       'SELECT * FROM usuarios WHERE (username = ? OR email = ?) AND active = 1',
-      email,
-      email
+      normalizeEmail(identifier),
+      normalizeEmail(identifier)
     );
 
     if (internalUser) {
@@ -1640,7 +1973,7 @@ app.post('/api/login', async (req, res) => {
       });
     }
 
-    const user = await db.get('SELECT * FROM clientes WHERE email = ?', email);
+    const user = await db.get('SELECT * FROM clientes WHERE email = ? OR email = ?', identifier, normalizeEmail(identifier));
 
     if (!user) {
       return res.status(401).json({ message: 'Credenciais inválidas.' }); // Usuário não encontrado
@@ -1652,10 +1985,12 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: 'Credenciais inválidas.' }); // Senha incorreta
     }
 
-    const role = user.email === 'SOLAR@' ? 'ADMIN' : 'CLIENTE';
+    const isSolarAdmin = user.email === 'SOLAR@';
+    const role = isSolarAdmin ? 'ADM' : 'CLIENTE';
+    const permissions = isSolarAdmin ? ADMIN_PERMISSIONS : mergePermissions();
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: role },
+      { id: user.id, nome: user.nome, email: user.email, role: role, permissions },
       JWT_SECRET,
       { expiresIn: '1d' } // O token expira em 1 dia
     );
@@ -1663,7 +1998,16 @@ app.post('/api/login', async (req, res) => {
     res.json({
       message: 'Login bem-sucedido!',
       token,
-      user: { id: user.id, nome: user.nome, email: user.email, role: role }
+      user: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        role,
+        userType: 'cliente',
+        permissions,
+        emailVerified: hasVerifiedEmail(user),
+        requiresEmailVerification: requiresEmailVerification(user),
+      }
     });
 
   } catch (error) {
@@ -1672,12 +2016,204 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.post('/api/email-verification/send', authRequired, async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!isRealEmail(email)) {
+    return res.status(400).json({ message: 'Informe um e-mail válido para receber o código.' });
+  }
+
+  try {
+    const [internalOwner, clientOwner] = await Promise.all([
+      db.get('SELECT id FROM usuarios WHERE email = ? AND id <> ?', email, req.user.userType === 'interno' ? req.user.id : 0),
+      db.get('SELECT id FROM clientes WHERE email = ? AND id <> ?', email, req.user.userType === 'cliente' ? req.user.id : 0),
+    ]);
+
+    if (internalOwner || clientOwner) {
+      return res.status(400).json({ message: 'Este e-mail já está cadastrado em outro acesso.' });
+    }
+
+    const code = createEmailCode();
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MINUTES * 60 * 1000).toISOString();
+    await updateAuthUserEmailVerification(req.user, {
+      pendingEmail: email,
+      emailVerificationCodeHash: hashEmailCode(code),
+      emailVerificationExpiresAt: expiresAt,
+    });
+
+    await sendEmailVerificationCode({
+      to: email,
+      name: req.user.nome || req.user.username,
+      code,
+    });
+
+    res.json({ message: 'Código enviado para o e-mail informado.', pendingEmail: email });
+  } catch (error) {
+    console.error('Erro ao enviar código de verificação:', error);
+    res.status(500).json({ message: 'Não foi possível enviar o código agora.' });
+  }
+});
+
+app.post('/api/email-verification/confirm', authRequired, async (req, res) => {
+  const code = String(req.body?.code || '').replace(/\D/g, '');
+  if (code.length !== 6) {
+    return res.status(400).json({ message: 'Informe o código de 6 dígitos.' });
+  }
+
+  try {
+    const user = await getAuthUserRecord(req.user);
+    if (!user?.pendingEmail || !user?.emailVerificationCodeHash || !user?.emailVerificationExpiresAt) {
+      return res.status(400).json({ message: 'Solicite um código antes de confirmar.' });
+    }
+
+    if (new Date(user.emailVerificationExpiresAt) <= new Date()) {
+      return res.status(400).json({ message: 'Código expirado. Solicite um novo código.' });
+    }
+
+    if (user.emailVerificationCodeHash !== hashEmailCode(code)) {
+      return res.status(400).json({ message: 'Código inválido.' });
+    }
+
+    const verifiedAt = new Date().toISOString();
+    await updateAuthUserEmailVerification(req.user, {
+      email: user.pendingEmail,
+      emailVerified: 1,
+      emailVerifiedAt: verifiedAt,
+      pendingEmail: null,
+      emailVerificationCodeHash: null,
+      emailVerificationExpiresAt: null,
+    });
+
+    const updated = await getAuthUserRecord(req.user);
+    const permissions = req.user.userType === 'interno'
+      ? parsePermissions(updated.permissions)
+      : (req.user.role === 'ADM' ? ADMIN_PERMISSIONS : mergePermissions());
+    const responseUser = req.user.userType === 'interno'
+      ? sanitizeUser({ ...updated, permissions })
+      : {
+        id: updated.id,
+        nome: updated.nome,
+        email: updated.email,
+        role: req.user.role,
+        userType: 'cliente',
+        permissions,
+        emailVerified: true,
+        requiresEmailVerification: false,
+      };
+
+    res.json({ message: 'E-mail verificado com sucesso.', user: responseUser });
+  } catch (error) {
+    if (error.code === 'SQLITE_CONSTRAINT') {
+      return res.status(400).json({ message: 'Este e-mail já está cadastrado em outro acesso.' });
+    }
+    console.error('Erro ao confirmar e-mail:', error);
+    res.status(500).json({ message: 'Não foi possível confirmar o e-mail agora.' });
+  }
+});
+
 app.get('/api/me', authRequired, async (req, res) => {
   if (req.user.userType === 'interno') {
     return res.json({ user: sanitizeUser(req.user) });
   }
 
-  res.json({ user: { id: req.user.id, email: req.user.email, role: req.user.role, userType: 'cliente', permissions: mergePermissions() } });
+  const permissions = req.user.role === 'ADM' ? ADMIN_PERMISSIONS : mergePermissions();
+  res.json({ user: { id: req.user.id, nome: req.user.nome, email: req.user.email, role: req.user.role, userType: 'cliente', permissions, emailVerified: hasVerifiedEmail(req.user), requiresEmailVerification: requiresEmailVerification(req.user) } });
+});
+
+app.post('/api/forgot-password', async (req, res) => {
+  const identifier = String(req.body?.email || req.body?.identifier || '').trim();
+  const genericMessage = 'Se esse e-mail estiver cadastrado, enviaremos um link para redefinir sua senha.';
+
+  if (!identifier) {
+    return res.status(400).json({ message: 'Informe seu e-mail ou usuário.' });
+  }
+
+  try {
+    const resetUser = await findPasswordResetUser(identifier);
+    if (resetUser) {
+      const token = createResetToken();
+      const tokenHash = hashResetToken(token);
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
+      const resetUrl = `${getAppUrl()}/redefinir-senha?token=${encodeURIComponent(token)}`;
+
+      await db.run(
+        `INSERT INTO password_reset_tokens
+          (userType, userId, email, tokenHash, expiresAt, usedAt, createdAt)
+         VALUES (?, ?, ?, ?, ?, NULL, ?)`,
+        resetUser.userType,
+        resetUser.id,
+        resetUser.email,
+        tokenHash,
+        expiresAt.toISOString(),
+        now.toISOString()
+      );
+
+      await sendPasswordResetEmail({
+        to: resetUser.email,
+        name: resetUser.name,
+        resetUrl,
+      });
+    }
+
+    res.json({ message: genericMessage });
+  } catch (error) {
+    console.error('Erro ao solicitar recuperação de senha:', error);
+    res.status(500).json({ message: 'Não foi possível enviar o e-mail de recuperação agora.' });
+  }
+});
+
+app.post('/api/reset-password', async (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  const newPassword = String(req.body?.password || req.body?.newPassword || '');
+
+  if (!token) {
+    return res.status(400).json({ message: 'Token de recuperação não informado.' });
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ message: 'A nova senha precisa ter pelo menos 6 caracteres.' });
+  }
+
+  try {
+    const tokenHash = hashResetToken(token);
+    const reset = await db.get(
+      `SELECT * FROM password_reset_tokens
+       WHERE tokenHash = ? AND usedAt IS NULL AND expiresAt > ?
+       ORDER BY id DESC LIMIT 1`,
+      tokenHash,
+      new Date().toISOString()
+    );
+
+    if (!reset) {
+      return res.status(400).json({ message: 'Link inválido ou expirado. Solicite um novo e-mail de recuperação.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    if (reset.userType === 'interno') {
+      await db.run(
+        'UPDATE usuarios SET password = ?, mustChangePassword = 0 WHERE id = ?',
+        hashedPassword,
+        reset.userId
+      );
+    } else {
+      await db.run(
+        'UPDATE clientes SET password = ? WHERE id = ?',
+        hashedPassword,
+        reset.userId
+      );
+    }
+
+    await db.run(
+      'UPDATE password_reset_tokens SET usedAt = ? WHERE id = ?',
+      new Date().toISOString(),
+      reset.id
+    );
+
+    res.json({ message: 'Senha redefinida com sucesso. Você já pode acessar o painel.' });
+  } catch (error) {
+    console.error('Erro ao redefinir senha:', error);
+    res.status(500).json({ message: 'Não foi possível redefinir a senha agora.' });
+  }
 });
 
 app.post('/api/change-password', authRequired, async (req, res) => {
@@ -1708,29 +2244,31 @@ app.post('/api/change-password', authRequired, async (req, res) => {
 
 // Rotas do Admin
 app.get('/api/admin/clientes', authRequired, requirePermission('clientes'), async (req, res) => {
-  const clientes = await db.all('SELECT id, nome, whatsapp, cidade, email, dataCadastro FROM clientes ORDER BY id DESC');
-  res.json(clientes);
+  const clientes = await db.all('SELECT * FROM clientes ORDER BY id DESC');
+  res.json(clientes.map(publicClient));
 });
 
 app.post('/api/admin/clientes', authRequired, requirePermission('gerenciarClientes'), async (req, res) => {
-  const { nome, whatsapp, cidade, email, password } = req.body;
-  if (!nome || !whatsapp || !cidade) {
+  const data = normalizeClientPayload(req.body);
+  if (!data.nome || !data.whatsapp || !data.cidade) {
     return res.status(400).json({ message: 'Nome, WhatsApp e cidade são obrigatórios.' });
   }
 
   try {
-    const normalizedEmail = String(email || '').trim() || null;
-    const hashedPassword = await bcrypt.hash(password || 'Cliente@DRM#2026', 10);
+    const hashedPassword = await bcrypt.hash(req.body.password || 'Cliente@DRM#2026', 10);
+    const columns = ['nome', 'whatsapp', 'cidade', 'email', 'password', 'dataCadastro', ...CLIENT_EXTRA_FIELDS];
     const result = await db.run(
-      'INSERT INTO clientes (nome, whatsapp, cidade, email, password, dataCadastro) VALUES (?, ?, ?, ?, ?, ?)',
-      String(nome).trim(),
-      String(whatsapp).trim(),
-      String(cidade).trim(),
-      normalizedEmail,
+      `INSERT INTO clientes (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+      data.nome,
+      data.whatsapp,
+      data.cidade,
+      data.email,
       hashedPassword,
-      new Date().toISOString().split('T')[0]
+      new Date().toISOString().split('T')[0],
+      ...CLIENT_EXTRA_FIELDS.map(field => data[field])
     );
-    res.status(201).json({ id: result.lastID, nome: String(nome).trim(), whatsapp: String(whatsapp).trim(), cidade: String(cidade).trim(), email: normalizedEmail, dataCadastro: new Date().toISOString().split('T')[0] });
+    const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', result.lastID);
+    res.status(201).json(publicClient(cliente));
   } catch (error) {
     if (error.code === 'SQLITE_CONSTRAINT') {
       return res.status(400).json({ message: 'Este e-mail já está cadastrado.' });
@@ -1740,15 +2278,15 @@ app.post('/api/admin/clientes', authRequired, requirePermission('gerenciarClient
 });
 
 app.put('/api/admin/clientes/:id', authRequired, requirePermission('gerenciarClientes'), async (req, res) => {
-  const { nome, whatsapp, cidade } = req.body;
+  const data = normalizeClientPayload(req.body);
+  const fields = ['nome', 'whatsapp', 'cidade', 'email', ...CLIENT_EXTRA_FIELDS];
   await db.run(
-    'UPDATE clientes SET nome = COALESCE(?, nome), whatsapp = COALESCE(?, whatsapp), cidade = COALESCE(?, cidade) WHERE id = ?',
-    nome || null,
-    whatsapp || null,
-    cidade || null,
+    `UPDATE clientes SET ${fields.map(field => `${field} = ?`).join(', ')} WHERE id = ?`,
+    ...fields.map(field => data[field]),
     req.params.id
   );
-  res.json({ message: 'Cliente atualizado.' });
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.params.id);
+  res.json(cliente ? publicClient(cliente) : { message: 'Cliente atualizado.' });
 });
 
 app.get('/api/admin/leads', authRequired, requirePermission('leads'), async (req, res) => {
@@ -1912,6 +2450,85 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   res.status(201).json(parsedContrato);
 });
 
+app.post('/api/admin/contratos-direto', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { clienteId, equipamentoId, manual = {} } = req.body;
+  if (!clienteId) return res.status(400).json({ message: 'Selecione um cliente para gerar o contrato.' });
+
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', clienteId);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+
+  const equipamento = equipamentoId
+    ? await db.get('SELECT * FROM equipamentos WHERE id = ?', equipamentoId)
+    : await db.get('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id DESC LIMIT 1');
+
+  const potenciaKwp = Number(manual.potenciaKwp || 0);
+  const potenciaPlacaW = Number(equipamento?.potenciaPlacaW || 0);
+  const numeroPaineis = Number(manual.numeroPaineis || 0) || (
+    potenciaKwp && potenciaPlacaW ? Math.ceil(potenciaKwp / (potenciaPlacaW / 1000)) : 0
+  );
+  const geracaoMensal = Number(manual.geracaoKwh || 0);
+  const valorSistema = Number(manual.valorSistema || 0);
+  const now = new Date().toISOString();
+  const clienteSnapshot = {
+    ...cliente,
+    enderecoCompleto: buildClientAddress(cliente),
+    enderecoInstalacaoCompleto: buildInstallAddress(cliente),
+  };
+  delete clienteSnapshot.password;
+
+  const dados = {
+    dimensionamento: {
+      potencia_real_instalada_kwp: potenciaKwp,
+      numero_paineis_necessarios: numeroPaineis,
+      potencia_painel_utilizado_w: potenciaPlacaW || null,
+      geracao_estimada_kwh: geracaoMensal,
+      geracao_anual_estimada_kwh: Number(manual.geracaoAnualKwh || 0) || (geracaoMensal * 12),
+      respostas_usuario: { origem: 'cliente_cadastrado' },
+    },
+    financeiro: {
+      preco_final_cliente_rs: valorSistema,
+      forma_pagamento_tipo: manual.formaPagamentoTipo || '',
+      forma_pagamento: manual.formaPagamento || '',
+      entrada_rs: Number(manual.valorEntrada || 0),
+      saldo_rs: Number(manual.valorSaldo || 0),
+    },
+    manual,
+    cliente: clienteSnapshot,
+    statusOrigem: 'Cliente cadastrado',
+    observacao: 'Contrato gerado diretamente a partir do cadastro completo do cliente.',
+  };
+
+  const result = await db.run(
+    `INSERT INTO contratos
+      (orcamentoId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, valorProjeto, status, dados,
+       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados)
+     VALUES (NULL, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    cliente.nome,
+    cliente.whatsapp,
+    cliente.email,
+    cliente.cidade,
+    valorSistema,
+    JSON.stringify(dados),
+    req.user.id,
+    req.user.nome,
+    now,
+    req.user.id,
+    req.user.nome,
+    equipamento?.id || null,
+    equipamento?.nome || null,
+    JSON.stringify({
+      ...(equipamento || {}),
+      placaModelo: manual.painel || equipamento?.placaModelo || '',
+      inversorModelo: manual.inversor || equipamento?.inversorModelo || '',
+    })
+  );
+
+  const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', result.lastID);
+  const parsedContrato = parseContrato(contrato);
+  io.emit('contrato_atualizado', parsedContrato);
+  res.status(201).json(parsedContrato);
+});
+
 app.put('/api/admin/contratos/:id/revisao', authRequired, requirePermission('contratos'), async (req, res) => {
   if (req.user.role !== 'ADM') {
     return res.status(403).json({ message: 'Somente o Deivson/administrador pode aprovar ou recusar contratos.' });
@@ -1969,18 +2586,21 @@ app.get('/api/admin/contratos/:id/download', authRequired, requirePermission('co
 });
 
 app.get('/api/admin/usuarios', authRequired, requirePermission('usuarios'), async (req, res) => {
-  const usuarios = await db.all('SELECT id, nome, username, email, whatsapp, role, permissions, mustChangePassword, active, createdAt FROM usuarios ORDER BY id ASC');
-  res.json(usuarios.map(user => ({ ...user, permissions: parsePermissions(user.permissions), mustChangePassword: Boolean(user.mustChangePassword), active: Boolean(user.active) })));
+  const usuarios = await db.all('SELECT id, nome, username, email, whatsapp, role, permissions, mustChangePassword, active, emailVerified, createdAt FROM usuarios ORDER BY id ASC');
+  res.json(usuarios.map(user => ({ ...user, permissions: parsePermissions(user.permissions), mustChangePassword: Boolean(user.mustChangePassword), active: Boolean(user.active), emailVerified: hasVerifiedEmail(user) })));
 });
 
 app.post('/api/admin/usuarios', authRequired, requirePermission('usuarios'), async (req, res) => {
   const { nome, username, email, whatsapp, role, permissions, temporaryPassword } = req.body;
   const normalizedName = String(nome || '').trim();
   const normalizedUsername = String(username || '').trim().toLowerCase();
-  const normalizedEmail = String(email || `${normalizedUsername}@drm.local`).trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
   const normalizedWhatsApp = normalizeWhatsAppPhone(whatsapp);
   const normalizedRole = ['ADM', 'EQUIPE_TECNICA_COMERCIAL', 'CONSULTOR'].includes(role) ? role : 'CONSULTOR';
   const password = String(temporaryPassword || `${normalizedUsername}@DRM#2026`).trim();
+  if (!isRealEmail(normalizedEmail)) {
+    return res.status(400).json({ message: 'Informe um e-mail válido para recuperação de senha.' });
+  }
   const mergedPermissions = mergePermissions(permissions || {
     dashboard: true,
     leads: true,
@@ -2020,6 +2640,7 @@ app.post('/api/admin/usuarios', authRequired, requirePermission('usuarios'), asy
     role: normalizedRole,
     permissions: mergedPermissions,
     mustChangePassword: true,
+    emailVerified: false,
     active: true,
     temporaryPassword: password,
   });
@@ -2332,7 +2953,7 @@ app.put('/api/admin/ordens-servico/:id', authRequired, requirePermission('ordens
 
 app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async (req, res) => {
   const canSeeAll = can(req.user, 'verTodosLeads');
-  const [leads, orcamentos, contratos, projetos, atividades, siteEvents] = await Promise.all([
+  const [leads, orcamentos, contratos, projetos, atividades, siteEvents, clientesResumo, usuariosResumo, ordensServico] = await Promise.all([
     canSeeAll ? db.all('SELECT * FROM leads') : db.all('SELECT * FROM leads WHERE assignedUserId = ?', req.user.id),
     canSeeAll ? db.all('SELECT * FROM orcamentos') : db.all('SELECT * FROM orcamentos WHERE assignedUserId = ?', req.user.id),
     canSeeAll ? db.all('SELECT * FROM contratos') : db.all('SELECT * FROM contratos WHERE assignedUserId = ? OR criadoPorId = ?', req.user.id, req.user.id),
@@ -2346,6 +2967,9 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
           ORDER BY id DESC
         `)
       : Promise.resolve([]),
+    canSeeAll ? db.all('SELECT id, nome, email, emailVerified FROM clientes') : Promise.resolve([]),
+    canSeeAll ? db.all('SELECT id, nome, username, email, emailVerified, active, mustChangePassword FROM usuarios') : Promise.resolve([]),
+    canSeeAll ? db.all('SELECT * FROM ordens_servico') : db.all('SELECT * FROM ordens_servico WHERE responsavelId = ? OR responsavelId IS NULL', req.user.id),
   ]);
 
   const hoje = new Date();
@@ -2391,21 +3015,59 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
     .map(([source, total]) => ({ source, total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 6);
+  const contratosPorStatus = contratos.reduce((acc, contrato) => {
+    const status = contrato.status || 'Sem status';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+  const valorPendenteContratos = contratos
+    .filter(contrato => contrato.status === 'Pendente')
+    .reduce((sum, contrato) => sum + Number(contrato.valorProjeto || 0), 0);
+  const emailsPendentesClientes = clientesResumo.filter(cliente => requiresEmailVerification(cliente)).length;
+  const emailsPendentesUsuarios = usuariosResumo.filter(user => user.active !== 0 && requiresEmailVerification(user)).length;
+  const recuperacaoLiberadaClientes = clientesResumo.filter(cliente => hasVerifiedEmail(cliente)).length;
+  const recuperacaoLiberadaUsuarios = usuariosResumo.filter(user => user.active !== 0 && hasVerifiedEmail(user)).length;
+  const osAbertas = ordensServico.filter(os => os.status === 'Aberta').length;
+  const osEmAtendimento = ordensServico.filter(os => os.status === 'Em atendimento').length;
 
   res.json({
     kpis: {
       leads: leads.length,
       novos: leadsPorStatus.Novo || 0,
       orcamentos: orcamentos.length,
+      contratos: contratos.length,
       contratosPendentes: contratos.filter(contrato => contrato.status === 'Pendente').length,
       contratosAprovados: contratos.filter(contrato => contrato.status === 'Aprovado').length,
+      contratosRecusados: contratos.filter(contrato => contrato.status === 'Recusado').length,
+      valorPendenteContratos,
+      osAbertas,
+      osEmAtendimento,
       projetosAtivos: projetos.filter(projeto => projeto.etapa !== 'Concluído').length,
       valorAprovadoMes,
       retornosSemana: leads.filter(lead => isBetween(lead.proximoRetorno, fimSemana)).length,
+      clientesSemEmailVerificado: emailsPendentesClientes,
+      usuariosSemEmailVerificado: emailsPendentesUsuarios,
+      acessosSemRecuperacao: emailsPendentesClientes + emailsPendentesUsuarios,
+      acessosComRecuperacao: recuperacaoLiberadaClientes + recuperacaoLiberadaUsuarios,
       visitasSite30d: analyticsByType.page_view || 0,
       clicksWhatsApp30d: analyticsByType.whatsapp_click || 0,
       clicksSimular30d: analyticsByType.simulation_click || 0,
       simulacoesConcluidas30d: analyticsByType.simulation_completed || 0,
+    },
+    contratosPorStatus,
+    operacao: {
+      contratosTotal: contratos.length,
+      contratosPendentes: contratos.filter(contrato => contrato.status === 'Pendente').length,
+      contratosAprovados: contratos.filter(contrato => contrato.status === 'Aprovado').length,
+      contratosRecusados: contratos.filter(contrato => contrato.status === 'Recusado').length,
+      valorPendenteContratos,
+      ordensServicoAbertas: osAbertas,
+      ordensServicoEmAtendimento: osEmAtendimento,
+      emailsPendentesClientes,
+      emailsPendentesUsuarios,
+      acessosSemRecuperacao: emailsPendentesClientes + emailsPendentesUsuarios,
+      acessosComRecuperacao: recuperacaoLiberadaClientes + recuperacaoLiberadaUsuarios,
+      senhasTemporarias: usuariosResumo.filter(user => user.active !== 0 && user.mustChangePassword).length,
     },
     siteAnalytics: {
       totalEventos30d: siteEvents.length,
