@@ -436,9 +436,22 @@ const AdminDashboard = () => {
       headers: { ...headers, ...(options.headers || {}) },
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Falha ao carregar dados.');
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('role');
+        navigate('/login');
+      }
+      if (data.requiresEmailVerification) {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({ ...currentUser, requiresEmailVerification: true }));
+        navigate('/verificar-email');
+      }
+      throw new Error(data.message || 'Falha ao carregar dados.');
+    }
     return data;
-  }, [headers]);
+  }, [headers, navigate]);
 
   const loadData = useCallback(async (user) => {
     const calls = [];
@@ -482,7 +495,9 @@ const AdminDashboard = () => {
       calls.push(request('/api/admin/financeiro').then(setFinanceiro));
     }
 
-    await Promise.allSettled(calls);
+    const results = await Promise.allSettled(calls);
+    const failed = results.find(result => result.status === 'rejected');
+    if (failed) throw failed.reason;
   }, [request]);
 
   useEffect(() => {
@@ -942,6 +957,18 @@ const AdminDashboard = () => {
 
         <div className="admin-body fade-in">
           {error && <p className="error-message">{error}</p>}
+
+          {activeTab === 'dashboard' && !resumo && (
+            <div className="admin-card">
+              <div className="card-header-flex compact">
+                <div>
+                  <h3>Carregando painel geral</h3>
+                  <p className="muted-text">Se você estava usando um acesso antigo, faça login novamente com um usuário oficial e confirme o e-mail.</p>
+                </div>
+                <button type="button" className="btn btn-outline btn-sm-admin" onClick={handleSair}>Entrar novamente</button>
+              </div>
+            </div>
+          )}
 
           {activeTab === 'dashboard' && resumo && (
             <div className="crm-dashboard">
