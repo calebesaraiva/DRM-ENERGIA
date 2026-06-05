@@ -1752,7 +1752,7 @@ const AdminDashboard = () => {
                 <input
                   value={projectSearch}
                   onChange={(event) => setProjectSearch(event.target.value)}
-                  placeholder="Ex: Cliente Demo, #12, 99991..."
+                  placeholder="Ex: nome do cliente, #12, 99991..."
                 />
                 <span>{filteredProjetos.length} resultado{filteredProjetos.length === 1 ? '' : 's'}</span>
               </div>

@@ -647,135 +647,6 @@ const ensureProjetosForApprovedContracts = async () => {
   }
 };
 
-const seedDemoData = async () => {
-  const demoVersion = 'finance-contract-demo-v1';
-  if (await getSetting('demoSeedVersion', null) === demoVersion) return;
-
-  const owners = await getLeadOwners();
-  if (owners.length === 0) return;
-
-  const equipamentosCount = await db.get('SELECT COUNT(*) as count FROM equipamentos');
-  if (equipamentosCount.count < 3) {
-    const kits = [
-      ['Kit Growatt 5kW + 610W', 'Painel Monocristalino 610W Half Cell', 'Inversor Growatt 5kW', 610, 5],
-      ['Kit Deye 8kW + 610W', 'Painel Monocristalino 610W N-Type', 'Inversor Deye 8kW', 610, 8],
-      ['Kit Solis 10kW + 610W', 'Painel Monocristalino 610W Bifacial', 'Inversor Solis 10kW', 610, 10],
-    ];
-    for (const kit of kits) {
-      await db.run(
-        `INSERT INTO equipamentos
-          (nome, placaModelo, inversorModelo, potenciaPlacaW, potenciaInversorKw, observacoes, active, createdAt)
-         VALUES (?, ?, ?, ?, ?, 'Demonstração para contratos', 1, ?)`,
-        ...kit,
-        new Date().toISOString()
-      );
-    }
-  }
-
-  const despesasCount = await db.get('SELECT COUNT(*) as count FROM despesas_fixas');
-  if (despesasCount.count === 0) {
-    const despesas = [
-      ['Aluguel', 2500, 'Estrutura'],
-      ['Internet e sistemas', 480, 'Operacional'],
-      ['Contabilidade', 650, 'Administrativo'],
-      ['Marketing', 1200, 'Comercial'],
-      ['Combustível e deslocamento', 1800, 'Operacional'],
-    ];
-    for (const despesa of despesas) {
-      await db.run(
-        'INSERT INTO despesas_fixas (nome, valor, categoria, active, createdAt) VALUES (?, ?, ?, 1, ?)',
-        ...despesa,
-        new Date().toISOString()
-      );
-    }
-  }
-
-  const current = new Date();
-  const lastMonth = new Date(current.getFullYear(), current.getMonth() - 1, 12);
-  const formatDate = (date) => date.toISOString().split('T')[0];
-  const demos = [
-    { nome: 'Cliente Demo Aprovado', telefone: '99991675608', email: 'aprovado.demo@drm.local', cidade: 'Imperatriz', conta: 550, status: 'Aprovado', owner: owners[0], date: current, manual: { geracaoKwh: '660', potenciaKwp: '5.49', quantidadeCabo: '42 metros', valorSistema: 14675, formaPagamentoTipo: 'misto', formaPagamento: 'Entrada de R$ 2.000,00 + restante financiado em banco parceiro.' } },
-    { nome: 'Cliente Demo Pendente', telefone: '99990000111', email: 'pendente.demo@drm.local', cidade: 'Açailândia', conta: 700, status: 'Pendente', owner: owners[1 % owners.length], date: current, manual: { geracaoKwh: '850', potenciaKwp: '7.32', quantidadeCabo: '55 metros', valorSistema: 19250, formaPagamentoTipo: 'financiado', formaPagamento: 'Financiamento total aguardando aprovação.' } },
-    { nome: 'Cliente Demo Recusado', telefone: '99990000222', email: 'recusado.demo@drm.local', cidade: 'João Lisboa', conta: 430, status: 'Recusado', owner: owners[2 % owners.length], date: current, manual: { geracaoKwh: '520', potenciaKwp: '4.27', quantidadeCabo: '36 metros', valorSistema: 12250, formaPagamentoTipo: 'cartao', formaPagamento: 'Cartão de crédito em 10x, recusado para revisão de margem.' } },
-    { nome: 'Cliente Demo Mês Passado', telefone: '99990000333', email: 'passado.demo@drm.local', cidade: 'Davinópolis', conta: 1000, status: 'Aprovado', owner: owners[3 % owners.length], date: lastMonth, manual: { geracaoKwh: '1220', potenciaKwp: '10.37', quantidadeCabo: '80 metros', valorSistema: 20750, formaPagamentoTipo: 'avista', formaPagamento: 'À vista com desconto comercial.' } },
-  ];
-
-  const equipamentos = await db.all('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id ASC');
-  for (let index = 0; index < demos.length; index += 1) {
-    const demo = demos[index];
-    const exists = await db.get('SELECT id FROM contratos WHERE clienteEmail = ?', demo.email);
-    if (exists) continue;
-
-    const resultado = calcularSimulacaoSolar({ contaEnergia: demo.conta });
-    const dataCadastro = formatDate(demo.date);
-    const owner = demo.owner;
-    const lead = await db.run(
-      `INSERT INTO leads
-        (nome, telefone, email, cidade, origem, status, dataCadastro, assignedUserId, assignedUserName)
-       VALUES (?, ?, ?, ?, 'Demonstração', ?, ?, ?, ?)`,
-      demo.nome,
-      demo.telefone,
-      demo.email,
-      demo.cidade,
-      demo.status === 'Pendente' ? 'Novo' : 'Em atendimento',
-      dataCadastro,
-      owner.id,
-      owner.nome
-    );
-    const orc = await db.run(
-      `INSERT INTO orcamentos
-        (leadId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, status, data, dimensionamento, financeiro, assignedUserId, assignedUserName)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      lead.lastID,
-      demo.nome,
-      demo.telefone,
-      demo.email,
-      demo.cidade,
-      demo.status === 'Aprovado' ? 'Fechado' : 'Aberto',
-      dataCadastro,
-      JSON.stringify(resultado.dimensionamento),
-      JSON.stringify(resultado.financeiro),
-      owner.id,
-      owner.nome
-    );
-    const equipamento = equipamentos[index % equipamentos.length];
-    const manual = {
-      ...demo.manual,
-      painel: equipamento.placaModelo,
-      inversor: equipamento.inversorModelo,
-    };
-    const contrato = await db.run(
-      `INSERT INTO contratos
-        (orcamentoId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, valorProjeto, status, dados,
-         criadoPorId, criadoPorNome, analisadoPorId, analisadoPorNome, observacaoAnalise, dataCriacao, dataAnalise,
-         assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      orc.lastID,
-      demo.nome,
-      demo.telefone,
-      demo.email,
-      demo.cidade,
-      manual.valorSistema,
-      demo.status,
-      JSON.stringify({ dimensionamento: resultado.dimensionamento, financeiro: resultado.financeiro, manual, statusOrigem: 'Demonstração' }),
-      owner.id,
-      owner.nome,
-      demo.status === 'Pendente' ? null : 1,
-      demo.status === 'Pendente' ? null : 'Deivson DRM',
-      demo.status === 'Recusado' ? 'Demonstração recusada para testar revisão.' : (demo.status === 'Aprovado' ? 'Demonstração aprovada para testar impressão.' : null),
-      demo.date.toISOString(),
-      demo.status === 'Pendente' ? null : demo.date.toISOString(),
-      owner.id,
-      owner.nome,
-      equipamento.id,
-      equipamento.nome,
-      JSON.stringify({ ...equipamento, placaModelo: manual.painel, inversorModelo: manual.inversor })
-    );
-  }
-
-  await setSetting('demoSeedVersion', demoVersion);
-};
-
 const calcularSimulacaoSolar = (body) => {
   const { contaEnergia } = body;
 
@@ -1656,7 +1527,6 @@ const buildContratoHtml = async (contrato) => {
   }
 
   await normalizeLeadDistribution();
-  await seedDemoData();
   await ensureProjetosForApprovedContracts();
 
   // Popula o portfólio com dados de exemplo se estiver vazio
@@ -1678,24 +1548,6 @@ const buildContratoHtml = async (contrato) => {
     console.log('Tabela de portfólio populada.');
   }
 
-  // Garante que o usuário admin exista e tenha a senha correta
-  const adminEmail = 'SOLAR@';
-  const adminPassword = 'solar610';
-  const hashedPassword = await bcrypt.hash(adminPassword, 10);
-  const adminUser = await db.get('SELECT id FROM clientes WHERE email = ? OR nome = ?', adminEmail, 'SOLAR@');
-
-  if (!adminUser) {
-    console.log('Usuário admin não encontrado, criando...');
-    await db.run(
-      'INSERT INTO clientes (nome, email, password, dataCadastro) VALUES (?, ?, ?, ?)',
-      'SOLAR@', adminEmail, hashedPassword, new Date().toISOString().split('T')[0]
-    );
-    console.log('Usuário admin criado com sucesso.');
-  } else {
-    console.log('Usuário admin encontrado. Garantindo que a senha esteja atualizada.');
-    await db.run('UPDATE clientes SET password = ? WHERE id = ?', hashedPassword, adminUser.id);
-    console.log('Senha do admin atualizada.');
-  }
 })();
 
 // --- ROTAS DA API ---
@@ -1985,9 +1837,8 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: 'Credenciais inválidas.' }); // Senha incorreta
     }
 
-    const isSolarAdmin = user.email === 'SOLAR@';
-    const role = isSolarAdmin ? 'ADM' : 'CLIENTE';
-    const permissions = isSolarAdmin ? ADMIN_PERMISSIONS : mergePermissions();
+    const role = 'CLIENTE';
+    const permissions = mergePermissions();
 
     const token = jwt.sign(
       { id: user.id, nome: user.nome, email: user.email, role: role, permissions },
