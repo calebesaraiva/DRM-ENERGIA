@@ -124,6 +124,44 @@ const emptyContractManual = {
   formaPagamento: '',
 };
 
+const emptyEquipamentoForm = {
+  nome: '',
+  tipo: 'Kit solar',
+  placaModelo: '',
+  inversorModelo: '',
+  potenciaPlacaW: '',
+  potenciaInversorKw: '',
+  geracaoKwh: '',
+  geracaoAnualKwh: '',
+  potenciaKwp: '',
+  numeroPaineis: '',
+  quantidadeCabo: '',
+  valorSistema: '',
+  valorEntrada: '',
+  valorSaldo: '',
+  prazoExecucao: '40',
+  formaPagamentoTipo: 'avista',
+  formaPagamento: '',
+  observacoes: '',
+};
+
+const applyEquipamentoToManual = (manual = {}, equipamento = {}) => ({
+  ...manual,
+  geracaoKwh: equipamento?.geracaoKwh || manual.geracaoKwh || '',
+  geracaoAnualKwh: equipamento?.geracaoAnualKwh || manual.geracaoAnualKwh || '',
+  potenciaKwp: equipamento?.potenciaKwp || manual.potenciaKwp || '',
+  numeroPaineis: equipamento?.numeroPaineis || manual.numeroPaineis || '',
+  quantidadeCabo: equipamento?.quantidadeCabo || manual.quantidadeCabo || '',
+  painel: equipamento?.placaModelo || manual.painel || '',
+  inversor: equipamento?.inversorModelo || manual.inversor || '',
+  valorSistema: equipamento?.valorSistema || manual.valorSistema || '',
+  valorEntrada: equipamento?.valorEntrada || manual.valorEntrada || '',
+  valorSaldo: equipamento?.valorSaldo || manual.valorSaldo || '',
+  prazoExecucao: equipamento?.prazoExecucao || manual.prazoExecucao || '',
+  formaPagamentoTipo: equipamento?.formaPagamentoTipo || manual.formaPagamentoTipo || 'avista',
+  formaPagamento: equipamento?.formaPagamento || manual.formaPagamento || '',
+});
+
 const emptyClientForm = {
   tipoPessoa: 'Pessoa física',
   nome: '',
@@ -229,7 +267,7 @@ const AdminDashboard = () => {
   const [reviewNote, setReviewNote] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [equipamentos, setEquipamentos] = useState([]);
-  const [equipamentoForm, setEquipamentoForm] = useState({ nome: '', placaModelo: '', inversorModelo: '', potenciaPlacaW: '', potenciaInversorKw: '', observacoes: '' });
+  const [equipamentoForm, setEquipamentoForm] = useState(emptyEquipamentoForm);
   const [selectedEquipamentos, setSelectedEquipamentos] = useState({});
   const [contractModal, setContractModal] = useState({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
   const [contractConfig, setContractConfig] = useState(defaultContractConfig);
@@ -770,21 +808,20 @@ const AdminDashboard = () => {
 
   const openContractModal = (orcamento) => {
     const equipamento = equipamentos.find(item => item.id === Number(selectedEquipamentos[orcamento.id])) || equipamentos.find(item => item.active);
+    const baseManual = {
+      ...emptyContractManual,
+      geracaoKwh: orcamento.dimensionamento?.geracao_estimada_kwh || '',
+      geracaoAnualKwh: orcamento.dimensionamento?.geracao_estimada_kwh ? Number(orcamento.dimensionamento.geracao_estimada_kwh) * 12 : '',
+      potenciaKwp: orcamento.dimensionamento?.potencia_real_instalada_kwp || '',
+      numeroPaineis: orcamento.dimensionamento?.numero_paineis_necessarios || '',
+      valorSistema: orcamento.financeiro?.preco_final_cliente_rs || '',
+      formaPagamentoTipo: 'avista',
+    };
     setContractModal({
       open: true,
       orcamento,
       equipamentoId: equipamento?.id || '',
-      manual: {
-        ...emptyContractManual,
-        geracaoKwh: orcamento.dimensionamento?.geracao_estimada_kwh || '',
-        geracaoAnualKwh: orcamento.dimensionamento?.geracao_estimada_kwh ? Number(orcamento.dimensionamento.geracao_estimada_kwh) * 12 : '',
-        potenciaKwp: orcamento.dimensionamento?.potencia_real_instalada_kwp || '',
-        numeroPaineis: orcamento.dimensionamento?.numero_paineis_necessarios || '',
-        painel: equipamento?.placaModelo || '',
-        inversor: equipamento?.inversorModelo || '',
-        valorSistema: orcamento.financeiro?.preco_final_cliente_rs || '',
-        formaPagamentoTipo: 'avista',
-      },
+      manual: applyEquipamentoToManual(baseManual, equipamento),
     });
   };
 
@@ -804,12 +841,7 @@ const AdminDashboard = () => {
         clienteData: cliente,
       },
       equipamentoId: equipamento?.id || '',
-      manual: {
-        ...emptyContractManual,
-        painel: equipamento?.placaModelo || '',
-        inversor: equipamento?.inversorModelo || '',
-        formaPagamentoTipo: 'avista',
-      },
+      manual: applyEquipamentoToManual({ ...emptyContractManual, formaPagamentoTipo: 'avista' }, equipamento),
     });
   };
 
@@ -867,7 +899,7 @@ const AdminDashboard = () => {
       body: JSON.stringify(equipamentoForm),
     });
     setEquipamentos(prev => [equipamento, ...prev]);
-    setEquipamentoForm({ nome: '', placaModelo: '', inversorModelo: '', potenciaPlacaW: '', potenciaInversorKw: '', observacoes: '' });
+    setEquipamentoForm(emptyEquipamentoForm);
   };
 
   const saveContractConfig = async (event) => {
@@ -1696,25 +1728,56 @@ const AdminDashboard = () => {
                   <div className="admin-card">
                     <div className="card-header-flex">
                       <div>
-                        <h3>Equipamentos</h3>
-                        <p className="muted-text">Cadastre os modelos usados com frequência e selecione no contrato pela setinha.</p>
+                        <h3>Produtos e pacotes</h3>
+                        <p className="muted-text">Cadastre kits, serviços e condições comerciais para selecionar no contrato e preencher automático.</p>
                       </div>
                       <span className="status-badge success">{equipamentos.length} itens</span>
                     </div>
                     <form className="equipment-form" onSubmit={createEquipamento}>
-                      <input placeholder="Nome do kit" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
+                      <input placeholder="Nome do produto/pacote" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
+                      <select value={equipamentoForm.tipo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, tipo: e.target.value }))}>
+                        <option>Kit solar</option>
+                        <option>Pacote completo</option>
+                        <option>Serviço</option>
+                        <option>Material</option>
+                      </select>
                       <input placeholder="Modelo da placa" value={equipamentoForm.placaModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, placaModelo: e.target.value }))} required />
                       <input placeholder="Modelo do inversor" value={equipamentoForm.inversorModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, inversorModelo: e.target.value }))} required />
                       <input placeholder="Potência placa W" type="number" value={equipamentoForm.potenciaPlacaW} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaPlacaW: e.target.value }))} />
                       <input placeholder="Potência inversor kW" type="number" step="0.01" value={equipamentoForm.potenciaInversorKw} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaInversorKw: e.target.value }))} />
-                      <input placeholder="Observações" value={equipamentoForm.observacoes} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, observacoes: e.target.value }))} />
-                      <button className="btn btn-primary" type="submit">Adicionar</button>
+                      <input placeholder="Geração mensal kWh" type="number" step="0.01" value={equipamentoForm.geracaoKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoKwh: e.target.value }))} />
+                      <input placeholder="Geração anual kWh" type="number" step="0.01" value={equipamentoForm.geracaoAnualKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoAnualKwh: e.target.value }))} />
+                      <input placeholder="Potência kWp" type="number" step="0.01" value={equipamentoForm.potenciaKwp} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaKwp: e.target.value }))} />
+                      <input placeholder="Quantidade de placas" type="number" value={equipamentoForm.numeroPaineis} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, numeroPaineis: e.target.value }))} />
+                      <input placeholder="Quantidade de cabo" value={equipamentoForm.quantidadeCabo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, quantidadeCabo: e.target.value }))} />
+                      <input placeholder="Valor do sistema" type="number" step="0.01" value={equipamentoForm.valorSistema} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSistema: e.target.value }))} />
+                      <input placeholder="Entrada" type="number" step="0.01" value={equipamentoForm.valorEntrada} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorEntrada: e.target.value }))} />
+                      <input placeholder="Saldo" type="number" step="0.01" value={equipamentoForm.valorSaldo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSaldo: e.target.value }))} />
+                      <input placeholder="Prazo de execução" type="number" value={equipamentoForm.prazoExecucao} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, prazoExecucao: e.target.value }))} />
+                      <select value={equipamentoForm.formaPagamentoTipo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamentoTipo: e.target.value }))}>
+                        <option value="avista">À vista</option>
+                        <option value="financiado">Financiado</option>
+                        <option value="cartao">Cartão de crédito</option>
+                        <option value="misto">Misto / mesclado</option>
+                      </select>
+                      <textarea className="span-2" placeholder="Forma de pagamento detalhada" value={equipamentoForm.formaPagamento} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamento: e.target.value }))} />
+                      <textarea className="span-2" placeholder="Observações do produto/pacote" value={equipamentoForm.observacoes} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, observacoes: e.target.value }))} />
+                      <button className="btn btn-primary" type="submit">Criar produto/pacote</button>
                     </form>
                     <div className="equipment-list">
                       {equipamentos.map(item => (
                         <div className="equipment-item" key={item.id}>
-                          <strong>{item.nome}</strong>
+                          <div className="equipment-item-head">
+                            <strong>{item.nome}</strong>
+                            <span className="status-badge neutral">{item.tipo || 'Kit solar'}</span>
+                          </div>
                           <span>{item.placaModelo} • {item.inversorModelo}</span>
+                          <small>
+                            {item.potenciaKwp ? `${item.potenciaKwp} kWp • ` : ''}
+                            {item.numeroPaineis ? `${item.numeroPaineis} placas • ` : ''}
+                            {item.geracaoKwh ? `${item.geracaoKwh} kWh/mês • ` : ''}
+                            {item.valorSistema ? money(item.valorSistema) : 'Sem valor padrão'}
+                          </small>
                         </div>
                       ))}
                     </div>
@@ -2631,11 +2694,7 @@ const AdminDashboard = () => {
                     setContractModal(prev => ({
                       ...prev,
                       equipamentoId: event.target.value,
-                      manual: {
-                        ...prev.manual,
-                        painel: equipamento?.placaModelo || prev.manual.painel,
-                        inversor: equipamento?.inversorModelo || prev.manual.inversor,
-                      },
+                      manual: equipamento ? applyEquipamentoToManual(prev.manual, equipamento) : prev.manual,
                     }));
                   }}
                 >

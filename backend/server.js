@@ -706,6 +706,59 @@ const parseContrato = (contrato) => ({
   equipamentoDados: parseJsonField(contrato.equipamentoDados),
 });
 
+const equipamentoExtraColumns = {
+  tipo: 'TEXT',
+  geracaoKwh: 'REAL',
+  geracaoAnualKwh: 'REAL',
+  potenciaKwp: 'REAL',
+  numeroPaineis: 'INTEGER',
+  quantidadeCabo: 'TEXT',
+  valorSistema: 'REAL',
+  valorEntrada: 'REAL',
+  valorSaldo: 'REAL',
+  prazoExecucao: 'INTEGER',
+  formaPagamentoTipo: 'TEXT',
+  formaPagamento: 'TEXT',
+};
+
+const normalizeEquipamentoPayload = (body = {}) => ({
+  nome: String(body.nome || '').trim(),
+  tipo: String(body.tipo || 'Kit solar').trim() || 'Kit solar',
+  placaModelo: String(body.placaModelo || '').trim(),
+  inversorModelo: String(body.inversorModelo || '').trim(),
+  potenciaPlacaW: body.potenciaPlacaW === '' || typeof body.potenciaPlacaW === 'undefined' ? null : Number(body.potenciaPlacaW),
+  potenciaInversorKw: body.potenciaInversorKw === '' || typeof body.potenciaInversorKw === 'undefined' ? null : Number(body.potenciaInversorKw),
+  geracaoKwh: body.geracaoKwh === '' || typeof body.geracaoKwh === 'undefined' ? null : Number(body.geracaoKwh),
+  geracaoAnualKwh: body.geracaoAnualKwh === '' || typeof body.geracaoAnualKwh === 'undefined' ? null : Number(body.geracaoAnualKwh),
+  potenciaKwp: body.potenciaKwp === '' || typeof body.potenciaKwp === 'undefined' ? null : Number(body.potenciaKwp),
+  numeroPaineis: body.numeroPaineis === '' || typeof body.numeroPaineis === 'undefined' ? null : Number(body.numeroPaineis),
+  quantidadeCabo: String(body.quantidadeCabo || '').trim() || null,
+  valorSistema: body.valorSistema === '' || typeof body.valorSistema === 'undefined' ? null : Number(body.valorSistema),
+  valorEntrada: body.valorEntrada === '' || typeof body.valorEntrada === 'undefined' ? null : Number(body.valorEntrada),
+  valorSaldo: body.valorSaldo === '' || typeof body.valorSaldo === 'undefined' ? null : Number(body.valorSaldo),
+  prazoExecucao: body.prazoExecucao === '' || typeof body.prazoExecucao === 'undefined' ? null : Number(body.prazoExecucao),
+  formaPagamentoTipo: String(body.formaPagamentoTipo || '').trim() || null,
+  formaPagamento: String(body.formaPagamento || '').trim() || null,
+  observacoes: String(body.observacoes || '').trim() || null,
+});
+
+const mergeManualWithEquipamento = (manual = {}, equipamento = {}) => ({
+  ...manual,
+  geracaoKwh: manual.geracaoKwh || equipamento?.geracaoKwh || '',
+  geracaoAnualKwh: manual.geracaoAnualKwh || equipamento?.geracaoAnualKwh || '',
+  potenciaKwp: manual.potenciaKwp || equipamento?.potenciaKwp || '',
+  numeroPaineis: manual.numeroPaineis || equipamento?.numeroPaineis || '',
+  quantidadeCabo: manual.quantidadeCabo || equipamento?.quantidadeCabo || '',
+  painel: manual.painel || equipamento?.placaModelo || '',
+  inversor: manual.inversor || equipamento?.inversorModelo || '',
+  valorSistema: manual.valorSistema || equipamento?.valorSistema || '',
+  valorEntrada: manual.valorEntrada || equipamento?.valorEntrada || '',
+  valorSaldo: manual.valorSaldo || equipamento?.valorSaldo || '',
+  prazoExecucao: manual.prazoExecucao || equipamento?.prazoExecucao || '',
+  formaPagamentoTipo: manual.formaPagamentoTipo || equipamento?.formaPagamentoTipo || '',
+  formaPagamento: manual.formaPagamento || equipamento?.formaPagamento || '',
+});
+
 const PROJECT_STAGES = [
   'Documentação',
   'Vistoria',
@@ -1254,10 +1307,22 @@ const buildContratoHtml = async (contrato) => {
     CREATE TABLE IF NOT EXISTS equipamentos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT NOT NULL,
+      tipo TEXT,
       placaModelo TEXT NOT NULL,
       inversorModelo TEXT NOT NULL,
       potenciaPlacaW INTEGER,
       potenciaInversorKw REAL,
+      geracaoKwh REAL,
+      geracaoAnualKwh REAL,
+      potenciaKwp REAL,
+      numeroPaineis INTEGER,
+      quantidadeCabo TEXT,
+      valorSistema REAL,
+      valorEntrada REAL,
+      valorSaldo REAL,
+      prazoExecucao INTEGER,
+      formaPagamentoTipo TEXT,
+      formaPagamento TEXT,
       observacoes TEXT,
       active INTEGER DEFAULT 1,
       createdAt TEXT
@@ -1438,6 +1503,14 @@ const buildContratoHtml = async (contrato) => {
     await db.exec('ALTER TABLE contratos ADD COLUMN equipamentoDados TEXT');
   }
 
+  const equipamentoColumns = await db.all('PRAGMA table_info(equipamentos)');
+  const existingEquipamentoColumns = equipamentoColumns.map(column => column.name);
+  for (const [field, definition] of Object.entries(equipamentoExtraColumns)) {
+    if (!existingEquipamentoColumns.includes(field)) {
+      await db.exec(`ALTER TABLE equipamentos ADD COLUMN ${field} ${definition}`);
+    }
+  }
+
   const usuarioColumns = await db.all('PRAGMA table_info(usuarios)');
   const existingUsuarioColumns = usuarioColumns.map(column => column.name);
   if (!existingUsuarioColumns.includes('whatsapp')) {
@@ -1509,13 +1582,17 @@ const buildContratoHtml = async (contrato) => {
   if (equipamentosCount.count === 0) {
     await db.run(
       `INSERT INTO equipamentos
-        (nome, placaModelo, inversorModelo, potenciaPlacaW, potenciaInversorKw, observacoes, active, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+        (nome, tipo, placaModelo, inversorModelo, potenciaPlacaW, potenciaInversorKw, quantidadeCabo, prazoExecucao, formaPagamentoTipo, observacoes, active, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
       'Kit padrão DRM',
+      'Kit solar',
       'Painel solar 610 W',
       'Inversor padrão conforme projeto',
       610,
       null,
+      '40 metros',
+      40,
+      'avista',
       'Equipamento padrão inicial. Edite conforme os modelos usados pela empresa.',
       new Date().toISOString()
     );
@@ -2183,21 +2260,35 @@ app.get('/api/admin/equipamentos', authRequired, requirePermission('contratos'),
 });
 
 app.post('/api/admin/equipamentos', authRequired, requirePermission('contratos'), async (req, res) => {
-  const { nome, placaModelo, inversorModelo, potenciaPlacaW, potenciaInversorKw, observacoes } = req.body;
-  if (!nome || !placaModelo || !inversorModelo) {
+  const data = normalizeEquipamentoPayload(req.body);
+  if (!data.nome || !data.placaModelo || !data.inversorModelo) {
     return res.status(400).json({ message: 'Nome, modelo da placa e modelo do inversor são obrigatórios.' });
   }
 
   const result = await db.run(
     `INSERT INTO equipamentos
-      (nome, placaModelo, inversorModelo, potenciaPlacaW, potenciaInversorKw, observacoes, active, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
-    nome,
-    placaModelo,
-    inversorModelo,
-    potenciaPlacaW || null,
-    potenciaInversorKw || null,
-    observacoes || null,
+      (nome, tipo, placaModelo, inversorModelo, potenciaPlacaW, potenciaInversorKw, geracaoKwh, geracaoAnualKwh,
+       potenciaKwp, numeroPaineis, quantidadeCabo, valorSistema, valorEntrada, valorSaldo, prazoExecucao,
+       formaPagamentoTipo, formaPagamento, observacoes, active, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    data.nome,
+    data.tipo,
+    data.placaModelo,
+    data.inversorModelo,
+    data.potenciaPlacaW,
+    data.potenciaInversorKw,
+    data.geracaoKwh,
+    data.geracaoAnualKwh,
+    data.potenciaKwp,
+    data.numeroPaineis,
+    data.quantidadeCabo,
+    data.valorSistema,
+    data.valorEntrada,
+    data.valorSaldo,
+    data.prazoExecucao,
+    data.formaPagamentoTipo,
+    data.formaPagamento,
+    data.observacoes,
     new Date().toISOString()
   );
   const equipamento = await db.get('SELECT * FROM equipamentos WHERE id = ?', result.lastID);
@@ -2205,23 +2296,48 @@ app.post('/api/admin/equipamentos', authRequired, requirePermission('contratos')
 });
 
 app.put('/api/admin/equipamentos/:id', authRequired, requirePermission('contratos'), async (req, res) => {
-  const { nome, placaModelo, inversorModelo, potenciaPlacaW, potenciaInversorKw, observacoes, active } = req.body;
+  const data = normalizeEquipamentoPayload(req.body);
+  const { active } = req.body;
   await db.run(
     `UPDATE equipamentos
      SET nome = COALESCE(?, nome),
+         tipo = COALESCE(?, tipo),
          placaModelo = COALESCE(?, placaModelo),
          inversorModelo = COALESCE(?, inversorModelo),
          potenciaPlacaW = ?,
          potenciaInversorKw = ?,
+         geracaoKwh = ?,
+         geracaoAnualKwh = ?,
+         potenciaKwp = ?,
+         numeroPaineis = ?,
+         quantidadeCabo = ?,
+         valorSistema = ?,
+         valorEntrada = ?,
+         valorSaldo = ?,
+         prazoExecucao = ?,
+         formaPagamentoTipo = ?,
+         formaPagamento = ?,
          observacoes = COALESCE(?, observacoes),
          active = ?
      WHERE id = ?`,
-    nome || null,
-    placaModelo || null,
-    inversorModelo || null,
-    potenciaPlacaW || null,
-    potenciaInversorKw || null,
-    observacoes || null,
+    data.nome || null,
+    data.tipo || null,
+    data.placaModelo || null,
+    data.inversorModelo || null,
+    data.potenciaPlacaW,
+    data.potenciaInversorKw,
+    data.geracaoKwh,
+    data.geracaoAnualKwh,
+    data.potenciaKwp,
+    data.numeroPaineis,
+    data.quantidadeCabo,
+    data.valorSistema,
+    data.valorEntrada,
+    data.valorSaldo,
+    data.prazoExecucao,
+    data.formaPagamentoTipo,
+    data.formaPagamento,
+    data.observacoes || null,
     active === false ? 0 : 1,
     req.params.id
   );
@@ -2260,11 +2376,12 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   const equipamento = equipamentoId
     ? await db.get('SELECT * FROM equipamentos WHERE id = ?', equipamentoId)
     : await db.get('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id DESC LIMIT 1');
+  const manualFinal = mergeManualWithEquipamento(manual, equipamento);
   const now = new Date().toISOString();
   const dados = {
     dimensionamento,
     financeiro,
-    manual,
+    manual: manualFinal,
     statusOrigem: orcamento.status,
     observacao: 'Contrato gerado no sistema e aguardando aprovação do responsável administrativo.',
   };
@@ -2279,7 +2396,7 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     orcamento.clienteTelefone,
     orcamento.clienteEmail,
     orcamento.clienteCidade,
-    Number(manual.valorSistema || financeiro.preco_final_cliente_rs) || 0,
+    Number(manualFinal.valorSistema || financeiro.preco_final_cliente_rs) || 0,
     JSON.stringify(dados),
     req.user.id,
     req.user.nome,
@@ -2290,8 +2407,8 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     equipamento?.nome || null,
     JSON.stringify({
       ...(equipamento || {}),
-      placaModelo: manual.painel || equipamento?.placaModelo || '',
-      inversorModelo: manual.inversor || equipamento?.inversorModelo || '',
+      placaModelo: manualFinal.painel || equipamento?.placaModelo || '',
+      inversorModelo: manualFinal.inversor || equipamento?.inversorModelo || '',
     })
   );
 
@@ -2311,14 +2428,15 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
   const equipamento = equipamentoId
     ? await db.get('SELECT * FROM equipamentos WHERE id = ?', equipamentoId)
     : await db.get('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id DESC LIMIT 1');
+  const manualFinal = mergeManualWithEquipamento(manual, equipamento);
 
-  const potenciaKwp = Number(manual.potenciaKwp || 0);
+  const potenciaKwp = Number(manualFinal.potenciaKwp || 0);
   const potenciaPlacaW = Number(equipamento?.potenciaPlacaW || 0);
-  const numeroPaineis = Number(manual.numeroPaineis || 0) || (
+  const numeroPaineis = Number(manualFinal.numeroPaineis || 0) || (
     potenciaKwp && potenciaPlacaW ? Math.ceil(potenciaKwp / (potenciaPlacaW / 1000)) : 0
   );
-  const geracaoMensal = Number(manual.geracaoKwh || 0);
-  const valorSistema = Number(manual.valorSistema || 0);
+  const geracaoMensal = Number(manualFinal.geracaoKwh || 0);
+  const valorSistema = Number(manualFinal.valorSistema || 0);
   const now = new Date().toISOString();
   const clienteSnapshot = {
     ...cliente,
@@ -2333,17 +2451,17 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
       numero_paineis_necessarios: numeroPaineis,
       potencia_painel_utilizado_w: potenciaPlacaW || null,
       geracao_estimada_kwh: geracaoMensal,
-      geracao_anual_estimada_kwh: Number(manual.geracaoAnualKwh || 0) || (geracaoMensal * 12),
+      geracao_anual_estimada_kwh: Number(manualFinal.geracaoAnualKwh || 0) || (geracaoMensal * 12),
       respostas_usuario: { origem: 'cliente_cadastrado' },
     },
     financeiro: {
       preco_final_cliente_rs: valorSistema,
-      forma_pagamento_tipo: manual.formaPagamentoTipo || '',
-      forma_pagamento: manual.formaPagamento || '',
-      entrada_rs: Number(manual.valorEntrada || 0),
-      saldo_rs: Number(manual.valorSaldo || 0),
+      forma_pagamento_tipo: manualFinal.formaPagamentoTipo || '',
+      forma_pagamento: manualFinal.formaPagamento || '',
+      entrada_rs: Number(manualFinal.valorEntrada || 0),
+      saldo_rs: Number(manualFinal.valorSaldo || 0),
     },
-    manual,
+    manual: manualFinal,
     cliente: clienteSnapshot,
     statusOrigem: 'Cliente cadastrado',
     observacao: 'Contrato gerado diretamente a partir do cadastro completo do cliente.',
@@ -2369,8 +2487,8 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
     equipamento?.nome || null,
     JSON.stringify({
       ...(equipamento || {}),
-      placaModelo: manual.painel || equipamento?.placaModelo || '',
-      inversorModelo: manual.inversor || equipamento?.inversorModelo || '',
+      placaModelo: manualFinal.painel || equipamento?.placaModelo || '',
+      inversorModelo: manualFinal.inversor || equipamento?.inversorModelo || '',
     })
   );
 
