@@ -1768,6 +1768,33 @@ const sendContratoPdf = async (res, contrato) => {
       createdAt TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS tabelas_precos_sistemas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      geracaoKwh REAL,
+      numeroPaineis INTEGER,
+      potenciaKwp REAL,
+      potenciaInversorKw REAL,
+      placaModelo TEXT,
+      inversorModelo TEXT,
+      valorKitSolar REAL DEFAULT 0,
+      custoInstalacao REAL DEFAULT 0,
+      materialCA REAL DEFAULT 0,
+      deslocamento REAL DEFAULT 0,
+      custoAdicional REAL DEFAULT 0,
+      margemEmpresa REAL DEFAULT 0,
+      comissaoPercentual REAL DEFAULT 0,
+      custoBase REAL DEFAULT 0,
+      valorComissao REAL DEFAULT 0,
+      precoFinal REAL DEFAULT 0,
+      observacoes TEXT,
+      active INTEGER DEFAULT 1,
+      criadoPorId INTEGER,
+      criadoPorNome TEXT,
+      createdAt TEXT,
+      updatedAt TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       userType TEXT NOT NULL,
@@ -4051,6 +4078,74 @@ app.put('/api/admin/despesas-fixas/:id', authRequired, requirePermission('financ
   );
   const despesa = await db.get('SELECT * FROM despesas_fixas WHERE id = ?', req.params.id);
   res.json({ ...despesa, active: Boolean(despesa.active) });
+});
+
+app.get('/api/admin/tabelas-precos', authRequired, requirePermission('precosSistemas'), async (req, res) => {
+  const rows = await db.all('SELECT * FROM tabelas_precos_sistemas ORDER BY active DESC, geracaoKwh ASC, precoFinal ASC, id DESC');
+  res.json(rows.map(item => ({ ...item, active: Boolean(item.active) })));
+});
+
+const normalizePriceTablePayload = body => {
+  const number = value => Number(value || 0);
+  return {
+    nome: String(body.nome || '').trim(),
+    geracaoKwh: number(body.geracaoKwh),
+    numeroPaineis: Math.max(0, Math.round(number(body.numeroPaineis))),
+    potenciaKwp: number(body.potenciaKwp),
+    potenciaInversorKw: number(body.potenciaInversorKw),
+    placaModelo: String(body.placaModelo || '').trim(),
+    inversorModelo: String(body.inversorModelo || '').trim(),
+    valorKitSolar: number(body.valorKitSolar),
+    custoInstalacao: number(body.custoInstalacao),
+    materialCA: number(body.materialCA),
+    deslocamento: number(body.deslocamento),
+    custoAdicional: number(body.custoAdicional),
+    margemEmpresa: number(body.margemEmpresa),
+    comissaoPercentual: number(body.comissaoPercentual),
+    custoBase: number(body.custoBase),
+    valorComissao: number(body.valorComissao),
+    precoFinal: number(body.precoFinal),
+    observacoes: String(body.observacoes || '').trim(),
+  };
+};
+
+app.post('/api/admin/tabelas-precos', authRequired, requirePermission('precosSistemas'), async (req, res) => {
+  const data = normalizePriceTablePayload(req.body);
+  if (!data.nome || data.geracaoKwh <= 0 || data.precoFinal <= 0) {
+    return res.status(400).json({ message: 'Informe nome, geração e preço final válidos.' });
+  }
+  const now = new Date().toISOString();
+  const result = await db.run(
+    `INSERT INTO tabelas_precos_sistemas
+      (nome, geracaoKwh, numeroPaineis, potenciaKwp, potenciaInversorKw, placaModelo, inversorModelo,
+       valorKitSolar, custoInstalacao, materialCA, deslocamento, custoAdicional, margemEmpresa,
+       comissaoPercentual, custoBase, valorComissao, precoFinal, observacoes, active, criadoPorId, criadoPorNome, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+    data.nome, data.geracaoKwh, data.numeroPaineis, data.potenciaKwp, data.potenciaInversorKw, data.placaModelo, data.inversorModelo,
+    data.valorKitSolar, data.custoInstalacao, data.materialCA, data.deslocamento, data.custoAdicional, data.margemEmpresa,
+    data.comissaoPercentual, data.custoBase, data.valorComissao, data.precoFinal, data.observacoes,
+    req.user.id, req.user.nome, now, now
+  );
+  const created = await db.get('SELECT * FROM tabelas_precos_sistemas WHERE id = ?', result.lastID);
+  res.status(201).json({ ...created, active: Boolean(created.active) });
+});
+
+app.put('/api/admin/tabelas-precos/:id', authRequired, requirePermission('precosSistemas'), async (req, res) => {
+  const existing = await db.get('SELECT * FROM tabelas_precos_sistemas WHERE id = ?', req.params.id);
+  if (!existing) return res.status(404).json({ message: 'Preço salvo não encontrado.' });
+  const data = normalizePriceTablePayload({ ...existing, ...req.body });
+  await db.run(
+    `UPDATE tabelas_precos_sistemas SET nome=?, geracaoKwh=?, numeroPaineis=?, potenciaKwp=?, potenciaInversorKw=?,
+      placaModelo=?, inversorModelo=?, valorKitSolar=?, custoInstalacao=?, materialCA=?, deslocamento=?,
+      custoAdicional=?, margemEmpresa=?, comissaoPercentual=?, custoBase=?, valorComissao=?, precoFinal=?,
+      observacoes=?, active=?, updatedAt=? WHERE id=?`,
+    data.nome, data.geracaoKwh, data.numeroPaineis, data.potenciaKwp, data.potenciaInversorKw,
+    data.placaModelo, data.inversorModelo, data.valorKitSolar, data.custoInstalacao, data.materialCA, data.deslocamento,
+    data.custoAdicional, data.margemEmpresa, data.comissaoPercentual, data.custoBase, data.valorComissao, data.precoFinal,
+    data.observacoes, req.body.active === false ? 0 : 1, new Date().toISOString(), req.params.id
+  );
+  const updated = await db.get('SELECT * FROM tabelas_precos_sistemas WHERE id = ?', req.params.id);
+  res.json({ ...updated, active: Boolean(updated.active) });
 });
 
 // --- WEBSOCKETS (Chat em Tempo Real) ---

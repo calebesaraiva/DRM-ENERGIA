@@ -6,6 +6,7 @@ import SolarJourneyScene from '../components/SolarJourneyScene';
 import ClientTrackingCenter from '../components/ClientTrackingCenter';
 import CompleteSystemGuide from '../components/CompleteSystemGuide';
 import ClientCommunicationCenter from '../components/ClientCommunicationCenter';
+import ClientFinancingSimulator from '../components/ClientFinancingSimulator';
 
 const money = (value) => Number(value || 0).toLocaleString('pt-BR', {
   style: 'currency',
@@ -413,6 +414,8 @@ function Dashboard() {
                 ))}
               </div>
             </section>
+
+            <ClientFinancingSimulator systemValue={selectedContrato?.valorProjeto || currentManual.valorSistema || 0} />
 
             <section className="portal-grid lower">
               <div className="portal-card delivery-card">

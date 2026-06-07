@@ -4,6 +4,7 @@ import io from 'socket.io-client';
 import './AdminDashboard.css';
 import { getApiBaseUrl, withApiBase } from '../utils/apiBase';
 import AdminCommunicationCenter from '../components/AdminCommunicationCenter';
+import PricingWorkbench from '../components/PricingWorkbench';
 
 const socket = io(getApiBaseUrl() || undefined);
 
@@ -307,6 +308,7 @@ const AdminDashboard = () => {
   const [adminUser] = useState(initialUser);
   const [error, setError] = useState('');
   const [comunicacoes, setComunicacoes] = useState(null);
+  const [tabelasPrecos, setTabelasPrecos] = useState([]);
 
   const headers = useMemo(() => ({
     'Content-Type': 'application/json',
@@ -583,6 +585,9 @@ const AdminDashboard = () => {
     }
     if (user.role === 'ADM' || user.permissions?.financeiro) {
       calls.push(request('/api/admin/financeiro').then(setFinanceiro));
+    }
+    if (user.role === 'ADM' || user.permissions?.precosSistemas) {
+      calls.push(request('/api/admin/tabelas-precos').then(setTabelasPrecos));
     }
 
     const results = await Promise.allSettled(calls);
@@ -1198,6 +1203,14 @@ const AdminDashboard = () => {
     setDespesaForm({ nome: '', valor: '', categoria: '' });
     const updated = await request('/api/admin/financeiro');
     setFinanceiro(updated);
+  };
+
+  const updateDespesaFixa = async (item, payload) => {
+    await request(`/api/admin/despesas-fixas/${item.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ ...item, ...payload }),
+    });
+    setFinanceiro(await request('/api/admin/financeiro'));
   };
 
   return (
@@ -2348,9 +2361,27 @@ const AdminDashboard = () => {
                   </form>
                   <div className="fixed-cost-list">
                     {(financeiro.despesasFixas || []).map(item => (
-                      <div key={item.id} className="fixed-cost-item">
-                        <div><strong>{item.nome}</strong><span>{item.categoria || 'Geral'}</span></div>
-                        <strong>{money(item.valor)}</strong>
+                      <div key={item.id} className={`fixed-cost-item editable ${item.active ? '' : 'inactive'}`}>
+                        <input
+                          defaultValue={item.nome}
+                          aria-label={`Nome do custo ${item.nome}`}
+                          onBlur={event => event.target.value !== item.nome && updateDespesaFixa(item, { nome: event.target.value })}
+                        />
+                        <input
+                          defaultValue={item.categoria || 'Geral'}
+                          aria-label={`Categoria do custo ${item.nome}`}
+                          onBlur={event => event.target.value !== (item.categoria || 'Geral') && updateDespesaFixa(item, { categoria: event.target.value })}
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={item.valor}
+                          aria-label={`Valor do custo ${item.nome}`}
+                          onBlur={event => Number(event.target.value) !== Number(item.valor) && updateDespesaFixa(item, { valor: event.target.value })}
+                        />
+                        <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateDespesaFixa(item, { active: !item.active })}>
+                          {item.active ? 'Desativar' : 'Ativar'}
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -2375,7 +2406,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {activeTab === 'precosSistemas' && (
+          {activeTab === '__precosSistemasLegacy' && (
             <div className="price-dashboard">
               <div className="section-heading">
                 <div>
@@ -2451,6 +2482,10 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'precosSistemas' && (
+            <PricingWorkbench items={tabelasPrecos} request={request} onItemsChange={setTabelasPrecos} />
           )}
 
           {activeTab === 'ordensServico' && (
