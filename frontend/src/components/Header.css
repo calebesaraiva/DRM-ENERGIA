@@ -75,22 +75,18 @@
   min-width: 0;
 }
 
-.client-panel-link {
+.team-panel-link {
   min-height: 40px;
-  padding: 0.48rem 0.85rem;
-  border-radius: 12px;
-  color: #0f172a;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.66);
+  padding: 0.48rem 0.35rem;
+  color: #334155;
   text-decoration: none;
-  font-weight: 800;
+  font-weight: 750;
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
 }
 
-.client-panel-link:hover {
-  border-color: rgba(249, 115, 22, 0.56);
+.team-panel-link:hover {
   color: #c2410c;
 }
 
@@ -150,11 +146,10 @@
     gap: 0.42rem;
   }
 
-  .client-panel-link {
+  .team-panel-link {
     min-height: 38px;
-    padding: 0.44rem 0.62rem;
+    padding: 0.44rem 0.2rem;
     font-size: 0.76rem;
-    border-radius: 11px;
   }
 }
 
@@ -171,7 +166,7 @@
     font-size: 0.72rem;
   }
 
-  .client-panel-link {
+  .team-panel-link {
     display: none;
   }
 }

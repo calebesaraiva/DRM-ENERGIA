@@ -3,13 +3,13 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import './Login.css';
 import { withApiBase } from '../utils/apiBase';
 
-const Login = () => {
+const Login = ({ accessType: forcedAccessType = null }) => {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const accessType = searchParams.get('tipo') === 'equipe' ? 'equipe' : 'cliente';
+  const accessType = forcedAccessType || (searchParams.get('tipo') === 'equipe' ? 'equipe' : 'cliente');
   const isTeamAccess = accessType === 'equipe';
 
   const handleLogin = async (e) => {
@@ -48,6 +48,21 @@ const Login = () => {
       localStorage.setItem('role', data.user.role);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      const isInternalUser = data.user.userType === 'interno' || ['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(data.user.role);
+      if (isTeamAccess && !isInternalUser) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('user');
+        throw new Error('Este acesso é exclusivo da equipe DRM. Use o Portal do Cliente.');
+      }
+
+      if (!isTeamAccess && isInternalUser) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('user');
+        throw new Error('Este acesso é exclusivo para clientes. Use o Sistema DRM.');
+      }
+
       if (data.user.requiresEmailVerification) {
         navigate('/verificar-email');
         return;
@@ -64,7 +79,7 @@ const Login = () => {
   };
 
   return (
-    <div className="login-wrapper">
+    <div className={`login-wrapper ${isTeamAccess ? 'team-login' : 'client-login'}`}>
       <div className="login-image-side">
         <div className="login-image-overlay">
           <span>{isTeamAccess ? 'Sistema interno DRM' : 'Portal do Cliente DRM'}</span>
@@ -77,10 +92,7 @@ const Login = () => {
           <Link to="/" className="login-logo-link">
             <img src="/assets/logo.png" alt="DRM Logo" className="login-logo" />
           </Link>
-          <div className="login-access-switch" aria-label="Tipo de acesso">
-            <Link to="/login?tipo=cliente" className={!isTeamAccess ? 'active' : ''}>Cliente</Link>
-            <Link to="/login?tipo=equipe" className={isTeamAccess ? 'active' : ''}>Equipe DRM</Link>
-          </div>
+          <span className="login-mode-label">{isTeamAccess ? 'Acesso interno' : 'Acesso do cliente'}</span>
           <h2 className="login-title">{isTeamAccess ? 'Entrar no Sistema DRM' : 'Entrar no Portal do Cliente'}</h2>
           {error && <p className="error-message" style={{ textAlign: 'center', marginBottom: '1rem' }}>{error}</p>}
           <p className="login-subtitle">{isTeamAccess ? 'Use seu usuário interno ou e-mail corporativo.' : 'Use o e-mail cadastrado para acompanhar seu projeto.'}</p>
@@ -122,7 +134,6 @@ const Login = () => {
           <div className="login-footer">
             <p className="login-security-note">{isTeamAccess ? 'Área exclusiva da equipe DRM.' : 'Seu acesso é protegido por verificação de e-mail.'}</p>
             <div className="login-footer-links">
-              <Link to="/acesso" className="btn-voltar">Escolher outro acesso</Link>
               <Link to="/" className="btn-voltar">Voltar para o site</Link>
             </div>
           </div>

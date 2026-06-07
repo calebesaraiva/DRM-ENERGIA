@@ -32,7 +32,7 @@ function Register() {
       if (response.ok) {
         setMessage('Cadastro realizado com sucesso!');
         setTimeout(() => {
-          navigate('/login');
+          navigate('/portal-cliente');
         }, 2000);
       } else {
         setMessage(data.message || 'Erro ao cadastrar.');
@@ -72,7 +72,7 @@ function Register() {
           <button type="submit" className="register-button">Cadastrar</button>
         </form>
         <p className="login-link">
-          Já tem uma conta? <Link to="/login">Faça Login</Link>
+          Já tem uma conta? <Link to="/portal-cliente">Faça Login</Link>
         </p>
         <Link to="/" className="btn-voltar" style={{ marginTop: '1rem', display: 'inline-block' }}>← Voltar para a página inicial</Link>
       </div>

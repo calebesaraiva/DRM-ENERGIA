@@ -72,7 +72,7 @@ function Dashboard() {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('role');
-        navigate('/login');
+        navigate('/portal-cliente');
       }
       if (data?.requiresEmailVerification) navigate('/verificar-email');
       throw new Error(data?.message || 'Não foi possível carregar agora.');
@@ -103,7 +103,7 @@ function Dashboard() {
     localStorage.removeItem('role');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    navigate('/login');
+    navigate('/portal-cliente');
   };
 
   const selectedContrato = useMemo(() => {

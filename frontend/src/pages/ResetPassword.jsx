@@ -45,7 +45,7 @@ const ResetPassword = () => {
         throw new Error(data?.message || 'Não foi possível redefinir a senha.');
       }
       setStatus(data?.message || 'Senha redefinida com sucesso.');
-      setTimeout(() => navigate('/login'), 1200);
+      setTimeout(() => navigate('/portal-cliente'), 1200);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -103,7 +103,7 @@ const ResetPassword = () => {
           </form>
 
           <div className="login-footer">
-            <Link to="/login" className="btn-voltar">Voltar para o login</Link>
+            <Link to="/portal-cliente" className="btn-voltar">Voltar para o portal</Link>
           </div>
         </div>
       </div>

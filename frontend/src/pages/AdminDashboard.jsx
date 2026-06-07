@@ -523,7 +523,7 @@ const AdminDashboard = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('role');
-        navigate('/login');
+        navigate('/sistema-drm');
       }
       if (data.requiresEmailVerification) {
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -587,7 +587,7 @@ const AdminDashboard = () => {
     const token = localStorage.getItem('token');
 
     if (!loggedInUser || !token) {
-      navigate('/login');
+      navigate('/sistema-drm');
       return;
     }
 

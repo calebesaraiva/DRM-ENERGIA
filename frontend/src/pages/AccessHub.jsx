@@ -19,7 +19,7 @@ const AccessHub = () => (
     </section>
 
     <section className="access-options" aria-label="Escolha de acesso">
-      <Link to="/login?tipo=cliente" className="access-card access-card-client">
+      <Link to="/portal-cliente" className="access-card access-card-client">
         <div>
           <span className="access-card-kicker">Para clientes DRM</span>
           <h2>Portal do Cliente</h2>
@@ -33,7 +33,7 @@ const AccessHub = () => (
         <strong>Acessar meu portal</strong>
       </Link>
 
-      <Link to="/login?tipo=equipe" className="access-card access-card-team">
+      <Link to="/sistema-drm" className="access-card access-card-team">
         <div>
           <span className="access-card-kicker">Uso interno</span>
           <h2>Sistema DRM</h2>

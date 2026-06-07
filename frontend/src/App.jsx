@@ -50,6 +50,8 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/acesso" element={<AccessHub />} />
+          <Route path="/portal-cliente" element={<Login accessType="cliente" />} />
+          <Route path="/sistema-drm" element={<Login accessType="equipe" />} />
           <Route path="/login" element={<Login />} />
           <Route path="/recuperar-senha" element={<ForgotPassword />} />
           <Route path="/redefinir-senha" element={<ResetPassword />} />

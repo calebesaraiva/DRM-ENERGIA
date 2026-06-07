@@ -41,8 +41,8 @@ const Header = () => {
             </div>
           ) : (
             <div className="access-actions">
-              <Link to="/login?tipo=cliente" className="client-panel-link">Portal do Cliente</Link>
-              <Link to="/acesso" className="btn btn-primary login-btn">Acessar painéis</Link>
+              <Link to="/sistema-drm" className="team-panel-link">Equipe DRM</Link>
+              <Link to="/portal-cliente" className="btn btn-primary login-btn">Portal do Cliente</Link>
             </div>
           )}
         </nav>
