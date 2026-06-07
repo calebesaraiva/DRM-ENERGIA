@@ -65,6 +65,9 @@ const SidebarIcon = ({ name }) => {
     contratos: (
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h8l4 4v16H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm7 1.8V7h3.2L14 3.8ZM8 11h8v1.8H8V11Zm0 3.5h8v1.8H8v-1.8Zm0 3.5h5v1.8H8V18Z" /></svg>
     ),
+    produtosPacotes: (
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Zm8 1.7 4.9-2.7L12 3.8 7.1 6.5 12 9.2Zm-6 6.1 5 2.8v-7.2L6 8.1v7.2Zm7 2.8 5-2.8V8.1l-5 2.8v7.2Z" /></svg>
+    ),
     financeiro: (
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 15.5V19h-2v-1.5a4.2 4.2 0 0 1-3-1.6l1.4-1.4a2.8 2.8 0 0 0 2.4 1.1c1 0 1.7-.4 1.7-1.1 0-.8-.8-1.1-2.1-1.5-1.6-.5-3-1.2-3-3 0-1.5 1-2.7 2.6-3.1V5h2v1.4a4 4 0 0 1 2.6 1.2l-1.4 1.4a2.5 2.5 0 0 0-1.9-.8c-.9 0-1.5.4-1.5 1 0 .7.7 1 2 1.4 1.7.5 3.2 1.2 3.2 3.1 0 1.8-1.2 3.1-3 3.5Z" /></svg>
     ),
@@ -294,6 +297,7 @@ const AdminDashboard = () => {
     { id: 'leads', label: 'Leads', permission: 'leads' },
     { id: 'orcamentos', label: 'Orçamentos', permission: 'orcamentos' },
     { id: 'contratos', label: 'Contratos', permission: 'contratos' },
+    { id: 'produtosPacotes', label: 'Produtos e Pacotes', permission: 'contratos' },
     { id: 'projetos', label: 'Projetos', permission: 'equipeTecnica' },
     { id: 'ordensServico', label: 'O.S', permission: 'ordensServico' },
     { id: 'precosSistemas', label: 'Preço dos Sistemas', permission: 'precosSistemas' },
@@ -306,6 +310,7 @@ const AdminDashboard = () => {
     { id: 'qa-orcamentos', label: 'Ver orçamentos', tab: 'orcamentos', permission: 'orcamentos' },
     { id: 'qa-novo-contrato', label: 'Gerar contrato', tab: 'novoContrato', permission: 'contratos', badge: clientes.length },
     { id: 'qa-contratos', label: 'Aprovar contrato', tab: 'contratos', permission: 'contratos', badge: contratos.filter(item => item.status === 'Pendente').length },
+    { id: 'qa-produtos-pacotes', label: 'Produtos/pacotes', tab: 'produtosPacotes', permission: 'contratos', badge: equipamentos.length },
     { id: 'qa-projetos', label: 'Projeto/visita', tab: 'projetos', permission: 'equipeTecnica', badge: projetos.filter(item => item.etapa !== 'Concluído').length },
     { id: 'qa-os', label: 'Abrir O.S', tab: 'ordensServico', permission: 'ordensServico', badge: ordensServico.filter(item => item.status === 'Aberta').length },
     { id: 'qa-precos', label: 'Calcular preço', tab: 'precosSistemas', permission: 'precosSistemas' },
@@ -753,6 +758,66 @@ const AdminDashboard = () => {
     setPriceResult(null);
     setPriceError('');
   };
+
+  const renderProdutosPacotes = () => (
+    <div className="admin-card products-packages-card">
+      <div className="card-header-flex">
+        <div>
+          <h3>Produtos e pacotes</h3>
+          <p className="muted-text">Cadastre kits, serviços e condições comerciais para selecionar no contrato e preencher automático.</p>
+        </div>
+        <span className="status-badge success">{equipamentos.length} itens</span>
+      </div>
+      <form className="equipment-form" onSubmit={createEquipamento}>
+        <input placeholder="Nome do produto/pacote" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
+        <select value={equipamentoForm.tipo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, tipo: e.target.value }))}>
+          <option>Kit solar</option>
+          <option>Pacote completo</option>
+          <option>Serviço</option>
+          <option>Material</option>
+        </select>
+        <input placeholder="Modelo da placa" value={equipamentoForm.placaModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, placaModelo: e.target.value }))} required />
+        <input placeholder="Modelo do inversor" value={equipamentoForm.inversorModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, inversorModelo: e.target.value }))} required />
+        <input placeholder="Potência placa W" type="number" value={equipamentoForm.potenciaPlacaW} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaPlacaW: e.target.value }))} />
+        <input placeholder="Potência inversor kW" type="number" step="0.01" value={equipamentoForm.potenciaInversorKw} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaInversorKw: e.target.value }))} />
+        <input placeholder="Geração mensal kWh" type="number" step="0.01" value={equipamentoForm.geracaoKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoKwh: e.target.value }))} />
+        <input placeholder="Geração anual kWh" type="number" step="0.01" value={equipamentoForm.geracaoAnualKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoAnualKwh: e.target.value }))} />
+        <input placeholder="Potência kWp" type="number" step="0.01" value={equipamentoForm.potenciaKwp} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaKwp: e.target.value }))} />
+        <input placeholder="Quantidade de placas" type="number" value={equipamentoForm.numeroPaineis} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, numeroPaineis: e.target.value }))} />
+        <input placeholder="Quantidade de cabo" value={equipamentoForm.quantidadeCabo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, quantidadeCabo: e.target.value }))} />
+        <input placeholder="Valor do sistema" type="number" step="0.01" value={equipamentoForm.valorSistema} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSistema: e.target.value }))} />
+        <input placeholder="Entrada" type="number" step="0.01" value={equipamentoForm.valorEntrada} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorEntrada: e.target.value }))} />
+        <input placeholder="Saldo" type="number" step="0.01" value={equipamentoForm.valorSaldo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSaldo: e.target.value }))} />
+        <input placeholder="Prazo de execução" type="number" value={equipamentoForm.prazoExecucao} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, prazoExecucao: e.target.value }))} />
+        <select value={equipamentoForm.formaPagamentoTipo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamentoTipo: e.target.value }))}>
+          <option value="avista">À vista</option>
+          <option value="financiado">Financiado</option>
+          <option value="cartao">Cartão de crédito</option>
+          <option value="misto">Misto / mesclado</option>
+        </select>
+        <textarea className="span-2" placeholder="Forma de pagamento detalhada" value={equipamentoForm.formaPagamento} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamento: e.target.value }))} />
+        <textarea className="span-2" placeholder="Observações do produto/pacote" value={equipamentoForm.observacoes} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, observacoes: e.target.value }))} />
+        <button className="btn btn-primary" type="submit">Criar produto/pacote</button>
+      </form>
+      <div className="equipment-list">
+        {equipamentos.map(item => (
+          <div className="equipment-item" key={item.id}>
+            <div className="equipment-item-head">
+              <strong>{item.nome}</strong>
+              <span className="status-badge neutral">{item.tipo || 'Kit solar'}</span>
+            </div>
+            <span>{item.placaModelo} • {item.inversorModelo}</span>
+            <small>
+              {item.potenciaKwp ? `${item.potenciaKwp} kWp • ` : ''}
+              {item.numeroPaineis ? `${item.numeroPaineis} placas • ` : ''}
+              {item.geracaoKwh ? `${item.geracaoKwh} kWh/mês • ` : ''}
+              {item.valorSistema ? money(item.valorSistema) : 'Sem valor padrão'}
+            </small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const updatePermissions = async (userId, permissions, active, extra = {}) => {
     await request(`/api/admin/usuarios/${userId}/permissoes`, {
@@ -1816,6 +1881,24 @@ const AdminDashboard = () => {
                   </form>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'produtosPacotes' && (
+            <div className="admin-section">
+              <div className="section-heading">
+                <div>
+                  <span className="section-kicker">Catálogo</span>
+                  <h3>Produtos e Pacotes</h3>
+                  <p>Cadastre os itens que entram no contrato para a equipe apenas selecionar e revisar.</p>
+                </div>
+                <div className="section-stats">
+                  <div><strong>{equipamentos.length}</strong><span>itens</span></div>
+                  <div><strong>{equipamentos.filter(item => item.active).length}</strong><span>ativos</span></div>
+                  <div><strong>{equipamentos.filter(item => item.valorSistema).length}</strong><span>com valor</span></div>
+                </div>
+              </div>
+              {renderProdutosPacotes()}
             </div>
           )}
 
