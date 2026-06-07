@@ -7,7 +7,7 @@ const makeBox = (width, height, depth, color, roughness = 0.65) => {
   return new THREE.Mesh(geometry, material);
 };
 
-function SolarJourneyScene({ delivered = false, installationDone = false }) {
+function SolarJourneyScene({ delivered = false, installationDone = false, connected = false }) {
   const mountRef = useRef(null);
 
   useEffect(() => {
@@ -104,6 +104,7 @@ function SolarJourneyScene({ delivered = false, installationDone = false }) {
     scene.add(home);
 
     const truck = new THREE.Group();
+    const wheels = [];
     const truckBase = makeBox(3.1, 0.55, 1.5, '#111827');
     truckBase.position.y = 0.65;
     truck.add(truckBase);
@@ -127,6 +128,7 @@ function SolarJourneyScene({ delivered = false, installationDone = false }) {
         wheel.rotation.x = Math.PI / 2;
         wheel.position.set(x, 0.42, z);
         truck.add(wheel);
+        wheels.push(wheel);
       }
     }
     truck.position.set(delivered ? 7 : -7, 0, 0);
@@ -138,6 +140,53 @@ function SolarJourneyScene({ delivered = false, installationDone = false }) {
     );
     sun.position.set(-7, 7, -5);
     scene.add(sun);
+
+    const clouds = [];
+    for (let index = 0; index < 3; index += 1) {
+      const cloud = new THREE.Group();
+      for (let puff = 0; puff < 4; puff += 1) {
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.45 + (puff % 2) * 0.12, 16, 16),
+          new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }),
+        );
+        mesh.position.set(puff * 0.55, Math.sin(puff) * 0.18, 0);
+        cloud.add(mesh);
+      }
+      cloud.position.set(-10 + index * 8, 6.1 + index * 0.55, -6 - index);
+      clouds.push(cloud);
+      scene.add(cloud);
+    }
+
+    const trees = [];
+    for (const x of [-5.8, -3.7, 4.7, 6.3]) {
+      const tree = new THREE.Group();
+      const trunk = makeBox(0.22, 1.1, 0.22, '#80522f');
+      trunk.position.y = 0.55;
+      tree.add(trunk);
+      const crown = new THREE.Mesh(
+        new THREE.ConeGeometry(0.72, 1.8, 7),
+        new THREE.MeshStandardMaterial({ color: '#3c8a4f', roughness: 0.9 }),
+      );
+      crown.position.y = 1.75;
+      crown.castShadow = true;
+      tree.add(crown);
+      tree.position.set(x, 0, 3.4 + (Math.abs(x) % 2));
+      trees.push(tree);
+      scene.add(tree);
+    }
+
+    const energyDots = [];
+    if (installationDone) {
+      for (let index = 0; index < 8; index += 1) {
+        const dot = new THREE.Mesh(
+          new THREE.SphereGeometry(0.08, 10, 10),
+          new THREE.MeshBasicMaterial({ color: connected ? '#55d67a' : '#ffb21c' }),
+        );
+        dot.position.set(6.8, 4.5, -3.5);
+        energyDots.push(dot);
+        scene.add(dot);
+      }
+    }
 
     const resize = () => {
       const width = Math.max(mount.clientWidth, 280);
@@ -156,8 +205,22 @@ function SolarJourneyScene({ delivered = false, installationDone = false }) {
       const elapsed = clock.getElapsedTime();
       if (!delivered) truck.position.x = -7 + ((elapsed * 1.45) % 14);
       truck.position.y = 0.04 + Math.sin(elapsed * 6) * 0.025;
+      wheels.forEach(wheel => { wheel.rotation.z = -elapsed * 4; });
       sun.position.y = 7 + Math.sin(elapsed * 0.65) * 0.2;
       home.rotation.y = Math.sin(elapsed * 0.32) * 0.015;
+      clouds.forEach((cloud, index) => {
+        cloud.position.x = -12 + ((elapsed * (0.3 + index * 0.06) + index * 8) % 26);
+      });
+      trees.forEach((tree, index) => {
+        tree.rotation.z = Math.sin(elapsed * 1.1 + index) * 0.018;
+      });
+      energyDots.forEach((dot, index) => {
+        const travel = (elapsed * 0.45 + index / energyDots.length) % 1;
+        dot.position.set(6.7 + travel * 2.2, 4.6 - travel * 2.5, -3.45);
+        dot.scale.setScalar(0.7 + Math.sin(elapsed * 4 + index) * 0.25);
+      });
+      camera.position.x = Math.sin(elapsed * 0.18) * 0.25;
+      camera.lookAt(0, 0.5, 0);
       renderer.render(scene, camera);
       frame = requestAnimationFrame(animate);
     };
@@ -174,19 +237,19 @@ function SolarJourneyScene({ delivered = false, installationDone = false }) {
       });
       mount.removeChild(renderer.domElement);
     };
-  }, [delivered, installationDone]);
+  }, [connected, delivered, installationDone]);
 
   return (
     <section className="solar-journey" aria-label="Jornada animada do equipamento até o cliente">
       <div className="journey-copy">
         <span>Rota do seu sistema</span>
-        <h2>{delivered ? 'Seu equipamento chegou ao destino.' : 'Seu kit solar está a caminho.'}</h2>
-        <p>{delivered ? 'Entrega confirmada. Agora a equipe segue com instalação e ligação.' : 'Acompanhe a jornada visual da DRM até sua casa enquanto preparamos os próximos passos.'}</p>
+        <h2>{connected ? 'Seu sistema está conectado.' : delivered ? 'Seu equipamento chegou ao destino.' : 'Seu kit solar está a caminho.'}</h2>
+        <p>{connected ? 'A energia já percorre o sistema até sua casa. Continue acompanhando a geração.' : delivered ? 'Entrega confirmada. Agora a equipe segue com instalação e ligação.' : 'Acompanhe a jornada visual da DRM até sua casa enquanto preparamos os próximos passos.'}</p>
       </div>
       <div className="journey-canvas" ref={mountRef} />
       <div className="journey-labels" aria-hidden="true">
         <span>Centro DRM</span>
-        <strong>{delivered ? 'Entregue' : 'Em preparação e transporte'}</strong>
+        <strong>{connected ? 'Gerando energia' : delivered ? 'Entregue' : 'Em preparação e transporte'}</strong>
         <span>Seu imóvel</span>
       </div>
     </section>

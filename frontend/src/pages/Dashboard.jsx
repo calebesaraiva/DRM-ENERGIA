@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 import { withApiBase } from '../utils/apiBase';
 import SolarJourneyScene from '../components/SolarJourneyScene';
+import ClientTrackingCenter from '../components/ClientTrackingCenter';
+import CompleteSystemGuide from '../components/CompleteSystemGuide';
 
 const money = (value) => Number(value || 0).toLocaleString('pt-BR', {
   style: 'currency',
@@ -41,27 +43,6 @@ const daysUntil = (value) => {
   return `Faltam ${days} dia${days === 1 ? '' : 's'}`;
 };
 
-const educationSections = [
-  {
-    kicker: 'Como funciona',
-    title: 'Da luz do sol até a sua tomada',
-    text: 'As placas transformam luz solar em energia elétrica. O inversor converte essa energia para o padrão da sua casa, e o medidor registra o que foi consumido e o excedente enviado para a rede.',
-    items: ['Placas captam a luz', 'Inversor converte a energia', 'Casa consome primeiro', 'Excedente vira crédito'],
-  },
-  {
-    kicker: 'Cuidados',
-    title: 'Pequenos cuidados, alta performance',
-    text: 'O sistema trabalha sozinho, mas inspeções simples ajudam a manter a geração esperada e aumentam a vida útil dos equipamentos.',
-    items: ['Evite sombras novas sobre as placas', 'Não jogue produtos químicos nos módulos', 'Mantenha o inversor ventilado', 'Solicite limpeza técnica quando necessário'],
-  },
-  {
-    kicker: 'Fique de olho',
-    title: 'Sinais que merecem atenção',
-    text: 'Oscilações pontuais são normais em dias nublados. Procure a DRM quando houver queda prolongada, alertas no inversor ou danos visíveis.',
-    items: ['Alerta vermelho no inversor', 'Queda incomum de geração', 'Cabos soltos ou danificados', 'Conta sem créditos após a ligação'],
-  },
-];
-
 const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(reader.result);
@@ -81,6 +62,7 @@ function Dashboard() {
   const [meterNote, setMeterNote] = useState('');
   const [meterStatus, setMeterStatus] = useState('');
   const [activeView, setActiveView] = useState('project');
+  const [lastSync, setLastSync] = useState(new Date());
   const navigate = useNavigate();
 
   const user = useMemo(() => {
@@ -121,6 +103,7 @@ function Dashboard() {
     try {
       const data = await request('/api/cliente/portal');
       setPortal(data);
+      setLastSync(new Date());
       setSelectedContratoId(prev => prev || String(data.contratos?.[0]?.id || ''));
     } catch (err) {
       setError(err.message);
@@ -133,6 +116,20 @@ function Dashboard() {
     const timer = window.setTimeout(loadPortal, 0);
     return () => window.clearTimeout(timer);
   }, [loadPortal]);
+
+  useEffect(() => {
+    const interval = window.setInterval(async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const data = await request('/api/cliente/portal');
+        setPortal(data);
+        setLastSync(new Date());
+      } catch {
+        // Keep the current portal visible if a background refresh fails.
+      }
+    }, 60000);
+    return () => window.clearInterval(interval);
+  }, [request]);
 
   const handleLogout = () => {
     localStorage.removeItem('role');
@@ -290,8 +287,11 @@ function Dashboard() {
               <button type="button" className={activeView === 'project' ? 'active' : ''} onClick={() => setActiveView('project')}>
                 Meu projeto
               </button>
+              <button type="button" className={activeView === 'tracking' ? 'active' : ''} onClick={() => setActiveView('tracking')}>
+                Acompanhamento
+              </button>
               <button type="button" className={activeView === 'education' ? 'active' : ''} onClick={() => setActiveView('education')}>
-                Guia do sistema
+                Guia completo
               </button>
             </nav>
 
@@ -316,6 +316,7 @@ function Dashboard() {
             <SolarJourneyScene
               delivered={Boolean(selectedProjeto?.equipamentoEntregueAt)}
               installationDone={Boolean(selectedProjeto?.checklist?.instalacao)}
+              connected={Boolean(selectedProjeto?.medidorTrocadoAt || selectedProjeto?.checklist?.sistemaLigado)}
             />
 
             <section className="portal-grid">
@@ -479,50 +480,20 @@ function Dashboard() {
               )}
             </section>
               </>
+            ) : activeView === 'tracking' ? (
+              <ClientTrackingCenter
+                contrato={selectedContrato}
+                projeto={selectedProjeto}
+                progressSteps={progressSteps}
+                complaints={selectedComplaints}
+                onDownloadContract={downloadContract}
+                lastSync={lastSync}
+              />
             ) : (
-              <section className="education-view">
-                <div className="education-intro">
-                  <span>Guia DRM</span>
-                  <h2>Entenda seu sistema e cuide bem da sua geração.</h2>
-                  <p>Informação simples para você acompanhar o desempenho, reconhecer sinais importantes e aproveitar melhor sua energia solar.</p>
-                </div>
-
-                <div className="energy-flow" aria-label="Fluxo de funcionamento do sistema solar">
-                  <div><strong>1</strong><span>Sol</span><p>Luz chega aos módulos.</p></div>
-                  <i></i>
-                  <div><strong>2</strong><span>Placas</span><p>Energia é produzida.</p></div>
-                  <i></i>
-                  <div><strong>3</strong><span>Inversor</span><p>Corrente é convertida.</p></div>
-                  <i></i>
-                  <div><strong>4</strong><span>Sua casa</span><p>Consumo e créditos.</p></div>
-                </div>
-
-                <div className="education-grid">
-                  {educationSections.map(section => (
-                    <article className="education-card" key={section.title}>
-                      <span>{section.kicker}</span>
-                      <h3>{section.title}</h3>
-                      <p>{section.text}</p>
-                      <ul>
-                        {section.items.map(item => <li key={item}>{item}</li>)}
-                      </ul>
-                    </article>
-                  ))}
-                </div>
-
-                <section className="monitoring-band">
-                  <div>
-                    <span>Acompanhamento inteligente</span>
-                    <h3>Compare a geração ao longo dos meses.</h3>
-                    <p>Dias nublados reduzem a produção naturalmente. O sinal de atenção é uma queda prolongada sem mudança no clima ou um alerta persistente no inversor.</p>
-                  </div>
-                  <div className="generation-bars" aria-hidden="true">
-                    {[52, 68, 74, 82, 78, 92, 86, 96].map((height, index) => (
-                      <b key={height + index} style={{ '--bar-height': `${height}%`, '--bar-delay': `${index * 90}ms` }}></b>
-                    ))}
-                  </div>
-                </section>
-              </section>
+              <CompleteSystemGuide
+                monthlyGeneration={currentManual.geracaoKwh || selectedContrato?.dados?.dimensionamento?.geracao_estimada_kwh}
+                power={currentManual.potenciaKwp || selectedContrato?.dados?.dimensionamento?.potencia_real_instalada_kwp}
+              />
             )}
           </>
         )}

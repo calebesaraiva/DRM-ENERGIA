@@ -2250,6 +2250,15 @@ app.get('/api/cliente/portal', authRequired, requireClientUser, async (req, res)
   const projetos = contratoIds.length
     ? (await db.all(`SELECT * FROM projetos WHERE contratoId IN (${contratoIds.map(() => '?').join(',')}) ORDER BY updatedAt DESC, id DESC`, ...contratoIds)).map(parseProjeto)
     : [];
+  const projetoIds = projetos.map(item => item.id);
+  const projetoFotos = projetoIds.length
+    ? await db.all(`SELECT * FROM projeto_fotos WHERE projetoId IN (${projetoIds.map(() => '?').join(',')}) ORDER BY createdAt DESC, id DESC`, ...projetoIds)
+    : [];
+  const fotosByProjeto = projetoFotos.reduce((acc, foto) => {
+    acc[foto.projetoId] = acc[foto.projetoId] || [];
+    acc[foto.projetoId].push(foto);
+    return acc;
+  }, {});
   const ordensServico = contratoIds.length
     ? await db.all(`SELECT * FROM ordens_servico WHERE contratoId IN (${contratoIds.map(() => '?').join(',')}) OR ${phoneFilter} ORDER BY id DESC`, ...contratoIds, phone, phoneWithoutCountry)
     : await db.all(`SELECT * FROM ordens_servico WHERE ${phoneFilter} OR clienteNome = ? ORDER BY id DESC`, phone, phoneWithoutCountry, cliente.nome);
@@ -2266,7 +2275,7 @@ app.get('/api/cliente/portal', authRequired, requireClientUser, async (req, res)
   res.json({
     cliente: publicClient(cliente),
     contratos,
-    projetos,
+    projetos: projetos.map(projeto => ({ ...projeto, fotos: fotosByProjeto[projeto.id] || [] })),
     ordensServico: ordensServico.map(os => parseOs({ ...os, fotos: fotosByOs[os.id] || [] })),
   });
 });
