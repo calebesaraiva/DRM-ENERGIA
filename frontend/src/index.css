@@ -32,6 +32,7 @@ html {
   overflow-x: hidden;
   overflow-y: auto;
   min-height: 100%;
+  background-color: var(--cor-fundo);
 }
 
 body {
@@ -49,6 +50,17 @@ body {
   overflow-y: auto;
   overscroll-behavior-y: auto;
   touch-action: pan-x pan-y;
+}
+
+#root {
+  min-height: 100dvh;
+  background-color: var(--cor-fundo);
+}
+
+@supports (padding: max(0px)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 button,

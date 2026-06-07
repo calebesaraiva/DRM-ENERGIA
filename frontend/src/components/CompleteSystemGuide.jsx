@@ -25,6 +25,17 @@ const faqs = [
   ['Posso lavar as placas?', 'A limpeza deve ser feita com segurança e sem produtos abrasivos. Dê preferência à avaliação técnica.'],
   ['O que muda na conta de energia?', 'Após a ligação, a conta passa a demonstrar energia injetada, consumida e saldo de créditos.'],
   ['Quanto tempo duram os equipamentos?', 'Módulos têm longa vida útil e o inversor exige ventilação e acompanhamento de alertas.'],
+  ['Se o sistema falhar, fico sem energia?', 'Não necessariamente. Em sistemas on-grid, a residência continua recebendo energia da distribuidora enquanto a rede estiver energizada.'],
+  ['O sistema piora a energia da casa?', 'Não. Problemas de qualidade normalmente estão relacionados à rede da distribuidora ou às instalações internas.'],
+];
+
+const advancedTopics = [
+  { tag: 'Rede', title: 'Como funciona o Fio B?', text: 'É a parcela relacionada ao uso da infraestrutura da distribuidora. Mesmo gerando energia própria, a rede continua disponível e pode haver cobrança pelo seu uso.', tone: 'blue' },
+  { tag: 'Economia', title: 'Consumo instantâneo', text: 'É a energia solar usada imediatamente pela casa ou empresa. Quanto mais geração você aproveita durante o dia, maior tende a ser a economia.', tone: 'green' },
+  { tag: 'Créditos', title: 'Rateio de energia', text: 'Os créditos podem ser distribuídos entre unidades consumidoras cadastradas, seguindo percentuais e regras previamente definidos.', tone: 'purple' },
+  { tag: 'Proteção', title: 'Alarmes do inversor', text: 'Quedas, oscilações e manobras da distribuidora podem gerar alarmes temporários. Muitos deles são mecanismos normais de proteção.', tone: 'orange' },
+  { tag: 'Rede elétrica', title: 'Queda ou variação de tensão', text: 'O inversor pode reduzir potência ou desligar temporariamente para se proteger e normalmente reinicia sozinho quando a rede estabiliza.', tone: 'red' },
+  { tag: 'Suporte', title: 'Quando procurar a DRM?', text: 'Acione o suporte em alarmes persistentes, ausência prolongada de geração, erros recorrentes ou quedas contínuas de produção.', tone: 'dark' },
 ];
 
 function CompleteSystemGuide({ monthlyGeneration = 0, power = '--' }) {
@@ -51,6 +62,8 @@ function CompleteSystemGuide({ monthlyGeneration = 0, power = '--' }) {
         <div><strong>4</strong><span>Sua casa</span><p>Consumo e créditos.</p></div>
       </div>
 
+      <SolarEducationScene />
+
       <div className="education-grid">
         {guideCards.map(section => (
           <article className="education-card" key={section.title}>
@@ -76,6 +89,38 @@ function CompleteSystemGuide({ monthlyGeneration = 0, power = '--' }) {
           <div className="generation-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <div className="generation-panel"><b></b><b></b><b></b><b></b><b></b><b></b></div>
         </div>
+      </section>
+
+      <section className="advanced-solar-guide">
+        <div className="tracking-panel-head">
+          <span>Conhecimento avançado</span>
+          <h3>Entenda o que acontece além dos painéis.</h3>
+          <p>Informações importantes do material educativo DRM para você reconhecer comportamentos normais e aproveitar melhor o sistema.</p>
+        </div>
+        <div className="advanced-topic-grid">
+          {advancedTopics.map((topic, index) => (
+            <article className={`advanced-topic ${topic.tone}`} key={topic.title}>
+              <div className="topic-signal" aria-hidden="true"><i></i><i></i><i></i></div>
+              <span>{topic.tag}</span>
+              <strong>{topic.title}</strong>
+              <p>{topic.text}</p>
+              <b>{String(index + 1).padStart(2, '0')}</b>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="client-good-practices">
+        <div>
+          <span>Boas práticas do cliente</span>
+          <h3>Quatro hábitos para manter tudo sob controle.</h3>
+        </div>
+        <ol>
+          <li><strong>Acompanhe a geração</strong><p>Confira periodicamente o aplicativo e compare o desempenho.</p></li>
+          <li><strong>Não desligue sem orientação</strong><p>Equipamentos de proteção devem permanecer configurados pela equipe técnica.</p></li>
+          <li><strong>Mantenha o cuidado periódico</strong><p>Faça limpeza e manutenção apenas quando recomendado.</p></li>
+          <li><strong>Registre falhas recorrentes</strong><p>Fotos, horários e mensagens do inversor agilizam o suporte.</p></li>
+        </ol>
       </section>
 
       <section className="care-calendar">
@@ -120,3 +165,4 @@ function CompleteSystemGuide({ monthlyGeneration = 0, power = '--' }) {
 }
 
 export default CompleteSystemGuide;
+import SolarEducationScene from './SolarEducationScene';

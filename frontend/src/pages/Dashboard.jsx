@@ -317,6 +317,9 @@ function Dashboard() {
               delivered={Boolean(selectedProjeto?.equipamentoEntregueAt)}
               installationDone={Boolean(selectedProjeto?.checklist?.instalacao)}
               connected={Boolean(selectedProjeto?.medidorTrocadoAt || selectedProjeto?.checklist?.sistemaLigado)}
+              startDate={selectedProjeto?.dataInicio || selectedContrato?.dataCriacao}
+              deadline={selectedProjeto?.prazoPrevisto}
+              destination={selectedProjeto?.clienteCidade || selectedContrato?.clienteCidade || 'Cidade de destino'}
             />
 
             <section className="portal-grid">
@@ -446,7 +449,8 @@ function Dashboard() {
                   required
                 />
                 <label className="photo-drop">
-                  Enviar fotos
+                  <span className="photo-drop-icon" aria-hidden="true">+</span>
+                  <span><strong>Adicionar fotos à reclamação</strong><small>Envie até 6 imagens para ajudar a equipe a entender melhor.</small></span>
                   <input type="file" accept="image/*" multiple onChange={handleFiles} />
                 </label>
                 {complaintForm.fotos.length > 0 && (

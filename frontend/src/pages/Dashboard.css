@@ -280,6 +280,81 @@
   font-weight: 900;
 }
 
+.journey-progress {
+  position: absolute;
+  z-index: 3;
+  top: 1rem;
+  right: 1rem;
+  width: min(300px, calc(100% - 2rem));
+  padding: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.86);
+  color: #ffffff;
+  backdrop-filter: blur(10px);
+}
+
+.journey-progress > span {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.journey-progress b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #f97316;
+  box-shadow: 0 0 16px rgba(249, 115, 22, 0.7);
+  animation: routeProgressGlow 2s ease-in-out infinite;
+}
+
+.journey-progress strong {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.76rem;
+}
+
+.journey-route-labels {
+  position: absolute;
+  z-index: 2;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.journey-route-labels span {
+  padding: 0.42rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #111827;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+.journey-status {
+  position: absolute;
+  z-index: 3;
+  bottom: 4rem;
+  left: 50%;
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  background: #f97316;
+  color: #111827;
+  font-size: 0.72rem;
+  font-weight: 900;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 .journey-labels span:last-child {
   text-align: right;
 }
@@ -511,17 +586,52 @@
 }
 
 .photo-drop {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  min-height: 54px;
+  gap: 0.8rem;
+  min-height: 88px;
   margin-bottom: 0.75rem;
-  border: 1px dashed #cbd5e1;
+  padding: 0.9rem;
+  border: 2px dashed #f97316;
   border-radius: 10px;
-  background: #f8fafc;
-  color: #334155;
+  background: #fff7ed;
+  color: #111827;
   font-weight: 900;
   cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.photo-drop:hover {
+  border-color: #c2410c;
+  background: #ffedd5;
+  transform: translateY(-1px);
+}
+
+.photo-drop-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f97316;
+  color: #111827;
+  font-size: 1.7rem;
+  line-height: 1;
+  box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.28);
+  animation: photoDropPulse 2.2s ease-in-out infinite;
+}
+
+.photo-drop strong,
+.photo-drop small {
+  display: block;
+}
+
+.photo-drop small {
+  margin-top: 0.2rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .photo-drop input {
@@ -668,6 +778,83 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
+}
+
+.education-3d-scene {
+  position: relative;
+  min-height: 500px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #101827;
+}
+
+.education-3d-canvas {
+  position: absolute;
+  inset: 0;
+  min-height: 500px;
+}
+
+.education-3d-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.education-3d-copy {
+  position: relative;
+  z-index: 2;
+  width: min(430px, calc(100% - 2rem));
+  margin: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(16, 24, 39, 0.84);
+  color: #ffffff;
+  backdrop-filter: blur(10px);
+}
+
+.education-3d-copy span,
+.advanced-solar-guide .tracking-panel-head span,
+.client-good-practices > div span {
+  color: #f97316;
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.education-3d-copy h3 {
+  margin: 0.3rem 0 0.5rem;
+  color: #ffffff;
+  font-size: clamp(1.7rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.education-3d-copy p {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.education-3d-legend {
+  position: absolute;
+  z-index: 2;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.education-3d-legend span {
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(16, 24, 39, 0.76);
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-align: center;
+  backdrop-filter: blur(8px);
 }
 
 .education-card {
@@ -1193,6 +1380,168 @@
   background: #e8f1fb;
 }
 
+.advanced-solar-guide {
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  border-radius: 14px;
+  background: #111827;
+}
+
+.advanced-solar-guide .tracking-panel-head h3 {
+  max-width: 760px;
+  color: #ffffff;
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+}
+
+.advanced-solar-guide .tracking-panel-head p {
+  color: #cbd5e1;
+}
+
+.advanced-topic-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.advanced-topic {
+  position: relative;
+  min-height: 280px;
+  padding: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.advanced-topic::after {
+  position: absolute;
+  right: -28px;
+  bottom: -28px;
+  width: 110px;
+  aspect-ratio: 1;
+  border: 14px solid rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  content: "";
+  animation: topicOrbit 8s linear infinite;
+}
+
+.advanced-topic.green { background: #14532d; }
+.advanced-topic.blue { background: #164e63; }
+.advanced-topic.purple { background: #4c1d95; }
+.advanced-topic.orange { background: #7c2d12; }
+.advanced-topic.red { background: #7f1d1d; }
+.advanced-topic.dark { background: #263241; }
+
+.advanced-topic > span,
+.advanced-topic > strong,
+.advanced-topic > p {
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+.advanced-topic > span {
+  color: #fed7aa;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.advanced-topic > strong {
+  margin-top: 0.5rem;
+  font-size: 1.25rem;
+  line-height: 1.1;
+}
+
+.advanced-topic > p {
+  margin-top: 0.55rem;
+  color: #e2e8f0;
+  font-size: 0.86rem;
+}
+
+.advanced-topic > b {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 0.4rem;
+  color: rgba(255, 255, 255, 0.12);
+  font-size: 3.7rem;
+}
+
+.topic-signal {
+  display: flex;
+  gap: 0.25rem;
+  align-items: flex-end;
+  height: 30px;
+  margin-bottom: 0.7rem;
+}
+
+.topic-signal i {
+  width: 5px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fb923c;
+  animation: signalWave 1.35s ease-in-out infinite;
+}
+
+.topic-signal i:nth-child(2) { height: 21px; animation-delay: 150ms; }
+.topic-signal i:nth-child(3) { height: 29px; animation-delay: 300ms; }
+
+.client-good-practices {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.65fr) minmax(0, 1.35fr);
+  gap: 1.2rem;
+  align-items: start;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  border-radius: 14px;
+  background: #f0fdf4;
+}
+
+.client-good-practices h3 {
+  margin-top: 0.35rem;
+  font-size: clamp(1.7rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.client-good-practices ol {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: practices;
+}
+
+.client-good-practices li {
+  position: relative;
+  padding: 0.9rem 0.9rem 0.9rem 3.3rem;
+  border: 1px solid #d5ecdc;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.8);
+  counter-increment: practices;
+}
+
+.client-good-practices li::before {
+  position: absolute;
+  top: 0.8rem;
+  left: 0.8rem;
+  display: grid;
+  width: 32px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #ffffff;
+  content: counter(practices);
+  font-size: 0.76rem;
+  font-weight: 900;
+  animation: practicePulse 2.4s ease-in-out infinite;
+}
+
+.client-good-practices li p {
+  margin: 0.2rem 0 0;
+  color: #64748b;
+}
+
 .pulse-copy h3,
 .bill-guide h3 {
   margin: 0.35rem 0 0.6rem;
@@ -1479,6 +1828,26 @@
   50% { box-shadow: 0 0 0 7px rgba(249, 115, 22, 0.12); }
 }
 
+@keyframes routeProgressGlow {
+  50% { filter: brightness(1.2); }
+}
+
+@keyframes photoDropPulse {
+  50% { box-shadow: 0 0 0 9px rgba(249, 115, 22, 0.12); }
+}
+
+@keyframes topicOrbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes signalWave {
+  50% { opacity: 0.35; transform: scaleY(0.55); }
+}
+
+@keyframes practicePulse {
+  50% { box-shadow: 0 0 0 7px rgba(22, 163, 74, 0.12); }
+}
+
 @keyframes educationFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
@@ -1509,6 +1878,14 @@
   .tracking-grid,
   .system-pulse,
   .bill-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-topic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .client-good-practices {
     grid-template-columns: 1fr;
   }
 
@@ -1600,11 +1977,29 @@
     margin: 0.5rem;
   }
 
-  .journey-labels {
+  .journey-progress {
+    top: auto;
+    right: 0.5rem;
+    bottom: 6.6rem;
+    left: 0.5rem;
+    width: auto;
+  }
+
+  .journey-labels,
+  .journey-route-labels {
     right: 0.5rem;
     bottom: 0.5rem;
     left: 0.5rem;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .journey-route-labels span {
+    padding: 0.28rem;
+    font-size: 0.58rem;
+  }
+
+  .journey-status {
+    bottom: 4.45rem;
   }
 
   .journey-labels strong {
@@ -1619,6 +2014,31 @@
 
   .education-card {
     min-height: 0;
+  }
+
+  .education-3d-scene,
+  .education-3d-canvas {
+    min-height: 560px;
+  }
+
+  .education-3d-copy {
+    width: calc(100% - 1rem);
+    margin: 0.5rem;
+  }
+
+  .education-3d-legend {
+    right: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .advanced-topic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-topic {
+    min-height: 220px;
   }
 
   .tracking-stage-rail,
@@ -1658,6 +2078,17 @@
   .generation-wave i,
   .care-calendar article::before,
   .bill-lines i {
+    animation: none;
+  }
+
+  .journey-progress b,
+  .photo-drop-icon {
+    animation: none;
+  }
+
+  .advanced-topic::after,
+  .topic-signal i,
+  .client-good-practices li::before {
     animation: none;
   }
 }
