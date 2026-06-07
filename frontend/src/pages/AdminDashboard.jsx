@@ -214,10 +214,11 @@ const projectChecklistLabels = {
   homologacao: 'Homologação',
   instalacao: 'Instalação',
   vistoriaFinal: 'Vistoria final',
+  medidorTrocado: 'Medidor trocado pela Equatorial',
   sistemaLigado: 'Sistema ligado',
 };
 
-const streetChecklistKeys = ['vistoriaRealizada', 'instalacao', 'vistoriaFinal', 'sistemaLigado'];
+const streetChecklistKeys = ['vistoriaRealizada', 'instalacao', 'vistoriaFinal', 'medidorTrocado', 'sistemaLigado'];
 const officeChecklistKeys = ['documentacaoRecebida', 'projetoTecnico', 'homologacao'];
 const emptyPriceForm = {
   valorKitSolar: '',
@@ -2158,6 +2159,10 @@ const AdminDashboard = () => {
                       <label>
                         Previsão Equatorial
                         <input type="date" value={selectedProjeto.previsaoLigacao || ''} onChange={(event) => updateProjeto(selectedProjeto.id, { previsaoLigacao: event.target.value })} />
+                      </label>
+                      <label>
+                        Medidor trocado em
+                        <input type="date" value={selectedProjeto.medidorTrocadoAt ? String(selectedProjeto.medidorTrocadoAt).slice(0, 10) : ''} onChange={(event) => updateProjeto(selectedProjeto.id, { medidorTrocadoAt: event.target.value })} />
                       </label>
                     </div>
 

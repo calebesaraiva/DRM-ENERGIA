@@ -46,6 +46,8 @@ function Dashboard() {
   const [complaintStatus, setComplaintStatus] = useState('');
   const [deliveryNote, setDeliveryNote] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState('');
+  const [meterNote, setMeterNote] = useState('');
+  const [meterStatus, setMeterStatus] = useState('');
   const navigate = useNavigate();
 
   const user = useMemo(() => {
@@ -127,7 +129,7 @@ function Dashboard() {
     { key: 'contrato', label: 'Contrato DRM', done: selectedContrato?.status === 'Aprovado', detail: selectedContrato?.status || 'Pendente' },
     { key: 'equipamento', label: 'Entrega do equipamento', done: Boolean(selectedProjeto?.equipamentoEntregueAt), detail: selectedProjeto?.equipamentoEntregueAt ? dateBr(selectedProjeto.equipamentoEntregueAt) : dateBr(selectedProjeto?.prazoPrevisto) },
     { key: 'instalacao', label: 'Instalação', done: selectedProjeto?.checklist?.instalacao, detail: dateTimeBr(selectedProjeto?.instalacaoAgendada) },
-    { key: 'equatorial', label: 'Ligação Equatorial', done: selectedProjeto?.checklist?.sistemaLigado, detail: dateBr(selectedProjeto?.previsaoLigacao) },
+    { key: 'equatorial', label: 'Troca do medidor / ligação Equatorial', done: Boolean(selectedProjeto?.medidorTrocadoAt || selectedProjeto?.checklist?.medidorTrocado || selectedProjeto?.checklist?.sistemaLigado), detail: selectedProjeto?.medidorTrocadoAt ? dateBr(selectedProjeto.medidorTrocadoAt) : dateBr(selectedProjeto?.previsaoLigacao) },
   ];
 
   const handleFiles = async (event) => {
@@ -179,6 +181,32 @@ function Dashboard() {
       await loadPortal();
     } catch (err) {
       setDeliveryStatus(err.message);
+    }
+  };
+
+  const downloadContract = () => {
+    if (!selectedContrato?.id) return;
+    const token = localStorage.getItem('token');
+    window.location.href = withApiBase(`/api/cliente/contratos/${selectedContrato.id}/download?token=${encodeURIComponent(token || '')}`);
+  };
+
+  const confirmMeterChange = async () => {
+    if (!selectedProjeto && !selectedContrato) return;
+    setMeterStatus('Registrando confirmação...');
+    try {
+      await request('/api/cliente/medidor-trocado', {
+        method: 'POST',
+        body: JSON.stringify({
+          projetoId: selectedProjeto?.id,
+          contratoId: selectedContrato?.id,
+          observacoes: meterNote,
+        }),
+      });
+      setMeterNote('');
+      setMeterStatus('Troca do medidor confirmada. A equipe DRM foi avisada.');
+      await loadPortal();
+    } catch (err) {
+      setMeterStatus(err.message);
     }
   };
 
@@ -258,6 +286,9 @@ function Dashboard() {
                   <div><span>Inversor</span><strong>{currentManual.inversor || currentEquipamento.inversorModelo || 'A definir'}</strong></div>
                   <div><span>Financiamento / pagamento</span><strong>{financingText}</strong></div>
                 </div>
+                {selectedContrato?.status === 'Aprovado' && (
+                  <button type="button" className="contract-download-button" onClick={downloadContract}>Baixar contrato em PDF</button>
+                )}
               </div>
 
               <div className="portal-card">
@@ -270,7 +301,7 @@ function Dashboard() {
                 <div className="deadline-list">
                   <div><span>Entrega do equipamento</span><strong>{selectedProjeto?.equipamentoEntregueAt ? `Entregue em ${dateBr(selectedProjeto.equipamentoEntregueAt)}` : dateBr(selectedProjeto?.prazoPrevisto)}</strong></div>
                   <div><span>Instalação</span><strong>{dateTimeBr(selectedProjeto?.instalacaoAgendada)}</strong></div>
-                  <div><span>Ligação pela Equatorial</span><strong>{dateBr(selectedProjeto?.previsaoLigacao)}</strong></div>
+                  <div><span>Troca do medidor / ligação Equatorial</span><strong>{selectedProjeto?.medidorTrocadoAt ? `Confirmada em ${dateBr(selectedProjeto.medidorTrocadoAt)}` : dateBr(selectedProjeto?.previsaoLigacao)}</strong></div>
                 </div>
               </div>
             </section>
@@ -314,6 +345,26 @@ function Dashboard() {
                   {selectedProjeto?.equipamentoEntregueAt ? 'Entrega já confirmada' : 'Confirmar entrega'}
                 </button>
                 {deliveryStatus && <small>{deliveryStatus}</small>}
+              </div>
+
+              <div className="portal-card delivery-card meter-card">
+                <div className="portal-card-head">
+                  <div>
+                    <span>Equatorial</span>
+                    <h2>Medidor foi trocado?</h2>
+                  </div>
+                  {selectedProjeto?.medidorTrocadoAt && <span className="portal-badge success">Confirmado</span>}
+                </div>
+                <p>Confirme quando a Equatorial realizar a troca do medidor para avisar a DRM e concluir esta etapa.</p>
+                <textarea
+                  value={meterNote}
+                  onChange={(event) => setMeterNote(event.target.value)}
+                  placeholder="Observação opcional. Ex: medidor trocado hoje pela manhã..."
+                />
+                <button type="button" onClick={confirmMeterChange} disabled={Boolean(selectedProjeto?.medidorTrocadoAt)}>
+                  {selectedProjeto?.medidorTrocadoAt ? 'Troca já confirmada' : 'Confirmar troca do medidor'}
+                </button>
+                {meterStatus && <small>{meterStatus}</small>}
               </div>
 
               <form className="portal-card complaint-card" onSubmit={submitComplaint}>

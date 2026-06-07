@@ -189,6 +189,10 @@
   align-items: start;
 }
 
+.portal-grid.lower .complaint-card {
+  grid-column: 1 / -1;
+}
+
 .portal-card,
 .portal-empty-panel {
   border: 1px solid #e5eaf2;
@@ -350,6 +354,11 @@
   color: #64748b;
 }
 
+.contract-download-button {
+  width: 100%;
+  margin-top: 1rem;
+}
+
 .portal-card textarea,
 .portal-card input,
 .portal-card select {
@@ -486,6 +495,10 @@
 
   .portal-main {
     width: min(100% - 1rem, 1180px);
+  }
+
+  .portal-grid.lower .complaint-card {
+    grid-column: auto;
   }
 
   .portal-hero {

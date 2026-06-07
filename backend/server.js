@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
+const PDFDocument = require('pdfkit');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -1242,6 +1243,141 @@ const buildContratoHtml = async (contrato) => {
 </html>`;
 };
 
+const htmlToPlainText = (value = '') => String(value)
+  .replace(/<br\s*\/?>/gi, '\n')
+  .replace(/<\/p>|<\/h1>|<\/h2>|<\/h3>|<\/li>/gi, '\n')
+  .replace(/<li[^>]*>/gi, '- ')
+  .replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/gi, ' ')
+  .replace(/&amp;/gi, '&')
+  .replace(/&lt;/gi, '<')
+  .replace(/&gt;/gi, '>')
+  .replace(/&quot;/gi, '"')
+  .replace(/&#39;/gi, "'")
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+const buildContratoPdf = async (contrato) => {
+  const parsed = parseContrato(contrato);
+  const dimensionamento = parsed.dados?.dimensionamento || {};
+  const manual = parsed.dados?.manual || {};
+  const cliente = parsed.dados?.cliente || {};
+  const equipamento = parsed.equipamentoDados || {};
+  const template = await getContractTemplate();
+  const logoPath = path.join(__dirname, '../frontend/public/assets/logo.png');
+  const projectRows = [
+    ['Potência instalada', `${manual.potenciaKwp || dimensionamento.potencia_real_instalada_kwp || 0} kWp`],
+    ['Geração mensal estimada', `${manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0} kWh`],
+    ['Quantidade de painéis', manual.numeroPaineis || dimensionamento.numero_paineis_necessarios || 'Não informado'],
+    ['Painel', manual.painel || equipamento.placaModelo || 'Não informado'],
+    ['Inversor', manual.inversor || equipamento.inversorModelo || 'Não informado'],
+    ['Valor do sistema', formatCurrency(manual.valorSistema || parsed.valorProjeto)],
+    ['Forma de pagamento', manual.formaPagamento || 'Não informado'],
+  ];
+  const contractVariables = {
+    empresa: template.empresa,
+    cliente: {
+      nome: parsed.clienteNome,
+      telefone: parsed.clienteTelefone || 'Não informado',
+      email: parsed.clienteEmail || 'Não informado',
+      cidade: parsed.clienteCidade || 'Não informado',
+      cpfCnpj: cliente.cpfCnpj || manual.cpfCnpj || 'Não informado',
+      endereco: cliente.enderecoCompleto || buildClientAddress(cliente),
+      enderecoInstalacao: cliente.enderecoInstalacaoCompleto || buildInstallAddress(cliente),
+    },
+    projeto: {
+      potencia: manual.potenciaKwp || dimensionamento.potencia_real_instalada_kwp || 0,
+      geracao: manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0,
+    },
+    contrato: {
+      valor: formatCurrency(manual.valorSistema || parsed.valorProjeto),
+      formaPagamento: manual.formaPagamento || 'Não informado',
+      prazoExecucao: manual.prazoExecucao || 40,
+    },
+  };
+  const clauses = htmlToPlainText(renderTemplate(template.corpo || DEFAULT_CONTRACT_TEMPLATE.corpo, contractVariables));
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 44, info: { Title: `Contrato DRM Solar #${parsed.id}` } });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const orange = '#F97316';
+    const dark = '#111827';
+    const muted = '#64748B';
+    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const ensureSpace = (height = 80) => {
+      if (doc.y + height > doc.page.height - doc.page.margins.bottom) doc.addPage();
+    };
+    const sectionTitle = (title) => {
+      ensureSpace(45);
+      doc.moveDown(0.7).font('Helvetica-Bold').fontSize(11).fillColor(orange).text(title.toUpperCase());
+      doc.moveDown(0.25).strokeColor('#E2E8F0').moveTo(doc.x, doc.y).lineTo(doc.x + pageWidth, doc.y).stroke();
+      doc.moveDown(0.55);
+    };
+    const infoRow = (label, value) => {
+      ensureSpace(34);
+      const startY = doc.y;
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(muted).text(String(label).toUpperCase(), doc.page.margins.left, startY, { width: 155 });
+      doc.font('Helvetica').fontSize(9.5).fillColor(dark).text(String(value ?? 'Não informado'), doc.page.margins.left + 160, startY, { width: pageWidth - 160 });
+      doc.y = Math.max(doc.y, startY + 22);
+      doc.strokeColor('#EEF2F7').moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.margins.left + pageWidth, doc.y).stroke();
+      doc.moveDown(0.4);
+    };
+
+    if (fs.existsSync(logoPath)) doc.image(logoPath, doc.page.margins.left, 34, { fit: [105, 58] });
+    doc.font('Helvetica-Bold').fontSize(17).fillColor(dark).text(template.titulo || 'CONTRATO DE FORNECIMENTO E INSTALAÇÃO DE SISTEMA FOTOVOLTAICO', 175, 38, { width: pageWidth - 130, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(orange).text(`CONTRATO #${parsed.id} - ${parsed.status}`, 175, 82, { width: pageWidth - 130, align: 'right' });
+    doc.moveTo(doc.page.margins.left, 108).lineTo(doc.page.margins.left + pageWidth, 108).lineWidth(2).strokeColor(orange).stroke();
+    doc.y = 126;
+
+    sectionTitle('Partes do contrato');
+    infoRow('Contratada', `${template.empresa.nome} - CNPJ ${template.empresa.cnpj || 'Não informado'}`);
+    infoRow('Contratante', `${parsed.clienteNome} - CPF/CNPJ ${contractVariables.cliente.cpfCnpj}`);
+    infoRow('Contato', `${contractVariables.cliente.telefone} - ${contractVariables.cliente.email}`);
+    infoRow('Endereço', contractVariables.cliente.endereco);
+    infoRow('Local da instalação', contractVariables.cliente.enderecoInstalacao);
+
+    sectionTitle('Resumo do sistema contratado');
+    projectRows.forEach(([label, value]) => infoRow(label, value));
+
+    sectionTitle('Condições e cláusulas');
+    doc.font('Helvetica').fontSize(9).fillColor(dark).text(clauses, { align: 'justify', lineGap: 3 });
+
+    ensureSpace(145);
+    sectionTitle('Assinaturas');
+    doc.font('Helvetica').fontSize(9).fillColor(dark).text(`${parsed.clienteCidade || 'Imperatriz'}, ${new Date().toLocaleDateString('pt-BR')}.`, { align: 'center' });
+    doc.moveDown(2.5);
+    const signatureY = doc.y;
+    doc.strokeColor(dark).moveTo(doc.page.margins.left, signatureY).lineTo(doc.page.margins.left + 205, signatureY).stroke();
+    doc.moveTo(doc.page.margins.left + pageWidth - 205, signatureY).lineTo(doc.page.margins.left + pageWidth, signatureY).stroke();
+    doc.font('Helvetica-Bold').fontSize(8.5).text(template.empresa.nome, doc.page.margins.left, signatureY + 7, { width: 205, align: 'center' });
+    doc.text(parsed.clienteNome, doc.page.margins.left + pageWidth - 205, signatureY + 7, { width: 205, align: 'center' });
+    doc.font('Helvetica').fontSize(8).fillColor(muted).text('CONTRATADA', doc.page.margins.left, signatureY + 20, { width: 205, align: 'center' });
+    doc.text('CONTRATANTE', doc.page.margins.left + pageWidth - 205, signatureY + 20, { width: 205, align: 'center' });
+
+    doc.end();
+  });
+};
+
+const sendContratoPdf = async (res, contrato) => {
+  const safeClientName = String(contrato.clienteNome || 'cliente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+  const fileName = `contrato-drm-${contrato.id}-${safeClientName || 'cliente'}.pdf`;
+  const pdf = await buildContratoPdf(contrato);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Length', pdf.length);
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.send(pdf);
+};
+
 (async () => {
   if (!fs.existsSync(DB_PATH) && fs.existsSync(TEMPLATE_DB_PATH)) {
     fs.copyFileSync(TEMPLATE_DB_PATH, DB_PATH);
@@ -1396,6 +1532,7 @@ const buildContratoHtml = async (contrato) => {
       instalacaoAgendada TEXT,
       previsaoLigacao TEXT,
       equipamentoEntregueAt TEXT,
+      medidorTrocadoAt TEXT,
       updatedAt TEXT,
       FOREIGN KEY (contratoId) REFERENCES contratos(id)
     );
@@ -1558,6 +1695,7 @@ const buildContratoHtml = async (contrato) => {
     ['instalacaoAgendada', 'TEXT'],
     ['previsaoLigacao', 'TEXT'],
     ['equipamentoEntregueAt', 'TEXT'],
+    ['medidorTrocadoAt', 'TEXT'],
   ]) {
     if (!existingProjetoColumns.includes(field)) {
       await db.exec(`ALTER TABLE projetos ADD COLUMN ${field} ${definition}`);
@@ -2133,6 +2271,18 @@ app.get('/api/cliente/portal', authRequired, requireClientUser, async (req, res)
   });
 });
 
+app.get('/api/cliente/contratos/:id/download', authRequired, requireClientUser, async (req, res) => {
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.user.id);
+  if (!cliente) return res.status(404).send('Cliente não encontrado.');
+
+  const contratos = await getClienteContratoRows(cliente);
+  const contrato = contratos.find(item => Number(item.id) === Number(req.params.id));
+  if (!contrato) return res.status(403).send('Contrato não pertence a este cliente.');
+  if (contrato.status !== 'Aprovado') return res.status(403).send('O contrato estará disponível após aprovação.');
+
+  await sendContratoPdf(res, contrato);
+});
+
 app.post('/api/cliente/reclamacoes', authRequired, requireClientUser, async (req, res) => {
   const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.user.id);
   if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
@@ -2217,6 +2367,47 @@ app.post('/api/cliente/equipamento-entregue', authRequired, requireClientUser, a
   await db.run(
     `UPDATE projetos
      SET equipamentoEntregueAt = ?, checklist = ?, observacoes = ?, updatedAt = ?
+     WHERE id = ?`,
+    now,
+    JSON.stringify(checklist),
+    nextObservacoes,
+    now,
+    projeto.id
+  );
+
+  const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', projeto.id));
+  io.emit('projeto_atualizado', updated);
+  res.json(updated);
+});
+
+app.post('/api/cliente/medidor-trocado', authRequired, requireClientUser, async (req, res) => {
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.user.id);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+
+  const { projetoId, contratoId, observacoes = '' } = req.body;
+  const contratos = await getClienteContratoRows(cliente);
+  const authorizedIds = contratos.map(item => Number(item.id));
+  if (authorizedIds.length === 0) return res.status(404).json({ message: 'Nenhum contrato encontrado para este cliente.' });
+
+  const projeto = projetoId
+    ? await db.get('SELECT * FROM projetos WHERE id = ?', projetoId)
+    : await db.get('SELECT * FROM projetos WHERE contratoId = ?', contratoId || authorizedIds[0]);
+  if (!projeto || !authorizedIds.includes(Number(projeto.contratoId))) {
+    return res.status(403).json({ message: 'Projeto não pertence a este cliente.' });
+  }
+
+  const now = new Date().toISOString();
+  const checklist = { ...parseJsonField(projeto.checklist, {}), medidorTrocado: true };
+  const nextObservacoes = [
+    projeto.observacoes,
+    observacoes
+      ? `Cliente confirmou troca do medidor pela Equatorial em ${new Date(now).toLocaleString('pt-BR')}: ${observacoes}`
+      : `Cliente confirmou troca do medidor pela Equatorial em ${new Date(now).toLocaleString('pt-BR')}`,
+  ].filter(Boolean).join('\n');
+
+  await db.run(
+    `UPDATE projetos
+     SET medidorTrocadoAt = ?, checklist = ?, observacoes = ?, updatedAt = ?
      WHERE id = ?`,
     now,
     JSON.stringify(checklist),
@@ -2731,10 +2922,7 @@ app.get('/api/admin/contratos/:id/download', authRequired, requirePermission('co
     return res.status(403).send('Este contrato só pode ser baixado após aprovação do Deivson/ADM.');
   }
 
-  const fileName = `contrato-drm-${contrato.id}-${String(contrato.clienteNome || 'cliente').replace(/[^\w-]+/g, '-').toLowerCase()}.html`;
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-  res.send(await buildContratoHtml(contrato));
+  await sendContratoPdf(res, contrato);
 });
 
 app.get('/api/admin/usuarios', authRequired, requirePermission('usuarios'), async (req, res) => {
@@ -2916,7 +3104,7 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
     return res.status(403).json({ message: 'Este projeto pertence a outro responsável.' });
   }
 
-  const { etapa, prioridade, responsavelId, observacoes, prazoPrevisto, checklist, instalacaoAgendada, previsaoLigacao, equipamentoEntregueAt } = req.body;
+  const { etapa, prioridade, responsavelId, observacoes, prazoPrevisto, checklist, instalacaoAgendada, previsaoLigacao, equipamentoEntregueAt, medidorTrocadoAt } = req.body;
   if (etapa && !PROJECT_STAGES.includes(etapa)) {
     return res.status(400).json({ message: 'Etapa de projeto inválida.' });
   }
@@ -2939,6 +3127,7 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
          instalacaoAgendada = COALESCE(?, instalacaoAgendada),
          previsaoLigacao = COALESCE(?, previsaoLigacao),
          equipamentoEntregueAt = COALESCE(?, equipamentoEntregueAt),
+         medidorTrocadoAt = COALESCE(?, medidorTrocadoAt),
          updatedAt = ?
      WHERE id = ?`,
     etapa || null,
@@ -2951,6 +3140,7 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
     instalacaoAgendada || null,
     previsaoLigacao || null,
     equipamentoEntregueAt || null,
+    medidorTrocadoAt || null,
     new Date().toISOString(),
     req.params.id
   );
