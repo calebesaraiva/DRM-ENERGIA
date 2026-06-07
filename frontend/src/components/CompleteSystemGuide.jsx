@@ -136,13 +136,16 @@ function CompleteSystemGuide({ monthlyGeneration = 0, power = '--' }) {
       <section className="bill-guide">
         <div>
           <span>Entenda sua conta</span>
-          <h3>Depois da ligação, três números contam a história.</h3>
-          <p>A nomenclatura pode variar, mas a lógica é simples: veja quanto consumiu, quanto enviou à rede e quantos créditos possui.</p>
+          <h3>Três informações mostram como sua energia circula.</h3>
+          <p>Entenda o que vem da concessionária, o que seu sistema envia para a rede e como o excedente se transforma em créditos.</p>
+          <div className="bill-cycle" aria-hidden="true">
+            <span>Rede</span><i></i><span>Sistema solar</span><i></i><span>Créditos</span>
+          </div>
         </div>
         <div className="bill-lines">
-          <article><i></i><strong>Energia consumida</strong><p>O total usado pelo imóvel.</p></article>
-          <article><i></i><strong>Energia injetada</strong><p>O excedente enviado à rede.</p></article>
-          <article><i></i><strong>Saldo de créditos</strong><p>Energia disponível para compensação.</p></article>
+          <article className="consumed"><i></i><span>01</span><strong>Energia Consumida</strong><p>Energia elétrica utilizada da rede da concessionária, geralmente com maior consumo durante o período noturno.</p></article>
+          <article className="injected"><i></i><span>02</span><strong>Energia Injetada</strong><p>Energia gerada pelo sistema durante o dia e não consumida imediatamente pela residência, sendo enviada para a rede e convertida em créditos energéticos.</p></article>
+          <article className="credits"><i></i><span>03</span><strong>Saldo de Créditos</strong><p>Energia acumulada a partir da energia injetada na rede, utilizada para compensar o consumo noturno ou ser rateada para outra unidade consumidora vinculada à mesma titularidade.</p></article>
         </div>
       </section>
 
