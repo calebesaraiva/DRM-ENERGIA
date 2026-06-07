@@ -9,7 +9,9 @@ const args = process.argv.slice(2);
 const shouldSend = args.includes('--send');
 const force = args.includes('--force');
 const imageArg = args.find(item => item.startsWith('--image='));
+const testToArg = args.find(item => item.startsWith('--test-to='));
 const imagePath = imageArg ? path.resolve(imageArg.slice('--image='.length)) : '';
+const testTo = testToArg ? String(testToArg.slice('--test-to='.length)).trim().toLowerCase() : '';
 const campaignKey = 'portal-cliente-lancamento-2026';
 const portalUrl = 'https://drmenergiasolar.com.br/portal-cliente';
 
@@ -44,22 +46,60 @@ const getRecipients = async db => {
   return [...recipients.values()];
 };
 
-const htmlTemplate = ({ name, hasImage }) => `
-  <div style="margin:0;background:#f3f4f6;padding:28px 12px;font-family:Arial,sans-serif;color:#111827">
-    <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb">
-      ${hasImage ? '<img src="cid:portal-launch-poster" alt="Portal do Cliente DRM Energia Solar" style="display:block;width:100%;height:auto">' : ''}
-      <div style="padding:28px">
-        <p style="margin:0 0 8px;color:#ea580c;font-size:13px;font-weight:bold;text-transform:uppercase">Novidade DRM Energia Solar</p>
-        <h1 style="margin:0 0 16px;font-size:30px;line-height:1.1">Olá, ${escapeHtml(name)}. Seu Portal do Cliente já está disponível.</h1>
-        <p style="margin:0 0 16px;color:#475569;line-height:1.6">Agora você acompanha contrato, prazos, entrega dos equipamentos, instalação, Equatorial, documentos e atendimento em um único lugar.</p>
-        <p style="margin:0 0 24px;color:#475569;line-height:1.6">O portal também reúne guia completo sobre energia solar, notificações automáticas, envio de fotos, acompanhamento de solicitações e um canal direto com a equipe DRM.</p>
-        <a href="${portalUrl}" style="display:inline-block;background:#f97316;color:#111827;padding:15px 22px;text-decoration:none;font-weight:bold">Acessar Portal do Cliente</a>
-        <p style="margin:24px 0 0;color:#64748b;font-size:13px;line-height:1.5">Use o e-mail cadastrado na DRM. Caso ainda não tenha senha, utilize a recuperação de acesso na tela de login.</p>
-      </div>
-      <div style="padding:18px 28px;background:#111827;color:#e5e7eb;font-size:13px">DRM Energia Solar · Tecnologia, transparência e energia limpa na palma da sua mão.</div>
-    </div>
-  </div>
-`;
+const htmlTemplate = ({ name, hasImage }) => {
+  const safeName = escapeHtml(name);
+  return `<!doctype html>
+  <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+  <body style="margin:0;padding:0;background:#eef2f6;font-family:Arial,Helvetica,sans-serif;color:#111827">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0">Uma nova forma de acompanhar cada etapa do seu projeto solar chegou.</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#eef2f6">
+      <tr><td align="center" style="padding:24px 10px">
+        <table role="presentation" width="680" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:680px;background:#ffffff;border-collapse:separate">
+          <tr><td style="padding:14px 24px;background:#0b1018;border-bottom:3px solid #f97316;color:#ffffff">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+              <td style="font-size:18px;font-weight:900;color:#ffffff">DRM <span style="color:#f97316">ENERGIA SOLAR</span></td>
+              <td align="right" style="font-size:11px;font-weight:bold;color:#cbd5e1;text-transform:uppercase">Lançamento oficial</td>
+            </tr></table>
+          </td></tr>
+          <tr><td style="padding:38px 30px 30px;background:#111827">
+            <p style="margin:0 0 10px;color:#fb923c;font-size:12px;font-weight:bold;text-transform:uppercase">Feito para você acompanhar tudo de perto</p>
+            <h1 style="margin:0 0 16px;color:#ffffff;font-size:34px;line-height:1.08">Olá, ${safeName}.<br>Seu projeto solar ganhou uma nova experiência.</h1>
+            <p style="margin:0;color:#cbd5e1;font-size:17px;line-height:1.6">A DRM reuniu transparência, tecnologia e atendimento em um portal exclusivo. Agora, cada avanço do seu projeto está ao alcance do seu celular.</p>
+          </td></tr>
+          ${hasImage ? '<tr><td style="background:#ffffff"><img src="cid:portal-launch-poster" alt="Conheça o novo Portal do Cliente DRM Energia Solar" width="680" style="display:block;width:100%;max-width:680px;height:auto;border:0"></td></tr>' : ''}
+          <tr><td style="padding:34px 30px 10px;background:#ffffff">
+            <p style="margin:0 0 8px;color:#ea580c;font-size:12px;font-weight:bold;text-transform:uppercase">Sua jornada, sem dúvidas e sem distância</p>
+            <h2 style="margin:0 0 14px;color:#111827;font-size:27px;line-height:1.15">Do contrato à geração de energia, você acompanha cada detalhe.</h2>
+            <p style="margin:0;color:#475569;font-size:16px;line-height:1.65">Consulte prazos, documentos e agendamentos; acompanhe a entrega, instalação e ligação pela Equatorial; receba notificações automáticas e fale diretamente com a equipe DRM.</p>
+          </td></tr>
+          <tr><td style="padding:22px 30px 30px;background:#ffffff">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+              <td width="48%" valign="top" style="padding:18px;background:#fff7ed;border-left:4px solid #f97316">
+                <strong style="display:block;color:#111827;font-size:15px">Tudo atualizado</strong>
+                <span style="display:block;margin-top:6px;color:#64748b;font-size:13px;line-height:1.5">Prazos, linha do tempo, fotos da equipe e status do projeto.</span>
+              </td>
+              <td width="4%"></td>
+              <td width="48%" valign="top" style="padding:18px;background:#ecfdf5;border-left:4px solid #16a34a">
+                <strong style="display:block;color:#111827;font-size:15px">Atendimento conectado</strong>
+                <span style="display:block;margin-top:6px;color:#64748b;font-size:13px;line-height:1.5">Solicitações, envio de fotos e mensagens em um único lugar.</span>
+              </td>
+            </tr></table>
+          </td></tr>
+          <tr><td align="center" style="padding:34px 28px;background:#f97316">
+            <p style="margin:0 0 8px;color:#431407;font-size:12px;font-weight:bold;text-transform:uppercase">Seu portal já está esperando por você</p>
+            <h2 style="margin:0 0 20px;color:#111827;font-size:27px;line-height:1.15">Acompanhe seu projeto solar agora.</h2>
+            <a href="${portalUrl}" style="display:inline-block;padding:16px 28px;background:#111827;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;border-radius:6px">ACESSAR MEU PORTAL</a>
+            <p style="margin:18px 0 0;color:#431407;font-size:12px;line-height:1.5">Use o e-mail cadastrado na DRM. Caso ainda não tenha senha, selecione “Esqueceu a senha?” na tela de acesso.</p>
+          </td></tr>
+          <tr><td style="padding:24px 28px;background:#0b1018;color:#cbd5e1">
+            <p style="margin:0 0 6px;color:#ffffff;font-size:15px;font-weight:bold">DRM Energia Solar</p>
+            <p style="margin:0;font-size:12px;line-height:1.6">Tecnologia, transparência e energia limpa na palma da sua mão.<br><a href="${portalUrl}" style="color:#fb923c;text-decoration:none">drmenergiasolar.com.br/portal-cliente</a></p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body></html>`;
+};
 
 (async () => {
   const db = await open({ filename: path.join(__dirname, '..', 'database.db'), driver: sqlite3.Database });
@@ -92,7 +132,10 @@ const htmlTemplate = ({ name, hasImage }) => `
     new Date().toISOString()
   );
 
-  const recipients = await getRecipients(db);
+  const allRecipients = await getRecipients(db);
+  const recipients = testTo
+    ? [{ email: testTo, name: allRecipients.find(item => item.email === testTo)?.name || 'Cliente DRM' }]
+    : allRecipients;
   console.log(`Destinatários únicos válidos: ${recipients.length}`);
   recipients.forEach(item => console.log(`- ${maskEmail(item.email)} (${item.name})`));
 
@@ -104,11 +147,13 @@ const htmlTemplate = ({ name, hasImage }) => `
   if (!imagePath || !fs.existsSync(imagePath)) throw new Error('Informe uma imagem existente usando --image=caminho.');
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) throw new Error('SMTP não configurado.');
 
-  const existing = await db.get('SELECT * FROM email_campaigns WHERE campaignKey = ?', campaignKey);
+  const existing = testTo ? null : await db.get('SELECT * FROM email_campaigns WHERE campaignKey = ?', campaignKey);
   if (existing?.status === 'sent' && !force) throw new Error('Campanha já enviada. Use --force somente se realmente precisar reenviar.');
   const now = new Date().toISOString();
   const subject = 'O Portal do Cliente DRM Energia Solar já está disponível';
-  if (!existing) {
+  if (testTo) {
+    console.log(`Modo de teste: o envio será feito somente para ${maskEmail(testTo)}.`);
+  } else if (!existing) {
     await db.run(
       'INSERT INTO email_campaigns (campaignKey, subject, imagePath, totalRecipients, status, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
       campaignKey, subject, imagePath, recipients.length, 'sending', now
@@ -119,7 +164,7 @@ const htmlTemplate = ({ name, hasImage }) => `
       imagePath, recipients.length, 'sending', existing.id
     );
   }
-  const campaign = await db.get('SELECT * FROM email_campaigns WHERE campaignKey = ?', campaignKey);
+  const campaign = testTo ? null : await db.get('SELECT * FROM email_campaigns WHERE campaignKey = ?', campaignKey);
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 465),
@@ -140,25 +185,25 @@ const htmlTemplate = ({ name, hasImage }) => `
         attachments: [{ filename: path.basename(imagePath), path: imagePath, cid: 'portal-launch-poster' }],
       });
       sent += 1;
-      await db.run(
+      if (!testTo) await db.run(
         `INSERT INTO email_campaign_deliveries (campaignId, email, name, status, sentAt) VALUES (?, ?, ?, 'sent', ?)
          ON CONFLICT(campaignId, email) DO UPDATE SET status = 'sent', error = NULL, sentAt = excluded.sentAt`,
         campaign.id, recipient.email, recipient.name, new Date().toISOString()
       );
     } catch (error) {
       failed += 1;
-      await db.run(
+      if (!testTo) await db.run(
         `INSERT INTO email_campaign_deliveries (campaignId, email, name, status, error) VALUES (?, ?, ?, 'failed', ?)
          ON CONFLICT(campaignId, email) DO UPDATE SET status = 'failed', error = excluded.error`,
         campaign.id, recipient.email, recipient.name, String(error.message || error).slice(0, 500)
       );
     }
   }
-  await db.run(
+  if (!testTo) await db.run(
     'UPDATE email_campaigns SET sentCount = ?, failedCount = ?, status = ?, sentAt = ? WHERE id = ?',
     sent, failed, failed ? 'partial' : 'sent', new Date().toISOString(), campaign.id
   );
-  await db.run(
+  if (!testTo) await db.run(
     `INSERT INTO client_notifications (clienteId, type, title, message, action, createdAt)
      SELECT id, 'launch', 'Bem-vindo ao novo Portal do Cliente', 'Seu novo portal DRM está disponível com acompanhamento, documentos, notificações e atendimento.', 'communication', ?
      FROM clientes
@@ -167,7 +212,7 @@ const htmlTemplate = ({ name, hasImage }) => `
      )`,
     new Date().toISOString()
   );
-  console.log(`Campanha concluída: ${sent} enviados, ${failed} falharam.`);
+  console.log(`${testTo ? 'Prévia' : 'Campanha'} concluída: ${sent} enviados, ${failed} falharam.`);
   await db.close();
 })().catch(error => {
   console.error(`Falha: ${error.message || error}`);
