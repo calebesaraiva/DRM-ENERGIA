@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 import { withApiBase } from '../utils/apiBase';
+import SolarJourneyScene from '../components/SolarJourneyScene';
 
 const money = (value) => Number(value || 0).toLocaleString('pt-BR', {
   style: 'currency',
@@ -30,6 +31,37 @@ const statusClass = (status = '') => {
   return 'info';
 };
 
+const daysUntil = (value) => {
+  if (!value) return null;
+  const target = new Date(value);
+  if (Number.isNaN(target.getTime())) return null;
+  const days = Math.ceil((target.getTime() - Date.now()) / 86400000);
+  if (days === 0) return 'Hoje';
+  if (days < 0) return `${Math.abs(days)} dia${Math.abs(days) === 1 ? '' : 's'} atrás`;
+  return `Faltam ${days} dia${days === 1 ? '' : 's'}`;
+};
+
+const educationSections = [
+  {
+    kicker: 'Como funciona',
+    title: 'Da luz do sol até a sua tomada',
+    text: 'As placas transformam luz solar em energia elétrica. O inversor converte essa energia para o padrão da sua casa, e o medidor registra o que foi consumido e o excedente enviado para a rede.',
+    items: ['Placas captam a luz', 'Inversor converte a energia', 'Casa consome primeiro', 'Excedente vira crédito'],
+  },
+  {
+    kicker: 'Cuidados',
+    title: 'Pequenos cuidados, alta performance',
+    text: 'O sistema trabalha sozinho, mas inspeções simples ajudam a manter a geração esperada e aumentam a vida útil dos equipamentos.',
+    items: ['Evite sombras novas sobre as placas', 'Não jogue produtos químicos nos módulos', 'Mantenha o inversor ventilado', 'Solicite limpeza técnica quando necessário'],
+  },
+  {
+    kicker: 'Fique de olho',
+    title: 'Sinais que merecem atenção',
+    text: 'Oscilações pontuais são normais em dias nublados. Procure a DRM quando houver queda prolongada, alertas no inversor ou danos visíveis.',
+    items: ['Alerta vermelho no inversor', 'Queda incomum de geração', 'Cabos soltos ou danificados', 'Conta sem créditos após a ligação'],
+  },
+];
+
 const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(reader.result);
@@ -48,6 +80,7 @@ function Dashboard() {
   const [deliveryStatus, setDeliveryStatus] = useState('');
   const [meterNote, setMeterNote] = useState('');
   const [meterStatus, setMeterStatus] = useState('');
+  const [activeView, setActiveView] = useState('project');
   const navigate = useNavigate();
 
   const user = useMemo(() => {
@@ -125,8 +158,10 @@ function Dashboard() {
   const currentManual = selectedContrato?.dados?.manual || {};
   const currentEquipamento = selectedContrato?.equipamentoDados || {};
   const financingText = currentManual.formaPagamento || selectedContrato?.dados?.financeiro?.forma_pagamento || 'Condição financeira ainda não registrada no portal.';
+  const signedAt = selectedContrato?.dataAnalise || selectedContrato?.dataCriacao;
+  const contractualDeadline = currentManual.prazoExecucao || currentEquipamento.prazoExecucao || 40;
   const progressSteps = [
-    { key: 'contrato', label: 'Contrato DRM', done: selectedContrato?.status === 'Aprovado', detail: selectedContrato?.status || 'Pendente' },
+    { key: 'contrato', label: 'Contrato DRM', done: selectedContrato?.status === 'Aprovado', detail: selectedContrato?.status === 'Aprovado' ? `Aprovado em ${dateBr(signedAt)}` : selectedContrato?.status || 'Pendente' },
     { key: 'equipamento', label: 'Entrega do equipamento', done: Boolean(selectedProjeto?.equipamentoEntregueAt), detail: selectedProjeto?.equipamentoEntregueAt ? dateBr(selectedProjeto.equipamentoEntregueAt) : dateBr(selectedProjeto?.prazoPrevisto) },
     { key: 'instalacao', label: 'Instalação', done: selectedProjeto?.checklist?.instalacao, detail: dateTimeBr(selectedProjeto?.instalacaoAgendada) },
     { key: 'equatorial', label: 'Troca do medidor / ligação Equatorial', done: Boolean(selectedProjeto?.medidorTrocadoAt || selectedProjeto?.checklist?.medidorTrocado || selectedProjeto?.checklist?.sistemaLigado), detail: selectedProjeto?.medidorTrocadoAt ? dateBr(selectedProjeto.medidorTrocadoAt) : dateBr(selectedProjeto?.previsaoLigacao) },
@@ -251,6 +286,17 @@ function Dashboard() {
               </div>
             </section>
 
+            <nav className="portal-view-tabs" aria-label="Áreas do portal">
+              <button type="button" className={activeView === 'project' ? 'active' : ''} onClick={() => setActiveView('project')}>
+                Meu projeto
+              </button>
+              <button type="button" className={activeView === 'education' ? 'active' : ''} onClick={() => setActiveView('education')}>
+                Guia do sistema
+              </button>
+            </nav>
+
+            {activeView === 'project' ? (
+              <>
             {portal?.contratos?.length > 1 && (
               <section className="portal-contract-switcher">
                 {portal.contratos.map(contrato => (
@@ -267,6 +313,11 @@ function Dashboard() {
               </section>
             )}
 
+            <SolarJourneyScene
+              delivered={Boolean(selectedProjeto?.equipamentoEntregueAt)}
+              installationDone={Boolean(selectedProjeto?.checklist?.instalacao)}
+            />
+
             <section className="portal-grid">
               <div className="portal-card contract-card">
                 <div className="portal-card-head">
@@ -282,6 +333,8 @@ function Dashboard() {
                   <div><span>Geração</span><strong>{currentManual.geracaoKwh || selectedContrato?.dados?.dimensionamento?.geracao_estimada_kwh || '--'} kWh/mês</strong></div>
                 </div>
                 <div className="portal-detail-list">
+                  <div><span>Contrato assinado / aprovado em</span><strong>{dateBr(signedAt)}</strong></div>
+                  <div><span>Prazo contratual</span><strong>Até {contractualDeadline} dias úteis após assinatura e condições iniciais</strong></div>
                   <div><span>Placas</span><strong>{currentManual.painel || currentEquipamento.placaModelo || 'A definir'}</strong></div>
                   <div><span>Inversor</span><strong>{currentManual.inversor || currentEquipamento.inversorModelo || 'A definir'}</strong></div>
                   <div><span>Financiamento / pagamento</span><strong>{financingText}</strong></div>
@@ -299,9 +352,10 @@ function Dashboard() {
                   </div>
                 </div>
                 <div className="deadline-list">
-                  <div><span>Entrega do equipamento</span><strong>{selectedProjeto?.equipamentoEntregueAt ? `Entregue em ${dateBr(selectedProjeto.equipamentoEntregueAt)}` : dateBr(selectedProjeto?.prazoPrevisto)}</strong></div>
-                  <div><span>Instalação</span><strong>{dateTimeBr(selectedProjeto?.instalacaoAgendada)}</strong></div>
-                  <div><span>Troca do medidor / ligação Equatorial</span><strong>{selectedProjeto?.medidorTrocadoAt ? `Confirmada em ${dateBr(selectedProjeto.medidorTrocadoAt)}` : dateBr(selectedProjeto?.previsaoLigacao)}</strong></div>
+                  <div><span>Assinatura / aprovação</span><strong>{dateBr(signedAt)}</strong><small>Marco inicial do contrato</small></div>
+                  <div><span>Entrega do equipamento</span><strong>{selectedProjeto?.equipamentoEntregueAt ? `Entregue em ${dateBr(selectedProjeto.equipamentoEntregueAt)}` : dateBr(selectedProjeto?.prazoPrevisto)}</strong><small>{selectedProjeto?.equipamentoEntregueAt ? 'Entrega confirmada' : daysUntil(selectedProjeto?.prazoPrevisto) || 'Aguardando previsão'}</small></div>
+                  <div><span>Instalação</span><strong>{dateTimeBr(selectedProjeto?.instalacaoAgendada)}</strong><small>{daysUntil(selectedProjeto?.instalacaoAgendada) || 'Aguardando agendamento'}</small></div>
+                  <div><span>Troca do medidor / ligação Equatorial</span><strong>{selectedProjeto?.medidorTrocadoAt ? `Confirmada em ${dateBr(selectedProjeto.medidorTrocadoAt)}` : dateBr(selectedProjeto?.previsaoLigacao)}</strong><small>{selectedProjeto?.medidorTrocadoAt ? 'Etapa confirmada' : daysUntil(selectedProjeto?.previsaoLigacao) || 'Aguardando previsão'}</small></div>
                 </div>
               </div>
             </section>
@@ -424,6 +478,52 @@ function Dashboard() {
                 <div className="portal-no-complaints">Nenhuma reclamação aberta para este contrato.</div>
               )}
             </section>
+              </>
+            ) : (
+              <section className="education-view">
+                <div className="education-intro">
+                  <span>Guia DRM</span>
+                  <h2>Entenda seu sistema e cuide bem da sua geração.</h2>
+                  <p>Informação simples para você acompanhar o desempenho, reconhecer sinais importantes e aproveitar melhor sua energia solar.</p>
+                </div>
+
+                <div className="energy-flow" aria-label="Fluxo de funcionamento do sistema solar">
+                  <div><strong>1</strong><span>Sol</span><p>Luz chega aos módulos.</p></div>
+                  <i></i>
+                  <div><strong>2</strong><span>Placas</span><p>Energia é produzida.</p></div>
+                  <i></i>
+                  <div><strong>3</strong><span>Inversor</span><p>Corrente é convertida.</p></div>
+                  <i></i>
+                  <div><strong>4</strong><span>Sua casa</span><p>Consumo e créditos.</p></div>
+                </div>
+
+                <div className="education-grid">
+                  {educationSections.map(section => (
+                    <article className="education-card" key={section.title}>
+                      <span>{section.kicker}</span>
+                      <h3>{section.title}</h3>
+                      <p>{section.text}</p>
+                      <ul>
+                        {section.items.map(item => <li key={item}>{item}</li>)}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+
+                <section className="monitoring-band">
+                  <div>
+                    <span>Acompanhamento inteligente</span>
+                    <h3>Compare a geração ao longo dos meses.</h3>
+                    <p>Dias nublados reduzem a produção naturalmente. O sinal de atenção é uma queda prolongada sem mudança no clima ou um alerta persistente no inversor.</p>
+                  </div>
+                  <div className="generation-bars" aria-hidden="true">
+                    {[52, 68, 74, 82, 78, 92, 86, 96].map((height, index) => (
+                      <b key={height + index} style={{ '--bar-height': `${height}%`, '--bar-delay': `${index * 90}ms` }}></b>
+                    ))}
+                  </div>
+                </section>
+              </section>
+            )}
           </>
         )}
       </main>
