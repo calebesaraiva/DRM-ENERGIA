@@ -307,7 +307,9 @@ const AdminDashboard = () => {
     Authorization: `Bearer ${localStorage.getItem('token')}`,
   }), []);
 
-  const hasPermission = (permission) => adminUser.role === 'ADM' || adminUser.permissions?.[permission];
+  const hasPermission = useCallback((permission) => (
+    adminUser.role === 'ADM' || adminUser.permissions?.[permission]
+  ), [adminUser.permissions, adminUser.role]);
 
   const tabs = [
     { id: 'dashboard', label: 'Painel geral', permission: 'dashboard' },
@@ -395,7 +397,7 @@ const AdminDashboard = () => {
       return [lead.nome, lead.telefone, lead.email, lead.cidade, lead.assignedUserName, lead.status]
         .some(value => String(value || '').toLowerCase().includes(search));
     });
-  }, [leadOwnerFilter, leadSearch, leadStatusFilter, leads, adminUser]);
+  }, [leadOwnerFilter, leadSearch, leadStatusFilter, leads, hasPermission]);
 
   const clientSummary = useMemo(() => {
     const search = clientSearch.trim().toLowerCase();
@@ -2148,6 +2150,14 @@ const AdminDashboard = () => {
                       <label>
                         Prazo previsto
                         <input type="date" value={selectedProjeto.prazoPrevisto || ''} onChange={(event) => updateProjeto(selectedProjeto.id, { prazoPrevisto: event.target.value })} />
+                      </label>
+                      <label>
+                        Instalação agendada
+                        <input type="datetime-local" value={selectedProjeto.instalacaoAgendada ? String(selectedProjeto.instalacaoAgendada).slice(0, 16) : ''} onChange={(event) => updateProjeto(selectedProjeto.id, { instalacaoAgendada: event.target.value })} />
+                      </label>
+                      <label>
+                        Previsão Equatorial
+                        <input type="date" value={selectedProjeto.previsaoLigacao || ''} onChange={(event) => updateProjeto(selectedProjeto.id, { previsaoLigacao: event.target.value })} />
                       </label>
                     </div>
 

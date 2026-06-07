@@ -13,7 +13,7 @@ const getStoredUser = () => {
 
 function VerifyEmail() {
   const navigate = useNavigate();
-  const storedUser = useMemo(getStoredUser, []);
+  const storedUser = useMemo(() => getStoredUser(), []);
   const [email, setEmail] = useState(storedUser.emailVerified ? storedUser.email || '' : '');
   const [code, setCode] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');

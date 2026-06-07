@@ -774,6 +774,33 @@ const parseProjeto = (projeto) => ({
   checklist: parseJsonField(projeto.checklist, {}),
 });
 
+const parseOs = (os = {}) => ({
+  ...os,
+  fotos: Array.isArray(os.fotos) ? os.fotos : parseJsonField(os.fotos, []),
+});
+
+const isClientUser = (user = {}) => user.userType === 'cliente' || user.role === 'CLIENTE';
+
+const requireClientUser = (req, res, next) => {
+  if (isClientUser(req.user)) return next();
+  return res.status(403).json({ message: 'Área exclusiva para clientes.' });
+};
+
+const getClienteContratoRows = async (cliente = {}) => {
+  const phone = normalizeWhatsAppPhone(cliente.whatsapp);
+  const phoneWithoutCountry = phone.startsWith('55') ? phone.slice(2) : phone;
+  const rows = await db.all(
+    `SELECT * FROM contratos
+     WHERE clienteEmail = ?
+        OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(clienteTelefone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') IN (?, ?)
+     ORDER BY id DESC`,
+    normalizeEmail(cliente.email),
+    phone,
+    phoneWithoutCountry
+  );
+  return rows.map(parseContrato);
+};
+
 const DEFAULT_CONTRACT_TEMPLATE = {
   version: 'drm-service-materials-v3',
   empresa: {
@@ -1366,6 +1393,9 @@ const buildContratoHtml = async (contrato) => {
       observacoes TEXT,
       dataInicio TEXT,
       prazoPrevisto TEXT,
+      instalacaoAgendada TEXT,
+      previsaoLigacao TEXT,
+      equipamentoEntregueAt TEXT,
       updatedAt TEXT,
       FOREIGN KEY (contratoId) REFERENCES contratos(id)
     );
@@ -1399,6 +1429,17 @@ const buildContratoHtml = async (contrato) => {
       dataAbertura TEXT,
       dataAtualizacao TEXT,
       dataFechamento TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS os_fotos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      osId INTEGER NOT NULL,
+      dataUrl TEXT NOT NULL,
+      descricao TEXT,
+      criadoPorId INTEGER,
+      criadoPorNome TEXT,
+      createdAt TEXT,
+      FOREIGN KEY (osId) REFERENCES ordens_servico(id)
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -1508,6 +1549,18 @@ const buildContratoHtml = async (contrato) => {
   for (const [field, definition] of Object.entries(equipamentoExtraColumns)) {
     if (!existingEquipamentoColumns.includes(field)) {
       await db.exec(`ALTER TABLE equipamentos ADD COLUMN ${field} ${definition}`);
+    }
+  }
+
+  const projetoColumns = await db.all('PRAGMA table_info(projetos)');
+  const existingProjetoColumns = projetoColumns.map(column => column.name);
+  for (const [field, definition] of [
+    ['instalacaoAgendada', 'TEXT'],
+    ['previsaoLigacao', 'TEXT'],
+    ['equipamentoEntregueAt', 'TEXT'],
+  ]) {
+    if (!existingProjetoColumns.includes(field)) {
+      await db.exec(`ALTER TABLE projetos ADD COLUMN ${field} ${definition}`);
     }
   }
 
@@ -2045,6 +2098,136 @@ app.get('/api/me', authRequired, async (req, res) => {
 
   const permissions = req.user.role === 'ADM' ? ADMIN_PERMISSIONS : mergePermissions();
   res.json({ user: { id: req.user.id, nome: req.user.nome, email: req.user.email, role: req.user.role, userType: 'cliente', permissions, emailVerified: hasVerifiedEmail(req.user), requiresEmailVerification: requiresEmailVerification(req.user) } });
+});
+
+app.get('/api/cliente/portal', authRequired, requireClientUser, async (req, res) => {
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.user.id);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+
+  const contratos = await getClienteContratoRows(cliente);
+  const contratoIds = contratos.map(item => item.id);
+  const phone = normalizeWhatsAppPhone(cliente.whatsapp);
+  const phoneWithoutCountry = phone.startsWith('55') ? phone.slice(2) : phone;
+  const phoneFilter = `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(clienteTelefone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') IN (?, ?)`;
+  const projetos = contratoIds.length
+    ? (await db.all(`SELECT * FROM projetos WHERE contratoId IN (${contratoIds.map(() => '?').join(',')}) ORDER BY updatedAt DESC, id DESC`, ...contratoIds)).map(parseProjeto)
+    : [];
+  const ordensServico = contratoIds.length
+    ? await db.all(`SELECT * FROM ordens_servico WHERE contratoId IN (${contratoIds.map(() => '?').join(',')}) OR ${phoneFilter} ORDER BY id DESC`, ...contratoIds, phone, phoneWithoutCountry)
+    : await db.all(`SELECT * FROM ordens_servico WHERE ${phoneFilter} OR clienteNome = ? ORDER BY id DESC`, phone, phoneWithoutCountry, cliente.nome);
+  const osIds = ordensServico.map(item => item.id);
+  const fotos = osIds.length
+    ? await db.all(`SELECT * FROM os_fotos WHERE osId IN (${osIds.map(() => '?').join(',')}) ORDER BY id DESC`, ...osIds)
+    : [];
+  const fotosByOs = fotos.reduce((acc, foto) => {
+    acc[foto.osId] = acc[foto.osId] || [];
+    acc[foto.osId].push(foto);
+    return acc;
+  }, {});
+
+  res.json({
+    cliente: publicClient(cliente),
+    contratos,
+    projetos,
+    ordensServico: ordensServico.map(os => parseOs({ ...os, fotos: fotosByOs[os.id] || [] })),
+  });
+});
+
+app.post('/api/cliente/reclamacoes', authRequired, requireClientUser, async (req, res) => {
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.user.id);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+
+  const { contratoId = null, assunto = 'Atendimento ao cliente', problema, prioridade = 'Normal', fotos = [] } = req.body;
+  if (!String(problema || '').trim()) {
+    return res.status(400).json({ message: 'Descreva o que aconteceu para abrir a reclamação.' });
+  }
+
+  const contratos = await getClienteContratoRows(cliente);
+  const authorizedContract = contratoId ? contratos.find(item => Number(item.id) === Number(contratoId)) : contratos[0];
+  if (contratoId && !authorizedContract) {
+    return res.status(403).json({ message: 'Contrato não pertence a este cliente.' });
+  }
+
+  const now = new Date().toISOString();
+  const result = await db.run(
+    `INSERT INTO ordens_servico
+      (clienteNome, clienteTelefone, contratoId, origem, problema, categoria, prioridade, status, responsavelId, responsavelNome, observacoes, dataAbertura, dataAtualizacao)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    cliente.nome,
+    cliente.whatsapp,
+    authorizedContract?.id || null,
+    'Portal do cliente',
+    problema,
+    'Reclamação',
+    prioridade,
+    'Aberta',
+    authorizedContract?.assignedUserId || null,
+    authorizedContract?.assignedUserName || null,
+    assunto,
+    now,
+    now
+  );
+
+  const validFotos = Array.isArray(fotos) ? fotos.filter(item => String(item?.dataUrl || item || '').startsWith('data:image/')).slice(0, 6) : [];
+  for (const item of validFotos) {
+    const dataUrl = typeof item === 'string' ? item : item.dataUrl;
+    const descricao = typeof item === 'string' ? '' : String(item.descricao || '');
+    await db.run(
+      `INSERT INTO os_fotos (osId, dataUrl, descricao, criadoPorId, criadoPorNome, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      result.lastID,
+      dataUrl,
+      descricao,
+      cliente.id,
+      cliente.nome,
+      now
+    );
+  }
+
+  const os = await db.get('SELECT * FROM ordens_servico WHERE id = ?', result.lastID);
+  const osFotos = await db.all('SELECT * FROM os_fotos WHERE osId = ? ORDER BY id DESC', result.lastID);
+  const parsed = parseOs({ ...os, fotos: osFotos });
+  io.emit('os_atualizada', parsed);
+  res.status(201).json(parsed);
+});
+
+app.post('/api/cliente/equipamento-entregue', authRequired, requireClientUser, async (req, res) => {
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.user.id);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+
+  const { projetoId, contratoId, observacoes = '' } = req.body;
+  const contratos = await getClienteContratoRows(cliente);
+  const authorizedIds = contratos.map(item => Number(item.id));
+  if (authorizedIds.length === 0) return res.status(404).json({ message: 'Nenhum contrato encontrado para este cliente.' });
+
+  const projeto = projetoId
+    ? await db.get('SELECT * FROM projetos WHERE id = ?', projetoId)
+    : await db.get('SELECT * FROM projetos WHERE contratoId = ?', contratoId || authorizedIds[0]);
+  if (!projeto || !authorizedIds.includes(Number(projeto.contratoId))) {
+    return res.status(403).json({ message: 'Projeto não pertence a este cliente.' });
+  }
+
+  const now = new Date().toISOString();
+  const checklist = { ...parseJsonField(projeto.checklist, {}), equipamentoEntregue: true };
+  const nextObservacoes = [
+    projeto.observacoes,
+    observacoes ? `Cliente confirmou entrega em ${new Date(now).toLocaleString('pt-BR')}: ${observacoes}` : `Cliente confirmou entrega em ${new Date(now).toLocaleString('pt-BR')}`,
+  ].filter(Boolean).join('\n');
+
+  await db.run(
+    `UPDATE projetos
+     SET equipamentoEntregueAt = ?, checklist = ?, observacoes = ?, updatedAt = ?
+     WHERE id = ?`,
+    now,
+    JSON.stringify(checklist),
+    nextObservacoes,
+    now,
+    projeto.id
+  );
+
+  const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', projeto.id));
+  io.emit('projeto_atualizado', updated);
+  res.json(updated);
 });
 
 app.post('/api/forgot-password', async (req, res) => {
@@ -2733,7 +2916,7 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
     return res.status(403).json({ message: 'Este projeto pertence a outro responsável.' });
   }
 
-  const { etapa, prioridade, responsavelId, observacoes, prazoPrevisto, checklist } = req.body;
+  const { etapa, prioridade, responsavelId, observacoes, prazoPrevisto, checklist, instalacaoAgendada, previsaoLigacao, equipamentoEntregueAt } = req.body;
   if (etapa && !PROJECT_STAGES.includes(etapa)) {
     return res.status(400).json({ message: 'Etapa de projeto inválida.' });
   }
@@ -2753,6 +2936,9 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
          checklist = COALESCE(?, checklist),
          observacoes = COALESCE(?, observacoes),
          prazoPrevisto = COALESCE(?, prazoPrevisto),
+         instalacaoAgendada = COALESCE(?, instalacaoAgendada),
+         previsaoLigacao = COALESCE(?, previsaoLigacao),
+         equipamentoEntregueAt = COALESCE(?, equipamentoEntregueAt),
          updatedAt = ?
      WHERE id = ?`,
     etapa || null,
@@ -2762,6 +2948,9 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
     checklist ? JSON.stringify(checklist) : null,
     observacoes || null,
     prazoPrevisto || null,
+    instalacaoAgendada || null,
+    previsaoLigacao || null,
+    equipamentoEntregueAt || null,
     new Date().toISOString(),
     req.params.id
   );
