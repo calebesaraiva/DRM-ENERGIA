@@ -333,6 +333,114 @@ const sendEmailVerificationCode = async ({ to, name, code }) => {
   });
 };
 
+const COMMUNICATION_TEMPLATES = [
+  {
+    id: 'portal-welcome',
+    audience: 'clientes_verificados',
+    title: 'Boas-vindas ao Portal do Cliente',
+    subject: 'Seu Portal do Cliente DRM Energia Solar está disponível',
+    heading: 'Seu projeto solar ganhou uma nova experiência.',
+    message: 'Acompanhe contrato, prazos, entrega, instalação, Equatorial, documentos, notificações e atendimento em um único lugar.',
+    ctaLabel: 'Acessar meu portal',
+    ctaUrl: '/portal-cliente',
+  },
+  {
+    id: 'project-update',
+    audience: 'clientes_verificados',
+    title: 'Atualização importante do projeto',
+    subject: 'Temos uma atualização sobre seu projeto solar',
+    heading: 'Novidades no seu projeto DRM.',
+    message: 'Nossa equipe atualizou informações importantes do seu projeto. Acesse o portal para acompanhar os detalhes e os próximos passos.',
+    ctaLabel: 'Ver atualização',
+    ctaUrl: '/portal-cliente',
+  },
+  {
+    id: 'old-client-invite',
+    audience: 'clientes_antigos',
+    title: 'Convite para clientes antigos',
+    subject: 'A DRM preparou uma novidade para você',
+    heading: 'Agora ficou ainda mais fácil acompanhar a DRM.',
+    message: 'Criamos uma experiência digital completa para aproximar você da nossa equipe e reunir informações importantes sobre energia solar.',
+    ctaLabel: 'Conhecer o Portal DRM',
+    ctaUrl: '/portal-cliente',
+  },
+  {
+    id: 'team-alert',
+    audience: 'equipe',
+    title: 'Comunicado para equipe DRM',
+    subject: 'Comunicado interno DRM Energia Solar',
+    heading: 'Informação importante para a equipe.',
+    message: 'Confira este comunicado e mantenha seus atendimentos e atividades atualizados no Sistema DRM.',
+    ctaLabel: 'Acessar Sistema DRM',
+    ctaUrl: '/acesso?tipo=equipe',
+  },
+  {
+    id: 'lead-followup',
+    audience: 'leads',
+    title: 'Retomada de contato com interessados',
+    subject: 'Sua economia com energia solar pode começar agora',
+    heading: 'Vamos transformar sua conta de energia?',
+    message: 'A equipe DRM Energia Solar está pronta para apresentar uma solução personalizada e acompanhar você em todas as etapas.',
+    ctaLabel: 'Falar com a DRM',
+    ctaUrl: '/',
+  },
+];
+
+const buildCommunicationEmail = ({ name, heading, message, ctaLabel, ctaUrl }) => {
+  const url = ctaUrl?.startsWith('http') ? ctaUrl : `${getAppUrl()}${ctaUrl || ''}`;
+  return `
+    <div style="margin:0;background:#eef2f6;padding:24px 10px;font-family:Arial,sans-serif;color:#111827">
+      <div style="max-width:640px;margin:auto;background:#fff">
+        <div style="padding:18px 26px;background:#111827;border-bottom:3px solid #f97316;color:#fff;font-size:18px;font-weight:900">DRM <span style="color:#f97316">ENERGIA SOLAR</span></div>
+        <div style="padding:34px 28px">
+          <p style="margin:0 0 8px;color:#ea580c;font-size:12px;font-weight:bold;text-transform:uppercase">Comunicação DRM</p>
+          <h1 style="margin:0 0 16px;font-size:30px;line-height:1.12">${escapeHtml(heading)}</h1>
+          <p style="margin:0 0 12px;color:#475569;line-height:1.65">Olá, <strong>${escapeHtml(name || 'cliente')}</strong>.</p>
+          <p style="margin:0 0 26px;color:#475569;line-height:1.65">${escapeHtml(message)}</p>
+          <a href="${escapeHtml(url)}" style="display:inline-block;background:#f97316;color:#111827;padding:15px 22px;text-decoration:none;font-weight:bold;border-radius:6px">${escapeHtml(ctaLabel || 'Acessar')}</a>
+        </div>
+        <div style="padding:18px 26px;background:#111827;color:#cbd5e1;font-size:12px">DRM Energia Solar · Tecnologia, transparência e energia limpa.</div>
+      </div>
+    </div>`;
+};
+
+const sendCommunicationEmail = async ({ to, name, subject, heading, message, ctaLabel, ctaUrl }) => (
+  getMailTransporter().sendMail({
+    from: process.env.SMTP_FROM || `DRM ENERGIA SOLAR <${process.env.SMTP_USER}>`,
+    to,
+    subject,
+    text: `Olá, ${name || 'cliente'}. ${heading}\n\n${message}\n\n${ctaUrl?.startsWith('http') ? ctaUrl : `${getAppUrl()}${ctaUrl || ''}`}`,
+    html: buildCommunicationEmail({ name, heading, message, ctaLabel, ctaUrl }),
+  })
+);
+
+const getCommunicationAudience = async audience => {
+  const queries = {
+    clientes_verificados: `SELECT nome name, lower(email) email FROM clientes WHERE emailVerified = 1 AND email IS NOT NULL`,
+    clientes_novos: `SELECT nome name, lower(email) email FROM clientes WHERE email IS NOT NULL AND date(dataCadastro) >= date('now', '-30 day')`,
+    clientes_antigos: `SELECT nome name, lower(email) email FROM clientes WHERE email IS NOT NULL AND date(dataCadastro) < date('now', '-30 day')`,
+    todos_clientes: `SELECT nome name, lower(email) email FROM clientes WHERE email IS NOT NULL`,
+    leads: `SELECT nome name, lower(email) email FROM leads WHERE email IS NOT NULL`,
+    equipe: `SELECT nome name, lower(email) email FROM usuarios WHERE active = 1 AND email IS NOT NULL`,
+  };
+  const rows = await db.all(queries[audience] || queries.clientes_verificados);
+  return [...new Map(rows.filter(item => isRealEmail(item.email)).map(item => [item.email, item])).values()];
+};
+
+const sendAutomaticPortalWelcome = async user => {
+  if (user.userType === 'interno' || !isRealEmail(user.email)) return;
+  const key = `portal-welcome-client-${user.id}`;
+  const existing = await db.get('SELECT id FROM communication_deliveries WHERE uniqueKey = ?', key);
+  if (existing) return;
+  const template = COMMUNICATION_TEMPLATES[0];
+  await sendCommunicationEmail({ to: user.email, name: user.nome, ...template });
+  await db.run(
+    `INSERT INTO communication_deliveries (uniqueKey, audience, email, name, subject, status, sentAt)
+     VALUES (?, 'automatico', ?, ?, ?, 'sent', ?)`,
+    key, user.email, user.nome, template.subject, new Date().toISOString()
+  );
+};
+
 const createClientNotification = async ({
   clienteId,
   contratoId = null,
@@ -1730,6 +1838,38 @@ const sendContratoPdf = async (res, contrato) => {
       createdAt TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS communication_campaigns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      templateId TEXT,
+      audience TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      heading TEXT NOT NULL,
+      message TEXT NOT NULL,
+      ctaLabel TEXT,
+      ctaUrl TEXT,
+      totalRecipients INTEGER DEFAULT 0,
+      sentCount INTEGER DEFAULT 0,
+      failedCount INTEGER DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'draft',
+      createdById INTEGER,
+      createdByName TEXT,
+      createdAt TEXT NOT NULL,
+      sentAt TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS communication_deliveries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaignId INTEGER,
+      uniqueKey TEXT UNIQUE,
+      audience TEXT,
+      email TEXT NOT NULL,
+      name TEXT,
+      subject TEXT,
+      status TEXT NOT NULL,
+      error TEXT,
+      sentAt TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS email_campaign_deliveries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       campaignId INTEGER NOT NULL,
@@ -2339,6 +2479,11 @@ app.post('/api/email-verification/confirm', authRequired, async (req, res) => {
     });
 
     const updated = await getAuthUserRecord(req.user);
+    try {
+      await sendAutomaticPortalWelcome({ ...updated, userType: req.user.userType });
+    } catch (welcomeError) {
+      console.error('Erro ao enviar boas-vindas automáticas:', welcomeError);
+    }
     const permissions = req.user.userType === 'interno'
       ? parsePermissions(updated.permissions)
       : (req.user.role === 'ADM' ? ADMIN_PERMISSIONS : mergePermissions());
@@ -3283,6 +3428,65 @@ app.put('/api/admin/usuarios/:id/permissoes', authRequired, requirePermission('p
   );
 
   res.json({ message: 'Permissões atualizadas.' });
+});
+
+app.get('/api/admin/comunicacoes', authRequired, requirePermission('usuarios'), async (req, res) => {
+  const audienceIds = ['clientes_verificados', 'clientes_novos', 'clientes_antigos', 'todos_clientes', 'leads', 'equipe'];
+  const audienceCounts = {};
+  for (const audience of audienceIds) audienceCounts[audience] = (await getCommunicationAudience(audience)).length;
+  const history = await db.all('SELECT * FROM communication_campaigns ORDER BY id DESC LIMIT 40');
+  res.json({ templates: COMMUNICATION_TEMPLATES, audienceCounts, history });
+});
+
+app.post('/api/admin/comunicacoes/teste', authRequired, requirePermission('usuarios'), async (req, res) => {
+  const { to, subject, heading, message, ctaLabel, ctaUrl } = req.body;
+  if (!isRealEmail(to)) return res.status(400).json({ message: 'Informe um e-mail válido para o teste.' });
+  if (!String(subject || '').trim() || !String(heading || '').trim() || !String(message || '').trim()) {
+    return res.status(400).json({ message: 'Assunto, título e mensagem são obrigatórios.' });
+  }
+  await sendCommunicationEmail({ to: normalizeEmail(to), name: req.user.nome, subject, heading, message, ctaLabel, ctaUrl });
+  res.json({ message: `Prévia enviada para ${normalizeEmail(to)}.` });
+});
+
+app.post('/api/admin/comunicacoes/disparar', authRequired, requirePermission('usuarios'), async (req, res) => {
+  const { templateId = 'custom', audience, subject, heading, message, ctaLabel = 'Acessar', ctaUrl = '/' } = req.body;
+  if (!String(subject || '').trim() || !String(heading || '').trim() || !String(message || '').trim()) {
+    return res.status(400).json({ message: 'Assunto, título e mensagem são obrigatórios.' });
+  }
+  const recipients = await getCommunicationAudience(audience);
+  if (!recipients.length) return res.status(400).json({ message: 'Nenhum destinatário válido encontrado para este público.' });
+  const now = new Date().toISOString();
+  const result = await db.run(
+    `INSERT INTO communication_campaigns
+      (templateId, audience, subject, heading, message, ctaLabel, ctaUrl, totalRecipients, status, createdById, createdByName, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?)`,
+    templateId, audience, subject, heading, message, ctaLabel, ctaUrl, recipients.length, req.user.id, req.user.nome, now
+  );
+  let sent = 0;
+  let failed = 0;
+  for (const recipient of recipients) {
+    try {
+      await sendCommunicationEmail({ to: recipient.email, name: recipient.name, subject, heading, message, ctaLabel, ctaUrl });
+      sent += 1;
+      await db.run(
+        `INSERT INTO communication_deliveries (campaignId, audience, email, name, subject, status, sentAt)
+         VALUES (?, ?, ?, ?, ?, 'sent', ?)`,
+        result.lastID, audience, recipient.email, recipient.name, subject, new Date().toISOString()
+      );
+    } catch (error) {
+      failed += 1;
+      await db.run(
+        `INSERT INTO communication_deliveries (campaignId, audience, email, name, subject, status, error)
+         VALUES (?, ?, ?, ?, ?, 'failed', ?)`,
+        result.lastID, audience, recipient.email, recipient.name, subject, String(error.message || error).slice(0, 500)
+      );
+    }
+  }
+  await db.run(
+    'UPDATE communication_campaigns SET sentCount = ?, failedCount = ?, status = ?, sentAt = ? WHERE id = ?',
+    sent, failed, failed ? 'partial' : 'sent', new Date().toISOString(), result.lastID
+  );
+  res.json({ message: `Disparo concluído: ${sent} enviado${sent === 1 ? '' : 's'} e ${failed} falha${failed === 1 ? '' : 's'}.`, sent, failed });
 });
 
 app.post('/api/admin/usuarios/:id/reset-password', authRequired, requirePermission('usuarios'), async (req, res) => {

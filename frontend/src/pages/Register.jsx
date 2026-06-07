@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Register.css';
 import { withApiBase } from '../utils/apiBase';
+import PasswordField from '../components/PasswordField';
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -54,7 +55,7 @@ function Register() {
             <input type="text" id="nome" name="nome" value={formData.nome} onChange={handleChange} required placeholder="Seu nome completo" />
           </div>
           <div className="input-group">
-            <label htmlFor="whatsapp">Whatsapp</label>
+            <label htmlFor="whatsapp">WhatsApp</label>
             <input type="tel" id="whatsapp" name="whatsapp" value={formData.whatsapp} onChange={handleChange} required placeholder="(00) 90000-0000" />
           </div>
           <div className="input-group">
@@ -65,10 +66,7 @@ function Register() {
             <label htmlFor="email">E-mail</label>
             <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required placeholder="seu@email.com" />
           </div>
-          <div className="input-group">
-            <label htmlFor="password">Senha</label>
-            <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} required placeholder="Crie uma senha segura" />
-          </div>
+          <PasswordField label="Senha" id="password" name="password" value={formData.password} onChange={handleChange} required placeholder="Crie uma senha segura" />
           <button type="submit" className="register-button">Cadastrar</button>
         </form>
         <p className="login-link">

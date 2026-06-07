@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import './Login.css';
 import { withApiBase } from '../utils/apiBase';
+import PasswordField from '../components/PasswordField';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -72,30 +73,24 @@ const ResetPassword = () => {
           <p className="login-subtitle">Informe sua nova senha de acesso.</p>
 
           <form onSubmit={handleSubmit} className="login-form">
-            <div className="input-group">
-              <label htmlFor="password">Nova senha</label>
-              <input
-                type="password"
+            <PasswordField
+                label="Nova senha"
                 id="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Digite a nova senha"
                 autoComplete="new-password"
                 required
-              />
-            </div>
-            <div className="input-group">
-              <label htmlFor="confirmPassword">Confirmar senha</label>
-              <input
-                type="password"
+            />
+            <PasswordField
+                label="Confirmar senha"
                 id="confirmPassword"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 placeholder="Repita a nova senha"
                 autoComplete="new-password"
                 required
-              />
-            </div>
+            />
 
             <button type="submit" className="btn btn-primary btn-block" disabled={loading || !token}>
               {loading ? 'Salvando...' : 'Redefinir senha'}

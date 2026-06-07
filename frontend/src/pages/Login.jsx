@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import './Login.css';
 import { withApiBase } from '../utils/apiBase';
+import PasswordField from '../components/PasswordField';
 
 const Login = ({ accessType: forcedAccessType = null }) => {
   const [email, setEmail] = useState('');
@@ -109,17 +110,14 @@ const Login = ({ accessType: forcedAccessType = null }) => {
                 required 
               />
             </div>
-            <div className="input-group">
-              <label htmlFor="senha">Senha</label>
-              <input 
-                type="password" 
-                id="senha" 
+            <PasswordField
+                label="Senha"
+                id="senha"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="Digite sua senha"
                 required 
-              />
-            </div>
+            />
             
             <div className="login-options">
               <label className="remember-me">

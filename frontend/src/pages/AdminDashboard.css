@@ -863,6 +863,202 @@
   padding: 1.5rem;
 }
 
+.communication-admin-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.message-template-list,
+.message-editor-panel {
+  border: 1px solid #dfe5ed;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.message-template-list {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  padding: 1rem;
+}
+
+.message-template-list > span {
+  margin-bottom: 0.5rem;
+  color: #64748b;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.message-template-list button {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #111827;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.message-template-list button.active {
+  border-color: #f97316;
+  background: #fff7ed;
+}
+
+.message-template-list small {
+  color: #64748b;
+}
+
+.message-editor-panel {
+  padding: 1rem;
+}
+
+.message-editor-head,
+.message-send-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.message-editor-head h3 {
+  margin: 0.25rem 0 0;
+}
+
+.recipient-counter {
+  padding: 0.65rem 0.8rem;
+  border-radius: 7px;
+  background: #111827;
+  color: #fff;
+  text-align: right;
+}
+
+.recipient-counter strong,
+.recipient-counter span {
+  display: block;
+}
+
+.recipient-counter strong {
+  color: #fb923c;
+  font-size: 1.35rem;
+}
+
+.recipient-counter span {
+  font-size: 0.7rem;
+}
+
+.message-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.message-editor-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.message-editor-grid .span-2 {
+  grid-column: 1 / -1;
+}
+
+.message-editor-grid input,
+.message-editor-grid select,
+.message-editor-grid textarea,
+.message-send-bar input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.7rem;
+  border: 1px solid #d7dee9;
+  border-radius: 7px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+
+.message-editor-grid textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.email-live-preview {
+  margin: 1rem 0;
+  padding: 1.2rem;
+  border-left: 5px solid #f97316;
+  background: #111827;
+  color: #fff;
+}
+
+.email-live-preview span {
+  color: #fb923c;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.email-live-preview h4 {
+  margin: 0.45rem 0;
+  color: #fff;
+  font-size: 1.3rem;
+}
+
+.email-live-preview p {
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+.email-live-preview strong {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 5px;
+  background: #f97316;
+  color: #111827;
+}
+
+.message-send-bar input {
+  flex: 1;
+}
+
+.message-send-status {
+  margin: 0.75rem 0 0;
+  color: #0f766e;
+  font-weight: 800;
+}
+
+.communication-history {
+  margin-top: 1rem;
+}
+
+@media (max-width: 900px) {
+  .communication-admin-layout,
+  .message-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .message-editor-grid .span-2 {
+    grid-column: auto;
+  }
+
+  .message-send-bar,
+  .message-editor-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .message-send-bar .btn {
+    width: 100%;
+  }
+}
+
 .leads-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Login.css';
 import { withApiBase } from '../utils/apiBase';
+import PasswordField from '../components/PasswordField';
 
 function ChangePassword() {
   const navigate = useNavigate();
@@ -61,18 +62,9 @@ function ChangePassword() {
           {error && <p className="error-message" style={{ textAlign: 'center', marginBottom: '1rem' }}>{error}</p>}
           {message && <p className="register-message">{message}</p>}
           <form onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label htmlFor="currentPassword">Senha temporária</label>
-              <input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-            </div>
-            <div className="input-group">
-              <label htmlFor="newPassword">Nova senha fixa</label>
-              <input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
-            </div>
-            <div className="input-group">
-              <label htmlFor="confirmPassword">Confirmar nova senha</label>
-              <input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-            </div>
+            <PasswordField label="Senha temporária" id="currentPassword" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+            <PasswordField label="Nova senha fixa" id="newPassword" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+            <PasswordField label="Confirmar nova senha" id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             <button type="submit" className="btn btn-primary btn-block">Salvar senha</button>
           </form>
         </div>

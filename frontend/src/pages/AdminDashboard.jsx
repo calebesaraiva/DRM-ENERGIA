@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import io from 'socket.io-client';
 import './AdminDashboard.css';
 import { getApiBaseUrl, withApiBase } from '../utils/apiBase';
+import AdminCommunicationCenter from '../components/AdminCommunicationCenter';
 
 const socket = io(getApiBaseUrl() || undefined);
 
@@ -85,6 +86,9 @@ const SidebarIcon = ({ name }) => {
     ),
     precosSistemas: (
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 6v6c0 5 3.8 8.6 9 10 5.2-1.4 9-5 9-10V6l-9-4Zm1 15h-2v-1.4a4 4 0 0 1-2.6-1.3l1.3-1.4c.6.6 1.3.9 2.2.9.8 0 1.3-.3 1.3-.8 0-.6-.6-.8-1.8-1.2-1.4-.4-2.7-1-2.7-2.6 0-1.3.9-2.3 2.3-2.7V5h2v1.4c.9.2 1.6.6 2.2 1.1L14 9c-.5-.4-1-.6-1.7-.6-.7 0-1.1.3-1.1.7 0 .5.5.7 1.6 1 1.5.5 2.9 1 2.9 2.8 0 1.4-.9 2.4-2.7 2.8V17Z" /></svg>
+    ),
+    comunicacoes: (
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3V5Zm2 2v.7l7 4.7 7-4.7V7H5Zm14 10V10l-7 4.5L5 10v7h14Z" /></svg>
     ),
   };
 
@@ -302,6 +306,7 @@ const AdminDashboard = () => {
   const [quickModal, setQuickModal] = useState(null);
   const [adminUser] = useState(initialUser);
   const [error, setError] = useState('');
+  const [comunicacoes, setComunicacoes] = useState(null);
 
   const headers = useMemo(() => ({
     'Content-Type': 'application/json',
@@ -324,6 +329,7 @@ const AdminDashboard = () => {
     { id: 'precosSistemas', label: 'Preço dos Sistemas', permission: 'precosSistemas' },
     { id: 'financeiro', label: 'Financeiro', permission: 'financeiro' },
     { id: 'usuarios', label: 'Acessos', permission: 'usuarios' },
+    { id: 'comunicacoes', label: 'Comunicações', permission: 'usuarios' },
   ].filter(tab => hasPermission(tab.permission));
 
   const quickActions = [
@@ -573,6 +579,7 @@ const AdminDashboard = () => {
     }
     if (user.role === 'ADM' || user.permissions?.usuarios) {
       calls.push(request('/api/admin/usuarios').then(setUsuarios));
+      calls.push(request('/api/admin/comunicacoes').then(setComunicacoes));
     }
     if (user.role === 'ADM' || user.permissions?.financeiro) {
       calls.push(request('/api/admin/financeiro').then(setFinanceiro));
@@ -2716,6 +2723,15 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
+
+          {activeTab === 'comunicacoes' && comunicacoes && (
+            <AdminCommunicationCenter
+              data={comunicacoes}
+              adminEmail={adminUser.email}
+              request={request}
+              onRefresh={() => request('/api/admin/comunicacoes').then(setComunicacoes)}
+            />
+          )}
         </div>
       </main>
 
@@ -2921,7 +2937,7 @@ const AdminDashboard = () => {
               <div>
                 <span className="section-kicker">Dados variáveis do contrato</span>
                 <h3>{contractModal.orcamento?.clienteNome}</h3>
-                <p>Cliente, empresa e dados de contato entram automático. Preencha só o que muda em cada contrato.</p>
+                <p>Cliente, empresa e dados de contato entram automaticamente. Preencha somente o que muda em cada contrato.</p>
               </div>
               <button type="button" className="lead-modal-close" onClick={() => setContractModal({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' })}>×</button>
             </div>
