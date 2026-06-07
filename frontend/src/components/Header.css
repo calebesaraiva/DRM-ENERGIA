@@ -68,6 +68,32 @@
   min-width: 0;
 }
 
+.access-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.client-panel-link {
+  min-height: 40px;
+  padding: 0.48rem 0.85rem;
+  border-radius: 12px;
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.66);
+  text-decoration: none;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.client-panel-link:hover {
+  border-color: rgba(249, 115, 22, 0.56);
+  color: #c2410c;
+}
+
 .login-btn,
 .logout-btn {
   min-height: 40px;
@@ -119,6 +145,17 @@
     gap: 0.4rem;
     flex-shrink: 0;
   }
+
+  .access-actions {
+    gap: 0.42rem;
+  }
+
+  .client-panel-link {
+    min-height: 38px;
+    padding: 0.44rem 0.62rem;
+    font-size: 0.76rem;
+    border-radius: 11px;
+  }
 }
 
 @media (max-width: 420px) {
@@ -132,5 +169,9 @@
     min-height: 36px;
     padding: 0.4rem 0.58rem;
     font-size: 0.72rem;
+  }
+
+  .client-panel-link {
+    display: none;
   }
 }

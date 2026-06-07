@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import './Login.css';
 import { withApiBase } from '../utils/apiBase';
 
@@ -8,6 +8,9 @@ const Login = () => {
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const accessType = searchParams.get('tipo') === 'equipe' ? 'equipe' : 'cliente';
+  const isTeamAccess = accessType === 'equipe';
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -64,8 +67,9 @@ const Login = () => {
     <div className="login-wrapper">
       <div className="login-image-side">
         <div className="login-image-overlay">
-          <h2>Bem-vindo de volta!</h2>
-          <p>Acesse seu painel e acompanhe sua simulação ou converse com nosso time de especialistas.</p>
+          <span>{isTeamAccess ? 'Sistema interno DRM' : 'Portal do Cliente DRM'}</span>
+          <h2>{isTeamAccess ? 'Operação conectada, do lead à instalação.' : 'Seu projeto solar na palma da mão.'}</h2>
+          <p>{isTeamAccess ? 'Entre para gerenciar clientes, contratos, produtos, projetos, ordens de serviço e financeiro.' : 'Acompanhe contrato, financiamento, entrega, instalação, previsão da Equatorial e atendimento.'}</p>
         </div>
       </div>
       <div className="login-form-side">
@@ -73,9 +77,13 @@ const Login = () => {
           <Link to="/" className="login-logo-link">
             <img src="/assets/logo.png" alt="DRM Logo" className="login-logo" />
           </Link>
-          <h2 className="login-title">Acesse sua conta</h2>
+          <div className="login-access-switch" aria-label="Tipo de acesso">
+            <Link to="/login?tipo=cliente" className={!isTeamAccess ? 'active' : ''}>Cliente</Link>
+            <Link to="/login?tipo=equipe" className={isTeamAccess ? 'active' : ''}>Equipe DRM</Link>
+          </div>
+          <h2 className="login-title">{isTeamAccess ? 'Entrar no Sistema DRM' : 'Entrar no Portal do Cliente'}</h2>
           {error && <p className="error-message" style={{ textAlign: 'center', marginBottom: '1rem' }}>{error}</p>}
-          <p className="login-subtitle">Insira suas credenciais para continuar</p>
+          <p className="login-subtitle">{isTeamAccess ? 'Use seu usuário interno ou e-mail corporativo.' : 'Use o e-mail cadastrado para acompanhar seu projeto.'}</p>
           
           <form onSubmit={handleLogin} className="login-form">
             <div className="input-group">
@@ -85,7 +93,7 @@ const Login = () => {
                 id="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Digite seu usuário ou e-mail"
+                placeholder={isTeamAccess ? 'Usuário ou e-mail da equipe' : 'E-mail do cliente'}
                 required 
               />
             </div>
@@ -96,7 +104,7 @@ const Login = () => {
                 id="senha" 
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
-                placeholder="Sua senha secreta"
+                placeholder="Digite sua senha"
                 required 
               />
             </div>
@@ -108,12 +116,15 @@ const Login = () => {
               <Link to="/recuperar-senha" className="forgot-password">Esqueceu a senha?</Link>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-block">Entrar no Painel</button>
+            <button type="submit" className="btn btn-primary btn-block">{isTeamAccess ? 'Entrar no sistema interno' : 'Acessar meu portal'}</button>
           </form>
           
           <div className="login-footer">
-            <p className="login-security-note">Acesso restrito ao painel DRM.</p>
-            <Link to="/" className="btn-voltar">← Voltar para a página inicial</Link>
+            <p className="login-security-note">{isTeamAccess ? 'Área exclusiva da equipe DRM.' : 'Seu acesso é protegido por verificação de e-mail.'}</p>
+            <div className="login-footer-links">
+              <Link to="/acesso" className="btn-voltar">Escolher outro acesso</Link>
+              <Link to="/" className="btn-voltar">Voltar para o site</Link>
+            </div>
           </div>
         </div>
       </div>

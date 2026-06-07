@@ -1,0 +1,232 @@
+.access-hub {
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(8, 13, 24, 0.88), rgba(15, 23, 42, 0.72)),
+    url('/assets/cliente2.jpeg') center/cover;
+  color: #f8fafc;
+  padding: clamp(1rem, 3vw, 2.2rem);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(1rem, 2.5vw, 2rem);
+}
+
+.access-hero {
+  width: min(1160px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 2rem);
+}
+
+.access-logo {
+  width: 152px;
+  min-height: 92px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+}
+
+.access-logo img {
+  width: 118px;
+  max-height: 72px;
+  object-fit: contain;
+}
+
+.access-copy span,
+.access-card-kicker {
+  display: block;
+  color: #fb923c;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+
+.access-copy h1 {
+  margin: 0.4rem 0 0.55rem;
+  font-size: clamp(2rem, 5vw, 4.7rem);
+  max-width: 11ch;
+  line-height: 0.96;
+  color: #ffffff;
+}
+
+.access-copy p {
+  margin: 0;
+  max-width: 64ch;
+  color: #dbeafe;
+  line-height: 1.65;
+}
+
+.access-status {
+  min-width: 176px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(15, 23, 42, 0.58);
+  border-radius: 18px;
+  padding: 1rem;
+}
+
+.access-status strong,
+.access-status span {
+  display: block;
+}
+
+.access-status strong {
+  color: #86efac;
+  font-size: 1.3rem;
+}
+
+.access-status span {
+  color: #cbd5e1;
+  font-size: 0.88rem;
+  margin-top: 0.25rem;
+}
+
+.access-options {
+  width: min(1160px, 100%);
+  margin: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+.access-card {
+  min-height: 420px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 22px;
+  padding: clamp(1.35rem, 3vw, 2.35rem);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(248, 250, 252, 0.94);
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.3rem;
+  box-shadow: 0 26px 70px rgba(2, 6, 23, 0.28);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.access-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(251, 146, 60, 0.58);
+  box-shadow: 0 34px 90px rgba(2, 6, 23, 0.36);
+}
+
+.access-card-team {
+  background: linear-gradient(160deg, #0f172a, #172033);
+  color: #f8fafc;
+}
+
+.access-card h2 {
+  margin: 0.55rem 0 0.8rem;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+  color: inherit;
+}
+
+.access-card p {
+  color: inherit;
+  opacity: 0.78;
+  line-height: 1.65;
+  max-width: 48ch;
+  margin: 0;
+}
+
+.access-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.access-card li {
+  position: relative;
+  padding-left: 1.25rem;
+  font-weight: 700;
+}
+
+.access-card li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #f97316;
+  position: absolute;
+  left: 0;
+  top: 0.58em;
+}
+
+.access-card > strong {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 52px;
+  padding: 0 1.1rem;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  background: #f97316;
+  color: #111827;
+  font-size: 1rem;
+}
+
+.access-footer {
+  width: min(1160px, 100%);
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.access-footer a {
+  color: #e2e8f0;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.access-footer a:hover {
+  color: #fb923c;
+}
+
+@media (max-width: 860px) {
+  .access-hero,
+  .access-options {
+    grid-template-columns: 1fr;
+  }
+
+  .access-logo {
+    width: 132px;
+    min-height: 82px;
+  }
+
+  .access-status {
+    width: 100%;
+  }
+
+  .access-card {
+    min-height: 340px;
+  }
+}
+
+@media (max-width: 560px) {
+  .access-hub {
+    padding: 0.85rem;
+  }
+
+  .access-copy h1 {
+    max-width: 10ch;
+  }
+
+  .access-card {
+    min-height: 0;
+    border-radius: 18px;
+  }
+
+  .access-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

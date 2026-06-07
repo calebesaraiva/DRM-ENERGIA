@@ -11,6 +11,7 @@ import { initSiteAnalytics, trackSiteEvent } from './utils/analytics';
 
 // Lazy loading das páginas para melhor performance
 const Home = React.lazy(() => import('./pages/Home'));
+const AccessHub = React.lazy(() => import('./pages/AccessHub'));
 const Login = React.lazy(() => import('./pages/Login'));
 const Register = React.lazy(() => import('./pages/Register'));
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
@@ -29,7 +30,7 @@ const LoadingFallback = () => (
 
 function AppShell() {
   const location = useLocation();
-  const isSystemRoute = ['/admin', '/dashboard', '/orcamento', '/alterar-senha', '/verificar-email'].some(path => location.pathname.startsWith(path));
+  const isSystemRoute = ['/admin', '/dashboard', '/orcamento', '/alterar-senha', '/verificar-email', '/acesso'].some(path => location.pathname.startsWith(path));
 
   useEffect(() => {
     initSiteAnalytics();
@@ -48,6 +49,7 @@ function AppShell() {
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/acesso" element={<AccessHub />} />
           <Route path="/login" element={<Login />} />
           <Route path="/recuperar-senha" element={<ForgotPassword />} />
           <Route path="/redefinir-senha" element={<ResetPassword />} />
