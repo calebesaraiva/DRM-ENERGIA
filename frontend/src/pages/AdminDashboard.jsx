@@ -146,7 +146,23 @@ const emptyEquipamentoForm = {
   formaPagamentoTipo: 'avista',
   formaPagamento: '',
   observacoes: '',
+  active: true,
 };
+
+const equipamentoTypeOptions = ['Kit solar', 'Pacote completo', 'Serviço', 'Material'];
+const pagamentoTypeOptions = [
+  { value: 'avista', label: 'À vista' },
+  { value: 'financiado', label: 'Financiado' },
+  { value: 'cartao', label: 'Cartão' },
+  { value: 'misto', label: 'Misto' },
+];
+
+const equipamentoToForm = (item = {}) => ({
+  ...emptyEquipamentoForm,
+  ...Object.fromEntries(Object.keys(emptyEquipamentoForm).map(key => [key, item[key] ?? emptyEquipamentoForm[key]])),
+  tipo: item.tipo || emptyEquipamentoForm.tipo,
+  formaPagamentoTipo: item.formaPagamentoTipo || emptyEquipamentoForm.formaPagamentoTipo,
+});
 
 const applyEquipamentoToManual = (manual = {}, equipamento = {}) => ({
   ...manual,
@@ -271,6 +287,8 @@ const AdminDashboard = () => {
   const [reviewError, setReviewError] = useState('');
   const [equipamentos, setEquipamentos] = useState([]);
   const [equipamentoForm, setEquipamentoForm] = useState(emptyEquipamentoForm);
+  const [editingEquipamentoId, setEditingEquipamentoId] = useState(null);
+  const [produtoSearch, setProdutoSearch] = useState('');
   const [selectedEquipamentos, setSelectedEquipamentos] = useState({});
   const [contractModal, setContractModal] = useState({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
   const [contractConfig, setContractConfig] = useState(defaultContractConfig);
@@ -431,6 +449,25 @@ const AdminDashboard = () => {
 
     return filteredByStatus;
   }, [contratoStatusFilter, contratos]);
+
+  const filteredProdutosPacotes = useMemo(() => {
+    const search = produtoSearch.trim().toLowerCase();
+    if (!search) return equipamentos;
+
+    return equipamentos.filter(item => [
+      item.nome,
+      item.tipo,
+      item.placaModelo,
+      item.inversorModelo,
+      item.observacoes,
+      item.formaPagamento,
+    ].some(value => String(value || '').toLowerCase().includes(search)));
+  }, [equipamentos, produtoSearch]);
+
+  const activeProdutosTotal = useMemo(
+    () => equipamentos.filter(item => item.active).length,
+    [equipamentos]
+  );
 
   const filteredProjetos = useMemo(() => {
     const term = projectSearch.trim().toLowerCase();
@@ -760,62 +797,193 @@ const AdminDashboard = () => {
   };
 
   const renderProdutosPacotes = () => (
-    <div className="admin-card products-packages-card">
-      <div className="card-header-flex">
-        <div>
-          <h3>Produtos e pacotes</h3>
-          <p className="muted-text">Cadastre kits, serviços e condições comerciais para selecionar no contrato e preencher automático.</p>
-        </div>
-        <span className="status-badge success">{equipamentos.length} itens</span>
-      </div>
-      <form className="equipment-form" onSubmit={createEquipamento}>
-        <input placeholder="Nome do produto/pacote" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
-        <select value={equipamentoForm.tipo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, tipo: e.target.value }))}>
-          <option>Kit solar</option>
-          <option>Pacote completo</option>
-          <option>Serviço</option>
-          <option>Material</option>
-        </select>
-        <input placeholder="Modelo da placa" value={equipamentoForm.placaModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, placaModelo: e.target.value }))} required />
-        <input placeholder="Modelo do inversor" value={equipamentoForm.inversorModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, inversorModelo: e.target.value }))} required />
-        <input placeholder="Potência placa W" type="number" value={equipamentoForm.potenciaPlacaW} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaPlacaW: e.target.value }))} />
-        <input placeholder="Potência inversor kW" type="number" step="0.01" value={equipamentoForm.potenciaInversorKw} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaInversorKw: e.target.value }))} />
-        <input placeholder="Geração mensal kWh" type="number" step="0.01" value={equipamentoForm.geracaoKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoKwh: e.target.value }))} />
-        <input placeholder="Geração anual kWh" type="number" step="0.01" value={equipamentoForm.geracaoAnualKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoAnualKwh: e.target.value }))} />
-        <input placeholder="Potência kWp" type="number" step="0.01" value={equipamentoForm.potenciaKwp} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaKwp: e.target.value }))} />
-        <input placeholder="Quantidade de placas" type="number" value={equipamentoForm.numeroPaineis} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, numeroPaineis: e.target.value }))} />
-        <input placeholder="Quantidade de cabo" value={equipamentoForm.quantidadeCabo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, quantidadeCabo: e.target.value }))} />
-        <input placeholder="Valor do sistema" type="number" step="0.01" value={equipamentoForm.valorSistema} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSistema: e.target.value }))} />
-        <input placeholder="Entrada" type="number" step="0.01" value={equipamentoForm.valorEntrada} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorEntrada: e.target.value }))} />
-        <input placeholder="Saldo" type="number" step="0.01" value={equipamentoForm.valorSaldo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSaldo: e.target.value }))} />
-        <input placeholder="Prazo de execução" type="number" value={equipamentoForm.prazoExecucao} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, prazoExecucao: e.target.value }))} />
-        <select value={equipamentoForm.formaPagamentoTipo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamentoTipo: e.target.value }))}>
-          <option value="avista">À vista</option>
-          <option value="financiado">Financiado</option>
-          <option value="cartao">Cartão de crédito</option>
-          <option value="misto">Misto / mesclado</option>
-        </select>
-        <textarea className="span-2" placeholder="Forma de pagamento detalhada" value={equipamentoForm.formaPagamento} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamento: e.target.value }))} />
-        <textarea className="span-2" placeholder="Observações do produto/pacote" value={equipamentoForm.observacoes} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, observacoes: e.target.value }))} />
-        <button className="btn btn-primary" type="submit">Criar produto/pacote</button>
-      </form>
-      <div className="equipment-list">
-        {equipamentos.map(item => (
-          <div className="equipment-item" key={item.id}>
-            <div className="equipment-item-head">
-              <strong>{item.nome}</strong>
-              <span className="status-badge neutral">{item.tipo || 'Kit solar'}</span>
-            </div>
-            <span>{item.placaModelo} • {item.inversorModelo}</span>
-            <small>
-              {item.potenciaKwp ? `${item.potenciaKwp} kWp • ` : ''}
-              {item.numeroPaineis ? `${item.numeroPaineis} placas • ` : ''}
-              {item.geracaoKwh ? `${item.geracaoKwh} kWh/mês • ` : ''}
-              {item.valorSistema ? money(item.valorSistema) : 'Sem valor padrão'}
-            </small>
+    <div className="products-catalog-layout">
+      <aside className="products-catalog-list">
+        <div className="catalog-list-header">
+          <div>
+            <strong>Catálogo</strong>
+            <span>{filteredProdutosPacotes.length} de {equipamentos.length} item{equipamentos.length === 1 ? '' : 's'}</span>
           </div>
-        ))}
-      </div>
+          <button type="button" className="btn btn-primary btn-sm-admin" onClick={startNewEquipamento}>Novo item</button>
+        </div>
+        <input
+          className="catalog-search"
+          value={produtoSearch}
+          onChange={(event) => setProdutoSearch(event.target.value)}
+          placeholder="Buscar por nome, placa, inversor..."
+        />
+        <div className="catalog-items">
+          {filteredProdutosPacotes.map(item => (
+            <button
+              type="button"
+              key={item.id}
+              className={`catalog-item ${editingEquipamentoId === item.id ? 'active' : ''} ${item.active ? '' : 'disabled'}`}
+              onClick={() => editEquipamento(item)}
+            >
+              <div>
+                <strong>{item.nome}</strong>
+                <span>{item.tipo || 'Kit solar'} • {item.valorSistema ? money(item.valorSistema) : 'sem valor'}</span>
+              </div>
+              <small>{item.potenciaKwp ? `${item.potenciaKwp} kWp` : 'Sem potência'} · {item.geracaoKwh ? `${item.geracaoKwh} kWh/mês` : 'Sem geração'}</small>
+            </button>
+          ))}
+          {filteredProdutosPacotes.length === 0 && (
+            <div className="catalog-empty">
+              <strong>Nenhum item encontrado</strong>
+              <span>Limpe a busca ou crie um novo produto.</span>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <form className="product-editor" onSubmit={saveEquipamento}>
+        <div className="product-editor-header">
+          <div>
+            <span className="section-kicker">{editingEquipamentoId ? `Editando #${editingEquipamentoId}` : 'Novo cadastro'}</span>
+            <h3>{editingEquipamentoId ? 'Editar produto/pacote' : 'Criar produto/pacote'}</h3>
+          </div>
+          <div className="product-editor-actions">
+            {editingEquipamentoId && (
+              <>
+                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => duplicateEquipamento(equipamentos.find(item => item.id === editingEquipamentoId))}>Duplicar</button>
+                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => toggleEquipamentoActive(equipamentos.find(item => item.id === editingEquipamentoId))}>
+                  {equipamentos.find(item => item.id === editingEquipamentoId)?.active ? 'Desativar' : 'Ativar'}
+                </button>
+              </>
+            )}
+            <button type="button" className="btn btn-outline btn-sm-admin" onClick={startNewEquipamento}>Limpar</button>
+          </div>
+        </div>
+
+        <section className="product-editor-section">
+          <div className="editor-section-title">
+            <strong>Identificação</strong>
+            <span>Como o item aparece para a equipe na seleção do contrato.</span>
+          </div>
+          <div className="equipment-form product-editor-grid">
+            <label className="span-2">
+              Nome do produto ou pacote
+              <input placeholder="Ex: Kit residencial 5,49 kWp" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
+            </label>
+            <div className="span-2">
+              <span className="field-label">Tipo</span>
+              <div className="segmented-options">
+                {equipamentoTypeOptions.map(option => (
+                  <button
+                    type="button"
+                    key={option}
+                    className={equipamentoForm.tipo === option ? 'active' : ''}
+                    onClick={() => setEquipamentoForm(prev => ({ ...prev, tipo: option }))}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="product-editor-section">
+          <div className="editor-section-title">
+            <strong>Dados técnicos</strong>
+            <span>Essas informações entram no quadro técnico do contrato.</span>
+          </div>
+          <div className="equipment-form product-editor-grid">
+            <label>
+              Modelo da placa
+              <input placeholder="Ex: Painel solar 610 W" value={equipamentoForm.placaModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, placaModelo: e.target.value }))} required />
+            </label>
+            <label>
+              Modelo do inversor
+              <input placeholder="Ex: Inversor 5 kW" value={equipamentoForm.inversorModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, inversorModelo: e.target.value }))} required />
+            </label>
+            <label>
+              Potência placa W
+              <input type="number" value={equipamentoForm.potenciaPlacaW} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaPlacaW: e.target.value }))} />
+            </label>
+            <label>
+              Potência inversor kW
+              <input type="number" step="0.01" value={equipamentoForm.potenciaInversorKw} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaInversorKw: e.target.value }))} />
+            </label>
+            <label>
+              Potência do sistema kWp
+              <input type="number" step="0.01" value={equipamentoForm.potenciaKwp} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaKwp: e.target.value }))} />
+            </label>
+            <label>
+              Quantidade de placas
+              <input type="number" value={equipamentoForm.numeroPaineis} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, numeroPaineis: e.target.value }))} />
+            </label>
+            <label>
+              Geração mensal kWh
+              <input type="number" step="0.01" value={equipamentoForm.geracaoKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoKwh: e.target.value }))} />
+            </label>
+            <label>
+              Geração anual kWh
+              <input type="number" step="0.01" value={equipamentoForm.geracaoAnualKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoAnualKwh: e.target.value }))} />
+            </label>
+            <label className="span-2">
+              Quantidade de cabo
+              <input placeholder="Ex: 45 metros" value={equipamentoForm.quantidadeCabo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, quantidadeCabo: e.target.value }))} />
+            </label>
+          </div>
+        </section>
+
+        <section className="product-editor-section">
+          <div className="editor-section-title">
+            <strong>Comercial e contrato</strong>
+            <span>Valores e condições que serão puxados automaticamente.</span>
+          </div>
+          <div className="equipment-form product-editor-grid">
+            <label>
+              Valor do sistema
+              <input type="number" step="0.01" value={equipamentoForm.valorSistema} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSistema: e.target.value }))} />
+            </label>
+            <label>
+              Entrada
+              <input type="number" step="0.01" value={equipamentoForm.valorEntrada} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorEntrada: e.target.value }))} />
+            </label>
+            <label>
+              Saldo
+              <input type="number" step="0.01" value={equipamentoForm.valorSaldo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSaldo: e.target.value }))} />
+            </label>
+            <label>
+              Prazo de execução
+              <input type="number" value={equipamentoForm.prazoExecucao} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, prazoExecucao: e.target.value }))} />
+            </label>
+            <div className="span-2">
+              <span className="field-label">Tipo de pagamento</span>
+              <div className="segmented-options">
+                {pagamentoTypeOptions.map(option => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    className={equipamentoForm.formaPagamentoTipo === option.value ? 'active' : ''}
+                    onClick={() => setEquipamentoForm(prev => ({ ...prev, formaPagamentoTipo: option.value }))}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="span-2">
+              Forma de pagamento detalhada
+              <textarea placeholder="Ex: Entrada de R$ 5.000,00 + saldo financiado em até 60x..." value={equipamentoForm.formaPagamento} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamento: e.target.value }))} />
+            </label>
+            <label className="span-2">
+              Observações internas
+              <textarea placeholder="Use para detalhes de fornecedor, validade, exceções comerciais ou instalação." value={equipamentoForm.observacoes} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, observacoes: e.target.value }))} />
+            </label>
+          </div>
+        </section>
+
+        <div className="product-editor-footer">
+          <div>
+            <strong>{equipamentoForm.valorSistema ? money(equipamentoForm.valorSistema) : 'Sem valor definido'}</strong>
+            <span>{equipamentoForm.potenciaKwp || '0'} kWp • {equipamentoForm.geracaoKwh || '0'} kWh/mês</span>
+          </div>
+          <button className="btn btn-primary" type="submit">{editingEquipamentoId ? 'Salvar alterações' : 'Criar item'}</button>
+        </div>
+      </form>
     </div>
   );
 
@@ -957,14 +1125,49 @@ const AdminDashboard = () => {
     `${withApiBase(`/api/admin/contratos/${contratoId}/download`)}?token=${localStorage.getItem('token')}`
   );
 
-  const createEquipamento = async (event) => {
+  const startNewEquipamento = () => {
+    setEditingEquipamentoId(null);
+    setEquipamentoForm(emptyEquipamentoForm);
+  };
+
+  const editEquipamento = (item) => {
+    setEditingEquipamentoId(item.id);
+    setEquipamentoForm(equipamentoToForm(item));
+  };
+
+  const duplicateEquipamento = (item) => {
+    if (!item) return;
+    setEditingEquipamentoId(null);
+    setEquipamentoForm({
+      ...equipamentoToForm(item),
+      nome: `${item.nome || 'Produto'} - cópia`,
+      active: true,
+    });
+  };
+
+  const saveEquipamento = async (event) => {
     event.preventDefault();
-    const equipamento = await request('/api/admin/equipamentos', {
-      method: 'POST',
+    const isEditing = Boolean(editingEquipamentoId);
+    const equipamento = await request(isEditing ? `/api/admin/equipamentos/${editingEquipamentoId}` : '/api/admin/equipamentos', {
+      method: isEditing ? 'PUT' : 'POST',
       body: JSON.stringify(equipamentoForm),
     });
-    setEquipamentos(prev => [equipamento, ...prev]);
-    setEquipamentoForm(emptyEquipamentoForm);
+    setEquipamentos(prev => {
+      const exists = prev.some(item => item.id === equipamento.id);
+      return exists ? prev.map(item => item.id === equipamento.id ? equipamento : item) : [equipamento, ...prev];
+    });
+    setEditingEquipamentoId(equipamento.id);
+    setEquipamentoForm(equipamentoToForm(equipamento));
+  };
+
+  const toggleEquipamentoActive = async (item) => {
+    if (!item) return;
+    const equipamento = await request(`/api/admin/equipamentos/${item.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ ...item, active: !item.active }),
+    });
+    setEquipamentos(prev => prev.map(current => current.id === equipamento.id ? equipamento : current));
+    if (editingEquipamentoId === equipamento.id) setEquipamentoForm(equipamentoToForm(equipamento));
   };
 
   const saveContractConfig = async (event) => {
@@ -1790,62 +1993,19 @@ const AdminDashboard = () => {
 
               {adminUser.role === 'ADM' && (
                 <div className="contract-admin-grid">
-                  <div className="admin-card">
+                  <div className="admin-card catalog-shortcut-card">
                     <div className="card-header-flex">
                       <div>
                         <h3>Produtos e pacotes</h3>
-                        <p className="muted-text">Cadastre kits, serviços e condições comerciais para selecionar no contrato e preencher automático.</p>
+                        <p className="muted-text">O cadastro completo agora fica em uma tela própria no menu lateral.</p>
                       </div>
                       <span className="status-badge success">{equipamentos.length} itens</span>
                     </div>
-                    <form className="equipment-form" onSubmit={createEquipamento}>
-                      <input placeholder="Nome do produto/pacote" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
-                      <select value={equipamentoForm.tipo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, tipo: e.target.value }))}>
-                        <option>Kit solar</option>
-                        <option>Pacote completo</option>
-                        <option>Serviço</option>
-                        <option>Material</option>
-                      </select>
-                      <input placeholder="Modelo da placa" value={equipamentoForm.placaModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, placaModelo: e.target.value }))} required />
-                      <input placeholder="Modelo do inversor" value={equipamentoForm.inversorModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, inversorModelo: e.target.value }))} required />
-                      <input placeholder="Potência placa W" type="number" value={equipamentoForm.potenciaPlacaW} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaPlacaW: e.target.value }))} />
-                      <input placeholder="Potência inversor kW" type="number" step="0.01" value={equipamentoForm.potenciaInversorKw} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaInversorKw: e.target.value }))} />
-                      <input placeholder="Geração mensal kWh" type="number" step="0.01" value={equipamentoForm.geracaoKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoKwh: e.target.value }))} />
-                      <input placeholder="Geração anual kWh" type="number" step="0.01" value={equipamentoForm.geracaoAnualKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoAnualKwh: e.target.value }))} />
-                      <input placeholder="Potência kWp" type="number" step="0.01" value={equipamentoForm.potenciaKwp} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaKwp: e.target.value }))} />
-                      <input placeholder="Quantidade de placas" type="number" value={equipamentoForm.numeroPaineis} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, numeroPaineis: e.target.value }))} />
-                      <input placeholder="Quantidade de cabo" value={equipamentoForm.quantidadeCabo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, quantidadeCabo: e.target.value }))} />
-                      <input placeholder="Valor do sistema" type="number" step="0.01" value={equipamentoForm.valorSistema} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSistema: e.target.value }))} />
-                      <input placeholder="Entrada" type="number" step="0.01" value={equipamentoForm.valorEntrada} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorEntrada: e.target.value }))} />
-                      <input placeholder="Saldo" type="number" step="0.01" value={equipamentoForm.valorSaldo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSaldo: e.target.value }))} />
-                      <input placeholder="Prazo de execução" type="number" value={equipamentoForm.prazoExecucao} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, prazoExecucao: e.target.value }))} />
-                      <select value={equipamentoForm.formaPagamentoTipo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamentoTipo: e.target.value }))}>
-                        <option value="avista">À vista</option>
-                        <option value="financiado">Financiado</option>
-                        <option value="cartao">Cartão de crédito</option>
-                        <option value="misto">Misto / mesclado</option>
-                      </select>
-                      <textarea className="span-2" placeholder="Forma de pagamento detalhada" value={equipamentoForm.formaPagamento} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamento: e.target.value }))} />
-                      <textarea className="span-2" placeholder="Observações do produto/pacote" value={equipamentoForm.observacoes} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, observacoes: e.target.value }))} />
-                      <button className="btn btn-primary" type="submit">Criar produto/pacote</button>
-                    </form>
-                    <div className="equipment-list">
-                      {equipamentos.map(item => (
-                        <div className="equipment-item" key={item.id}>
-                          <div className="equipment-item-head">
-                            <strong>{item.nome}</strong>
-                            <span className="status-badge neutral">{item.tipo || 'Kit solar'}</span>
-                          </div>
-                          <span>{item.placaModelo} • {item.inversorModelo}</span>
-                          <small>
-                            {item.potenciaKwp ? `${item.potenciaKwp} kWp • ` : ''}
-                            {item.numeroPaineis ? `${item.numeroPaineis} placas • ` : ''}
-                            {item.geracaoKwh ? `${item.geracaoKwh} kWh/mês • ` : ''}
-                            {item.valorSistema ? money(item.valorSistema) : 'Sem valor padrão'}
-                          </small>
-                        </div>
-                      ))}
+                    <div className="catalog-shortcut-summary">
+                      <div><strong>{activeProdutosTotal}</strong><span>ativos</span></div>
+                      <div><strong>{equipamentos.filter(item => item.valorSistema).length}</strong><span>com valor</span></div>
                     </div>
+                    <button type="button" className="btn btn-primary" onClick={() => setActiveTab('produtosPacotes')}>Abrir catálogo</button>
                   </div>
 
                   <form className="admin-card contract-template-editor" onSubmit={saveContractConfig}>
