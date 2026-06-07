@@ -6,6 +6,7 @@ import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop.jsx';
+import ScrollSafety from './components/ScrollSafety.jsx';
 import StickyCTA from './components/StickyCTA.jsx';
 import { initSiteAnalytics, trackSiteEvent } from './utils/analytics';
 
@@ -58,6 +59,7 @@ function AppShell() {
   return (
     <>
       {!isSystemRoute && <Header />}
+      <ScrollSafety />
       <ScrollToTop />
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
