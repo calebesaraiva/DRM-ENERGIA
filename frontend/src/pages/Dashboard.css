@@ -107,6 +107,8 @@
   margin: 0.5rem 0;
   font-size: clamp(2rem, 5vw, 4rem);
   line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 2px 16px rgba(2, 6, 23, 0.34);
 }
 
 .portal-hero p {

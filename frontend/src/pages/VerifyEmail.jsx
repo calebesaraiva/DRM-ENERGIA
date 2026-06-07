@@ -62,7 +62,8 @@ function VerifyEmail() {
       localStorage.setItem('user', JSON.stringify(data.user));
       setMessage('E-mail confirmado. Abrindo o painel...');
       setTimeout(() => {
-        if (data.user?.role === 'ADM' || data.user?.permissions?.dashboard) {
+        const isInternalUser = data.user?.userType === 'interno' || ['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(data.user?.role);
+        if (isInternalUser) {
           navigate('/admin');
         } else {
           navigate('/dashboard');

@@ -68,10 +68,10 @@ const Login = ({ accessType: forcedAccessType = null }) => {
         return;
       }
 
-      if (data.user.role === 'ADMIN' || data.user.role === 'ADM') {
+      if (isInternalUser) {
         navigate('/admin');
       } else {
-        navigate(data.user.permissions?.dashboard ? '/admin' : '/dashboard');
+        navigate('/dashboard');
       }
     } catch (err) {
       setError(err.message);

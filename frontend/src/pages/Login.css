@@ -284,46 +284,60 @@
 }
 
 @media (max-width: 520px) {
+  .login-image-side {
+    min-height: 210px;
+    max-height: 210px;
+  }
+
+  .login-image-overlay {
+    padding: 1rem 1.25rem 1.5rem;
+  }
+
   .login-form-side {
-    margin-top: -18px;
-    padding: 0.9rem;
+    margin-top: -24px;
+    padding: 0.75rem 0.9rem 1rem;
   }
 
   .login-card-modern {
-    padding: 1.2rem 1rem;
+    padding: 1rem;
     border-radius: 16px;
   }
 
   .login-logo-link {
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.85rem;
   }
 
   .login-logo {
-    max-width: 130px;
+    max-width: 112px;
     height: auto;
   }
 
   .login-title {
-    font-size: 1.52rem;
+    font-size: 1.42rem;
   }
 
   .login-subtitle {
-    margin-bottom: 1.1rem;
+    margin-bottom: 0.9rem;
     font-size: 0.94rem;
   }
 
   .input-group {
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .input-group input {
+    min-height: 48px;
   }
 
   .login-options {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
   }
 
   .login-footer {
-    margin-top: 1.25rem;
+    margin-top: 1rem;
   }
 }
 

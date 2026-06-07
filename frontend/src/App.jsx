@@ -30,7 +30,20 @@ const LoadingFallback = () => (
 
 function AppShell() {
   const location = useLocation();
-  const isSystemRoute = ['/admin', '/dashboard', '/orcamento', '/alterar-senha', '/verificar-email', '/acesso'].some(path => location.pathname.startsWith(path));
+  const isSystemRoute = [
+    '/admin',
+    '/dashboard',
+    '/orcamento',
+    '/alterar-senha',
+    '/verificar-email',
+    '/acesso',
+    '/portal-cliente',
+    '/sistema-drm',
+    '/login',
+    '/register',
+    '/recuperar-senha',
+    '/redefinir-senha',
+  ].some(path => location.pathname.startsWith(path));
 
   useEffect(() => {
     initSiteAnalytics();
