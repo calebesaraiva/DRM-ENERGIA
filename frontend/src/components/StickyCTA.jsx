@@ -65,8 +65,8 @@ const StickyCTA = ({ onOpenSimulation }) => {
       </button>
 
       {mobileOpen && (
-        <div className="mobile-cta-popup-backdrop" onClick={() => setMobileOpen(false)} role="presentation">
-          <div className="mobile-cta-popup" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="mobile-cta-popup-backdrop" role="presentation">
+          <div className="mobile-cta-popup" role="dialog" aria-modal="true">
             <button className="mobile-cta-close" onClick={() => setMobileOpen(false)} type="button" aria-label="Fechar">x</button>
             <h4>Escolha sua ação</h4>
             <p>{hasSimulated ? 'Sua simulação já foi feita. Continue direto com um consultor no WhatsApp.' : 'Atendimento imediato com simulação ou consultor no WhatsApp.'}</p>

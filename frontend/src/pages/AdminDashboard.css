@@ -4185,7 +4185,9 @@
   .contract-modal {
     height: min(90dvh, 720px);
     max-height: 90dvh;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     border-radius: 16px 16px 0 0;
     padding: 0.9rem;
   }
@@ -4193,7 +4195,9 @@
   .quick-modal {
     height: min(88dvh, 680px);
     max-height: 88dvh;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     border-radius: 16px 16px 0 0;
     padding: 0.9rem;
   }
@@ -4224,7 +4228,7 @@
 
   .contract-modal-grid {
     gap: 0.55rem;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .contract-modal-grid label {

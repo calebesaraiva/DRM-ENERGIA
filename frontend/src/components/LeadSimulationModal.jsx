@@ -183,8 +183,8 @@ function LeadSimulationModal({ isOpen, onClose }) {
   const ctaSecondary = ctaVariant === 'A' ? 'Receba sua proposta completa no WhatsApp' : 'Atendimento com prioridade ainda hoje';
 
   return createPortal(
-    <div className="lead-modal-backdrop" role="presentation" onMouseDown={handleClose}>
-      <div className={`lead-modal lead-step-${step}`} role="dialog" aria-modal="true" aria-labelledby="lead-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="lead-modal-backdrop" role="presentation">
+      <div className={`lead-modal lead-step-${step}`} role="dialog" aria-modal="true" aria-labelledby="lead-modal-title">
         <button className="lead-modal-close" type="button" onClick={handleClose} aria-label="Fechar">✕</button>
 
         <div className="lead-modal-header">

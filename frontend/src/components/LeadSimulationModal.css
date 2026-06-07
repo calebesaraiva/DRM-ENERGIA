@@ -87,6 +87,7 @@
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
+  z-index: 4;
   width: 44px;
   height: 44px;
   border: 1px solid var(--cor-borda);
@@ -1004,7 +1005,8 @@
   .lead-modal-backdrop {
     align-items: center;
     padding: 0.55rem;
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .lead-modal {
@@ -1012,7 +1014,8 @@
     flex-direction: column;
     width: min(560px, calc(100vw - 1.1rem));
     max-height: min(95dvh, 840px);
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     border-right: 1px solid rgba(249, 115, 22, 0.34);
     border-bottom: 1px solid rgba(249, 115, 22, 0.34);
     border-left: 1px solid rgba(249, 115, 22, 0.34);
@@ -1387,7 +1390,8 @@
   .lead-modal {
     width: calc(100vw - 1rem);
     max-height: 95dvh;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     border-radius: 16px;
     padding: 0.68rem;
   }

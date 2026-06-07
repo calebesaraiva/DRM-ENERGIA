@@ -2122,8 +2122,8 @@ const AdminDashboard = () => {
               </div>
 
               {selectedProjeto && (
-                <div className="contract-modal-backdrop" onClick={() => setSelectedProjeto(null)}>
-                  <div className="project-detail-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="contract-modal-backdrop">
+                  <div className="project-detail-modal">
                     <div className="contract-modal-header">
                       <div>
                         <span className="section-kicker">Contrato #{selectedProjeto.contratoId}</span>
@@ -2715,8 +2715,8 @@ const AdminDashboard = () => {
       </main>
 
       {quickModal && (
-        <div className="contract-modal-backdrop" onClick={() => setQuickModal(null)}>
-          <div className="quick-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="contract-modal-backdrop">
+          <div className="quick-modal">
             <div className="contract-modal-header">
               <div>
                 <span className="section-kicker">Ação rápida</span>
@@ -2910,8 +2910,8 @@ const AdminDashboard = () => {
       )}
 
       {contractModal.open && (
-        <div className="contract-modal-backdrop" onClick={() => setContractModal({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' })}>
-          <form className="contract-modal" onSubmit={gerarContrato} onClick={(event) => event.stopPropagation()}>
+        <div className="contract-modal-backdrop">
+          <form className="contract-modal" onSubmit={gerarContrato}>
             <div className="contract-modal-header">
               <div>
                 <span className="section-kicker">Dados variáveis do contrato</span>
