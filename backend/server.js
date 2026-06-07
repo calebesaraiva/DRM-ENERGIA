@@ -333,6 +333,71 @@ const sendEmailVerificationCode = async ({ to, name, code }) => {
   });
 };
 
+const createClientNotification = async ({
+  clienteId,
+  contratoId = null,
+  projetoId = null,
+  type = 'info',
+  title,
+  message,
+  action = 'project',
+}) => {
+  if (!clienteId || !title || !message) return null;
+  const now = new Date().toISOString();
+  const duplicateSince = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const duplicate = await db.get(
+    `SELECT id FROM client_notifications
+     WHERE clienteId = ? AND COALESCE(contratoId, 0) = COALESCE(?, 0)
+       AND COALESCE(projetoId, 0) = COALESCE(?, 0) AND type = ? AND title = ? AND message = ?
+       AND createdAt >= ?
+     LIMIT 1`,
+    clienteId,
+    contratoId,
+    projetoId,
+    type,
+    title,
+    message,
+    duplicateSince
+  );
+  if (duplicate) return duplicate;
+
+  const result = await db.run(
+    `INSERT INTO client_notifications
+      (clienteId, contratoId, projetoId, type, title, message, action, readAt, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
+    clienteId,
+    contratoId,
+    projetoId,
+    type,
+    title,
+    message,
+    action,
+    now
+  );
+  return { id: result.lastID, clienteId, contratoId, projetoId, type, title, message, action, readAt: null, createdAt: now };
+};
+
+const notifyClientByContract = async (contratoId, notification) => {
+  if (!contratoId) return null;
+  const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', contratoId);
+  if (!contrato) return null;
+  let cliente = isRealEmail(contrato.clienteEmail)
+    ? await db.get('SELECT * FROM clientes WHERE lower(email) = lower(?) LIMIT 1', contrato.clienteEmail)
+    : null;
+  const normalizedPhone = normalizeWhatsAppPhone(contrato.clienteTelefone);
+  if (!cliente && normalizedPhone) {
+    cliente = await db.get(
+      `SELECT * FROM clientes
+       WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(whatsapp, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') IN (?, ?)
+       LIMIT 1`,
+      normalizedPhone,
+      normalizedPhone.startsWith('55') ? normalizedPhone.slice(2) : normalizedPhone
+    );
+  }
+  if (!cliente) return null;
+  return createClientNotification({ clienteId: cliente.id, contratoId: contrato.id, ...notification });
+};
+
 const findPasswordResetUser = async (identifier) => {
   const value = String(identifier || '').trim();
   if (!value) return null;
@@ -1605,6 +1670,77 @@ const sendContratoPdf = async (res, contrato) => {
       usedAt TEXT,
       createdAt TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS client_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clienteId INTEGER NOT NULL,
+      contratoId INTEGER,
+      projetoId INTEGER,
+      type TEXT NOT NULL DEFAULT 'info',
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      action TEXT DEFAULT 'project',
+      readAt TEXT,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (clienteId) REFERENCES clientes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS client_feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clienteId INTEGER NOT NULL,
+      contratoId INTEGER,
+      rating INTEGER NOT NULL,
+      comment TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      FOREIGN KEY (clienteId) REFERENCES clientes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS client_referrals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clienteId INTEGER NOT NULL,
+      nome TEXT NOT NULL,
+      telefone TEXT NOT NULL,
+      cidade TEXT,
+      status TEXT NOT NULL DEFAULT 'Recebida',
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (clienteId) REFERENCES clientes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS email_campaigns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaignKey TEXT NOT NULL UNIQUE,
+      subject TEXT NOT NULL,
+      imagePath TEXT,
+      totalRecipients INTEGER DEFAULT 0,
+      sentCount INTEGER DEFAULT 0,
+      failedCount INTEGER DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'draft',
+      createdById INTEGER,
+      createdAt TEXT NOT NULL,
+      sentAt TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS mailing_contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      email TEXT NOT NULL UNIQUE,
+      active INTEGER NOT NULL DEFAULT 1,
+      source TEXT,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS email_campaign_deliveries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaignId INTEGER NOT NULL,
+      email TEXT NOT NULL,
+      name TEXT,
+      status TEXT NOT NULL,
+      error TEXT,
+      sentAt TEXT,
+      UNIQUE(campaignId, email),
+      FOREIGN KEY (campaignId) REFERENCES email_campaigns(id)
+    );
   `);
 
   const clienteColumns = await db.all('PRAGMA table_info(clientes)');
@@ -2271,13 +2407,122 @@ app.get('/api/cliente/portal', authRequired, requireClientUser, async (req, res)
     acc[foto.osId].push(foto);
     return acc;
   }, {});
+  const notifications = await db.all(
+    'SELECT * FROM client_notifications WHERE clienteId = ? ORDER BY createdAt DESC, id DESC LIMIT 80',
+    cliente.id
+  );
+  const feedback = await db.get(
+    'SELECT * FROM client_feedback WHERE clienteId = ? ORDER BY updatedAt DESC LIMIT 1',
+    cliente.id
+  );
+  const referrals = await db.all(
+    'SELECT * FROM client_referrals WHERE clienteId = ? ORDER BY createdAt DESC, id DESC LIMIT 20',
+    cliente.id
+  );
 
   res.json({
     cliente: publicClient(cliente),
     contratos,
     projetos: projetos.map(projeto => ({ ...projeto, fotos: fotosByProjeto[projeto.id] || [] })),
     ordensServico: ordensServico.map(os => parseOs({ ...os, fotos: fotosByOs[os.id] || [] })),
+    notifications,
+    feedback,
+    referrals,
   });
+});
+
+app.put('/api/cliente/notificacoes/lidas', authRequired, requireClientUser, async (req, res) => {
+  const now = new Date().toISOString();
+  await db.run(
+    'UPDATE client_notifications SET readAt = COALESCE(readAt, ?) WHERE clienteId = ?',
+    now,
+    req.user.id
+  );
+  res.json({ message: 'Notificações marcadas como lidas.', readAt: now });
+});
+
+app.post('/api/cliente/mensagens', authRequired, requireClientUser, async (req, res) => {
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.user.id);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+  const { contratoId = null, assunto = 'Mensagem pelo portal', mensagem } = req.body;
+  if (!String(mensagem || '').trim()) return res.status(400).json({ message: 'Escreva uma mensagem para enviar.' });
+  const contratos = await getClienteContratoRows(cliente);
+  const contrato = contratoId ? contratos.find(item => Number(item.id) === Number(contratoId)) : contratos[0];
+  if (contratoId && !contrato) return res.status(403).json({ message: 'Contrato não pertence a este cliente.' });
+  const now = new Date().toISOString();
+  const result = await db.run(
+    `INSERT INTO ordens_servico
+      (clienteNome, clienteTelefone, contratoId, origem, problema, categoria, prioridade, status, responsavelId, responsavelNome, observacoes, dataAbertura, dataAtualizacao)
+     VALUES (?, ?, ?, 'Portal do cliente', ?, 'Mensagem', 'Normal', 'Aberta', ?, ?, ?, ?, ?)`,
+    cliente.nome,
+    cliente.whatsapp,
+    contrato?.id || null,
+    String(mensagem).trim(),
+    contrato?.assignedUserId || null,
+    contrato?.assignedUserName || null,
+    String(assunto || 'Mensagem pelo portal').trim(),
+    now,
+    now
+  );
+  await createClientNotification({
+    clienteId: cliente.id,
+    contratoId: contrato?.id || null,
+    type: 'success',
+    title: 'Mensagem enviada',
+    message: 'A equipe DRM recebeu sua mensagem e responderá pelo acompanhamento da solicitação.',
+    action: 'communication',
+  });
+  const created = parseOs(await db.get('SELECT * FROM ordens_servico WHERE id = ?', result.lastID));
+  io.emit('os_atualizada', created);
+  res.status(201).json(created);
+});
+
+app.post('/api/cliente/avaliacao', authRequired, requireClientUser, async (req, res) => {
+  const rating = Number(req.body.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ message: 'Escolha uma avaliação entre 1 e 5.' });
+  }
+  const now = new Date().toISOString();
+  const existing = await db.get('SELECT id FROM client_feedback WHERE clienteId = ? ORDER BY id DESC LIMIT 1', req.user.id);
+  if (existing) {
+    await db.run(
+      'UPDATE client_feedback SET contratoId = ?, rating = ?, comment = ?, updatedAt = ? WHERE id = ?',
+      req.body.contratoId || null,
+      rating,
+      String(req.body.comment || '').trim(),
+      now,
+      existing.id
+    );
+  } else {
+    await db.run(
+      'INSERT INTO client_feedback (clienteId, contratoId, rating, comment, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+      req.user.id,
+      req.body.contratoId || null,
+      rating,
+      String(req.body.comment || '').trim(),
+      now,
+      now
+    );
+  }
+  res.json({ message: 'Obrigado pela avaliação. Ela foi enviada para a equipe DRM.' });
+});
+
+app.post('/api/cliente/indicacoes', authRequired, requireClientUser, async (req, res) => {
+  const { nome, telefone, cidade = '' } = req.body;
+  if (!String(nome || '').trim() || normalizeWhatsAppPhone(telefone).length < 12) {
+    return res.status(400).json({ message: 'Informe o nome e um WhatsApp válido da pessoa indicada.' });
+  }
+  const now = new Date().toISOString();
+  const result = await db.run(
+    'INSERT INTO client_referrals (clienteId, nome, telefone, cidade, status, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+    req.user.id,
+    String(nome).trim(),
+    normalizeWhatsAppPhone(telefone),
+    String(cidade).trim(),
+    'Recebida',
+    now
+  );
+  res.status(201).json({ id: result.lastID, nome: String(nome).trim(), telefone: normalizeWhatsAppPhone(telefone), cidade: String(cidade).trim(), status: 'Recebida', createdAt: now });
 });
 
 app.get('/api/cliente/contratos/:id/download', authRequired, requireClientUser, async (req, res) => {
@@ -2346,6 +2591,14 @@ app.post('/api/cliente/reclamacoes', authRequired, requireClientUser, async (req
   const os = await db.get('SELECT * FROM ordens_servico WHERE id = ?', result.lastID);
   const osFotos = await db.all('SELECT * FROM os_fotos WHERE osId = ? ORDER BY id DESC', result.lastID);
   const parsed = parseOs({ ...os, fotos: osFotos });
+  await createClientNotification({
+    clienteId: cliente.id,
+    contratoId: authorizedContract?.id || null,
+    type: 'service',
+    title: 'Solicitação aberta',
+    message: `Sua solicitação #${result.lastID} foi recebida e já está no acompanhamento da equipe DRM.`,
+    action: 'communication',
+  });
   io.emit('os_atualizada', parsed);
   res.status(201).json(parsed);
 });
@@ -2385,6 +2638,15 @@ app.post('/api/cliente/equipamento-entregue', authRequired, requireClientUser, a
   );
 
   const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', projeto.id));
+  await createClientNotification({
+    clienteId: cliente.id,
+    contratoId: projeto.contratoId,
+    projetoId: projeto.id,
+    type: 'success',
+    title: 'Entrega confirmada',
+    message: 'Recebemos sua confirmação de entrega. A equipe seguirá com os próximos passos.',
+    action: 'tracking',
+  });
   io.emit('projeto_atualizado', updated);
   res.json(updated);
 });
@@ -2426,6 +2688,15 @@ app.post('/api/cliente/medidor-trocado', authRequired, requireClientUser, async 
   );
 
   const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', projeto.id));
+  await createClientNotification({
+    clienteId: cliente.id,
+    contratoId: projeto.contratoId,
+    projetoId: projeto.id,
+    type: 'success',
+    title: 'Troca do medidor confirmada',
+    message: 'A DRM recebeu sua confirmação da troca do medidor pela Equatorial.',
+    action: 'tracking',
+  });
   io.emit('projeto_atualizado', updated);
   res.json(updated);
 });
@@ -3155,6 +3426,20 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
   );
 
   const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id));
+  const changeMessages = [];
+  if (etapa && etapa !== projeto.etapa) changeMessages.push(`Seu projeto avançou para a etapa: ${etapa}.`);
+  if (prazoPrevisto && prazoPrevisto !== projeto.prazoPrevisto) changeMessages.push(`A previsão de entrega foi atualizada para ${new Date(prazoPrevisto).toLocaleDateString('pt-BR')}.`);
+  if (instalacaoAgendada && instalacaoAgendada !== projeto.instalacaoAgendada) changeMessages.push(`Sua instalação foi agendada para ${new Date(instalacaoAgendada).toLocaleString('pt-BR')}.`);
+  if (previsaoLigacao && previsaoLigacao !== projeto.previsaoLigacao) changeMessages.push(`A previsão da ligação pela Equatorial foi atualizada para ${new Date(previsaoLigacao).toLocaleDateString('pt-BR')}.`);
+  if (changeMessages.length) {
+    await notifyClientByContract(projeto.contratoId, {
+      projetoId: projeto.id,
+      type: 'update',
+      title: 'Novidade no seu projeto',
+      message: changeMessages.join(' '),
+      action: 'tracking',
+    });
+  }
   io.emit('projeto_atualizado', updated);
   res.json(updated);
 });

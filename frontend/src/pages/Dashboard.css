@@ -180,13 +180,236 @@
 
 .portal-view-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.4rem;
   margin-bottom: 1rem;
   padding: 0.35rem;
   border: 1px solid #dce3ee;
   border-radius: 12px;
   background: #e9eef5;
+}
+
+.communication-center {
+  display: grid;
+  gap: 1rem;
+}
+
+.communication-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 1rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border-radius: 14px;
+  background: #111827;
+  color: #fff;
+  overflow: hidden;
+}
+
+.communication-hero > div:first-child > span {
+  color: #fb923c;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.communication-hero h2 {
+  max-width: 620px;
+  margin: 0.45rem 0;
+  color: #fff;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.02;
+}
+
+.communication-hero p {
+  max-width: 650px;
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.communication-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.communication-summary article {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background: #1f2937;
+}
+
+.communication-summary strong,
+.communication-summary span {
+  display: block;
+}
+
+.communication-summary strong {
+  color: #fb923c;
+  font-size: 1.8rem;
+}
+
+.communication-summary span {
+  color: #e5e7eb;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.communication-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.notification-panel,
+.document-center {
+  min-height: 380px;
+}
+
+.notification-list,
+.document-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.notification-list {
+  max-height: 390px;
+  padding-right: 0.25rem;
+  overflow: auto;
+}
+
+.notification-list article {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.notification-list article.unread {
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.notification-list i {
+  width: 8px;
+  height: 8px;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.notification-list .unread i {
+  background: #f97316;
+  box-shadow: 0 0 0 5px #ffedd5;
+}
+
+.notification-list strong,
+.notification-list p,
+.notification-list span {
+  display: block;
+}
+
+.notification-list p {
+  margin: 0.2rem 0;
+  color: #475569;
+}
+
+.notification-list span,
+.document-list span,
+.communication-form-note {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.document-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.document-list strong,
+.document-list span {
+  display: block;
+}
+
+.document-list button {
+  flex: 0 0 auto;
+}
+
+.document-state {
+  padding: 0.4rem 0.6rem;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857 !important;
+  font-weight: 900;
+}
+
+.communication-form {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+}
+
+.communication-form input,
+.communication-form textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.8rem;
+  border: 1px solid #d7dee9;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+
+.communication-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.communication-form > p {
+  margin: 0;
+  color: #64748b;
+}
+
+.rating-picker {
+  display: grid;
+  grid-template-columns: repeat(5, 44px);
+  gap: 0.35rem;
+}
+
+.rating-picker button {
+  min-height: 44px;
+  padding: 0;
+  background: #f1f5f9;
+  color: #cbd5e1;
+  font-size: 1.35rem;
+}
+
+.rating-picker button.active {
+  background: #fff7ed;
+  color: #f97316;
+}
+
+.referral-form {
+  grid-column: 1 / -1;
+}
+
+.communication-empty {
+  padding: 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  text-align: center;
 }
 
 .portal-view-tabs button {
@@ -1959,7 +2182,9 @@
   .tracking-command,
   .tracking-grid,
   .system-pulse,
-  .bill-guide {
+  .bill-guide,
+  .communication-hero,
+  .communication-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2047,6 +2272,27 @@
     top: 0.5rem;
     z-index: 10;
     grid-template-columns: 1fr;
+  }
+
+  .communication-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .communication-summary article {
+    padding: 0.65rem;
+  }
+
+  .communication-summary strong {
+    font-size: 1.35rem;
+  }
+
+  .document-list article {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .document-list button {
+    width: 100%;
   }
 
   .solar-journey,

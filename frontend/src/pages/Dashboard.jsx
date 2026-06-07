@@ -5,6 +5,7 @@ import { withApiBase } from '../utils/apiBase';
 import SolarJourneyScene from '../components/SolarJourneyScene';
 import ClientTrackingCenter from '../components/ClientTrackingCenter';
 import CompleteSystemGuide from '../components/CompleteSystemGuide';
+import ClientCommunicationCenter from '../components/ClientCommunicationCenter';
 
 const money = (value) => Number(value || 0).toLocaleString('pt-BR', {
   style: 'currency',
@@ -216,10 +217,36 @@ function Dashboard() {
     }
   };
 
-  const downloadContract = () => {
-    if (!selectedContrato?.id) return;
+  const downloadContract = (contract = selectedContrato) => {
+    if (!contract?.id) return;
     const token = localStorage.getItem('token');
-    window.location.href = withApiBase(`/api/cliente/contratos/${selectedContrato.id}/download?token=${encodeURIComponent(token || '')}`);
+    window.location.href = withApiBase(`/api/cliente/contratos/${contract.id}/download?token=${encodeURIComponent(token || '')}`);
+  };
+
+  const markNotificationsRead = async () => {
+    await request('/api/cliente/notificacoes/lidas', { method: 'PUT' });
+    setPortal(prev => ({ ...prev, notifications: (prev?.notifications || []).map(item => ({ ...item, readAt: item.readAt || new Date().toISOString() })) }));
+  };
+
+  const sendMessage = async (payload) => {
+    await request('/api/cliente/mensagens', {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, contratoId: selectedContrato?.id }),
+    });
+    await loadPortal();
+  };
+
+  const sendFeedback = async (payload) => {
+    await request('/api/cliente/avaliacao', {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, contratoId: selectedContrato?.id }),
+    });
+    await loadPortal();
+  };
+
+  const sendReferral = async (payload) => {
+    await request('/api/cliente/indicacoes', { method: 'POST', body: JSON.stringify(payload) });
+    await loadPortal();
   };
 
   const confirmMeterChange = async () => {
@@ -292,6 +319,9 @@ function Dashboard() {
               </button>
               <button type="button" className={activeView === 'education' ? 'active' : ''} onClick={() => setActiveView('education')}>
                 Guia completo
+              </button>
+              <button type="button" className={activeView === 'communication' ? 'active' : ''} onClick={() => setActiveView('communication')}>
+                Central DRM {(portal?.notifications || []).some(item => !item.readAt) ? '•' : ''}
               </button>
             </nav>
 
@@ -493,10 +523,24 @@ function Dashboard() {
                 onDownloadContract={downloadContract}
                 lastSync={lastSync}
               />
-            ) : (
+            ) : activeView === 'education' ? (
               <CompleteSystemGuide
                 monthlyGeneration={currentManual.geracaoKwh || selectedContrato?.dados?.dimensionamento?.geracao_estimada_kwh}
                 power={currentManual.potenciaKwp || selectedContrato?.dados?.dimensionamento?.potencia_real_instalada_kwp}
+              />
+            ) : (
+              <ClientCommunicationCenter
+                notifications={portal?.notifications || []}
+                contracts={portal?.contratos || []}
+                project={selectedProjeto}
+                requests={selectedComplaints}
+                feedback={portal?.feedback}
+                referrals={portal?.referrals || []}
+                onReadNotifications={markNotificationsRead}
+                onDownloadContract={downloadContract}
+                onSendMessage={sendMessage}
+                onSendFeedback={sendFeedback}
+                onSendReferral={sendReferral}
               />
             )}
           </>
