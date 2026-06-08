@@ -3024,7 +3024,7 @@
 
 .products-catalog-list {
   position: sticky;
-  top: 1rem;
+  top: calc(62px + 1rem);
   padding: 1rem;
 }
 
@@ -3123,7 +3123,7 @@
 }
 
 .product-editor {
-  overflow: hidden;
+  overflow: clip;
 }
 
 .product-editor-header {

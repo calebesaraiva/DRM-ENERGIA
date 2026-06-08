@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import io from 'socket.io-client';
 import './AdminDashboard.css';
@@ -398,6 +398,7 @@ const AdminDashboard = () => {
   const [equipamentoForm, setEquipamentoForm] = useState(emptyEquipamentoForm);
   const [editingEquipamentoId, setEditingEquipamentoId] = useState(null);
   const [produtoSearch, setProdutoSearch] = useState('');
+  const equipamentoNomeRef = useRef(null);
   const [selectedEquipamentos, setSelectedEquipamentos] = useState({});
   const [contractModal, setContractModal] = useState({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
   const [contractConfig, setContractConfig] = useState(defaultContractConfig);
@@ -1117,7 +1118,7 @@ const AdminDashboard = () => {
           <div className="equipment-form product-editor-grid">
             <label className="span-2">
               Nome do produto ou pacote
-              <input placeholder="Ex: Kit residencial 5,49 kWp" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
+              <input ref={equipamentoNomeRef} placeholder="Ex: Kit residencial 5,49 kWp" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
             </label>
             <div className="span-2">
               <span className="field-label">Tipo</span>
@@ -1488,11 +1489,18 @@ const AdminDashboard = () => {
     setEditingEquipamentoId(null);
     setEquipamentoForm(emptyEquipamentoForm);
     setProdutoSearch('');
+    setTimeout(() => {
+      equipamentoNomeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      equipamentoNomeRef.current?.focus();
+    }, 50);
   };
 
   const editEquipamento = (item) => {
     setEditingEquipamentoId(item.id);
     setEquipamentoForm(equipamentoToForm(item));
+    setTimeout(() => {
+      equipamentoNomeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
   };
 
   const duplicateEquipamento = (item) => {
