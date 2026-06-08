@@ -5353,3 +5353,257 @@
     height: 100% !important;
   }
 }
+
+/* === CADASTRAR CLIENTE PAGE === */
+.cc-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cc-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cc-page-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cc-page-icon {
+  width: 30px;
+  height: 30px;
+  fill: #64748b;
+  flex-shrink: 0;
+}
+
+.cc-page-title h3 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.cc-badge {
+  font-weight: 400;
+  color: #64748b;
+  font-size: 1.1rem;
+}
+
+.cc-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.cc-breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #f97316;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.cc-breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.cc-breadcrumb-sep {
+  color: #cbd5e1;
+  font-size: 0.75rem;
+}
+
+.cc-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.cc-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.cc-fields {
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.cc-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cc-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.cc-required {
+  color: #ef4444;
+}
+
+.cc-section-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 0.85rem;
+}
+
+.cc-address-block {
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cc-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 0.875rem;
+  border: 1px solid #dce2ea;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  appearance: auto;
+}
+
+.cc-input::placeholder {
+  color: #94a3b8;
+}
+
+.cc-input:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.cc-textarea {
+  height: auto;
+  min-height: 110px;
+  padding: 0.75rem 0.875rem;
+  resize: vertical;
+}
+
+.cc-row {
+  display: grid;
+  gap: 1rem;
+}
+
+.cc-row-rua {
+  grid-template-columns: 1fr 160px;
+}
+
+.cc-row-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.cc-row-3 {
+  grid-template-columns: 140px 1fr 180px;
+}
+
+.cc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.75rem;
+  border-top: 1px solid #e6eaf0;
+  background: #f8fafc;
+}
+
+.cc-btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 42px;
+  padding: 0 1.25rem;
+  border: 1px solid #dce2ea;
+  border-radius: 10px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.cc-btn-cancel:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.cc-btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 42px;
+  padding: 0 1.5rem;
+  border: none;
+  border-radius: 10px;
+  background: #22c55e;
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cc-btn-save:hover {
+  background: #16a34a;
+}
+
+.cc-list-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cc-new-btn {
+  height: 42px;
+  padding: 0 1.25rem;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .cc-row-rua,
+  .cc-row-2,
+  .cc-row-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .cc-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cc-footer {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  .cc-fields {
+    padding: 1.25rem;
+  }
+}

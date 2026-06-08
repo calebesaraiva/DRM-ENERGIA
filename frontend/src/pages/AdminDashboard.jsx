@@ -99,6 +99,33 @@ const SidebarIcon = ({ name }) => {
   return icons[name] || icons.leads;
 };
 
+const ESTADOS_BR = [
+  'AC','AL','AP','AM','BA','CE','DF','ES','GO',
+  'MA','MT','MS','MG','PA','PB','PR','PE','PI',
+  'RJ','RN','RS','RO','RR','SC','SP','SE','TO',
+];
+
+const maskCpf = (v) => {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0,3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
+  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+};
+
+const maskWhatsapp = (v) => {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : '';
+  if (d.length <= 7) return `(${d.slice(0,2)}) ${d.slice(2)}`;
+  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+};
+
+const maskCep = (v) => {
+  const d = v.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 5) return d;
+  return `${d.slice(0,5)}-${d.slice(5)}`;
+};
+
 const money = (value) => Number(value || 0).toLocaleString('pt-BR', {
   style: 'currency',
   currency: 'BRL',
@@ -383,6 +410,7 @@ const AdminDashboard = () => {
   const [envioHomologacaoForm, setEnvioHomologacaoForm] = useState(emptyEnvioHomologacaoForm);
   const [atividades, setAtividades] = useState([]);
   const [novoCliente, setNovoCliente] = useState(emptyClientForm);
+  const [clientView, setClientView] = useState('list');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [orcamentos, setOrcamentos] = useState([]);
   const [selectedOrcamento, setSelectedOrcamento] = useState(null);
@@ -1298,6 +1326,7 @@ const AdminDashboard = () => {
       });
       setClientes(prev => [cliente, ...prev]);
       setNovoCliente(emptyClientForm);
+      setClientView('list');
       showToast('Cliente cadastrado com sucesso.', 'success');
     } catch (err) {
       showToast(err.message, 'error');
@@ -1879,116 +1908,193 @@ const AdminDashboard = () => {
 
           {activeTab === 'clientes' && (
             <div className="admin-section client-screen">
-              <div className="section-heading">
-                <div>
-                  <span className="section-kicker">Base comercial</span>
-                  <h3>Clientes</h3>
-                  <p>Cadastre, encontre e fale com clientes sem sair da tela.</p>
-                </div>
-                <div className="section-stats">
-                  <div><strong>{clientes.length}</strong><span>clientes</span></div>
-                  <div><strong>{clientSummary.withWhatsApp}</strong><span>com WhatsApp</span></div>
-                  <div><strong>{clientSummary.withCity}</strong><span>com cidade</span></div>
-                </div>
-              </div>
+              {clientView === 'new' ? (
+                <div className="cc-page">
+                  <div className="cc-page-header">
+                    <div className="cc-page-title">
+                      <svg className="cc-page-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M16 11a4 4 0 1 0-3.2-6.4A5 5 0 0 1 15 9c0 .7-.1 1.4-.4 2H16Zm-8 0a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V19h12v-2.2C14 14.7 11.3 13 8 13Zm8 0c-.6 0-1.1.1-1.7.2 1.1.9 1.7 2.1 1.7 3.6V19h6v-2.2c0-2.1-2.7-3.8-6-3.8Z" />
+                      </svg>
+                      <h3>Cadastrar Cliente <span className="cc-badge">(Cadastro Básico)</span></h3>
+                    </div>
+                    <nav className="cc-breadcrumb" aria-label="Navegação">
+                      <button type="button" className="cc-breadcrumb-link" onClick={() => { setClientView('list'); setNovoCliente(emptyClientForm); }}>Clientes</button>
+                      <span className="cc-breadcrumb-sep">&gt;</span>
+                      <span>Cadastrar Cliente</span>
+                    </nav>
+                  </div>
 
-              {hasPermission('gerenciarClientes') && (
-                <form className="client-create-panel client-create-panel-full" onSubmit={createCliente}>
-                  <div>
-                    <span className="section-kicker">Novo cliente</span>
-                    <h4>Cadastro completo</h4>
-                    <p>Esses dados entram automaticamente no contrato e ficam salvos no histórico.</p>
-                  </div>
-                  <select value={novoCliente.tipoPessoa} onChange={(e) => setNovoCliente(prev => ({ ...prev, tipoPessoa: e.target.value }))}>
-                    <option>Pessoa física</option>
-                    <option>Pessoa jurídica</option>
-                  </select>
-                  <input placeholder="Nome do cliente" value={novoCliente.nome} onChange={(e) => setNovoCliente(prev => ({ ...prev, nome: e.target.value }))} required />
-                  <input placeholder="CPF/CNPJ" value={novoCliente.cpfCnpj} onChange={(e) => setNovoCliente(prev => ({ ...prev, cpfCnpj: e.target.value }))} />
-                  <input placeholder="RG/IE" value={novoCliente.rgIe} onChange={(e) => setNovoCliente(prev => ({ ...prev, rgIe: e.target.value }))} />
-                  <input placeholder="WhatsApp" value={novoCliente.whatsapp} onChange={(e) => setNovoCliente(prev => ({ ...prev, whatsapp: e.target.value }))} required />
-                  <input placeholder="E-mail (opcional)" type="email" value={novoCliente.email} onChange={(e) => setNovoCliente(prev => ({ ...prev, email: e.target.value }))} />
-                  <input placeholder="Endereço" value={novoCliente.endereco} onChange={(e) => setNovoCliente(prev => ({ ...prev, endereco: e.target.value }))} />
-                  <input placeholder="Número" value={novoCliente.numero} onChange={(e) => setNovoCliente(prev => ({ ...prev, numero: e.target.value }))} />
-                  <input placeholder="Bairro" value={novoCliente.bairro} onChange={(e) => setNovoCliente(prev => ({ ...prev, bairro: e.target.value }))} />
-                  <input placeholder="CEP" value={novoCliente.cep} onChange={(e) => setNovoCliente(prev => ({ ...prev, cep: e.target.value }))} />
-                  <input placeholder="Cidade" value={novoCliente.cidade} onChange={(e) => setNovoCliente(prev => ({ ...prev, cidade: e.target.value }))} required />
-                  <input placeholder="UF" value={novoCliente.estado} onChange={(e) => setNovoCliente(prev => ({ ...prev, estado: e.target.value.toUpperCase() }))} maxLength="2" />
-                  <input placeholder="Complemento" value={novoCliente.complemento} onChange={(e) => setNovoCliente(prev => ({ ...prev, complemento: e.target.value }))} />
-                  <input placeholder="Unidade consumidora" value={novoCliente.unidadeConsumidora} onChange={(e) => setNovoCliente(prev => ({ ...prev, unidadeConsumidora: e.target.value }))} />
-                  <input placeholder="Distribuidora" value={novoCliente.distribuidora} onChange={(e) => setNovoCliente(prev => ({ ...prev, distribuidora: e.target.value }))} />
-                  <input placeholder="Endereço de instalação" value={novoCliente.enderecoInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, enderecoInstalacao: e.target.value }))} />
-                  <input placeholder="Nº instalação" value={novoCliente.numeroInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, numeroInstalacao: e.target.value }))} />
-                  <input placeholder="Bairro instalação" value={novoCliente.bairroInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, bairroInstalacao: e.target.value }))} />
-                  <input placeholder="CEP instalação" value={novoCliente.cepInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, cepInstalacao: e.target.value }))} />
-                  <input placeholder="Cidade instalação" value={novoCliente.cidadeInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, cidadeInstalacao: e.target.value }))} />
-                  <input placeholder="UF instalação" value={novoCliente.estadoInstalacao} onChange={(e) => setNovoCliente(prev => ({ ...prev, estadoInstalacao: e.target.value.toUpperCase() }))} maxLength="2" />
-                  <textarea placeholder="Observações do cliente, documentação ou condições especiais" value={novoCliente.observacoes} onChange={(e) => setNovoCliente(prev => ({ ...prev, observacoes: e.target.value }))} />
-                  <button className="btn btn-primary" type="submit">Cadastrar cliente</button>
-                </form>
-              )}
+                  <div className="admin-card cc-card">
+                    <form onSubmit={createCliente} className="cc-form">
+                      <div className="cc-fields">
+                        <div className="cc-field">
+                          <label className="cc-label">Nome completo <span className="cc-required">*</span></label>
+                          <input className="cc-input" placeholder="Digite o nome completo do cliente" value={novoCliente.nome} onChange={(e) => setNovoCliente(prev => ({ ...prev, nome: e.target.value }))} required />
+                        </div>
 
-              <div className="admin-card">
-                <div className="card-header-flex">
-                  <div>
-                    <h3>Clientes cadastrados</h3>
-                    <p className="muted-text">{clientSummary.filtered.length} encontrado{clientSummary.filtered.length === 1 ? '' : 's'} na busca atual.</p>
-                  </div>
-                  <div className="client-search-box">
-                    <input
-                      placeholder="Buscar por nome, WhatsApp, cidade ou e-mail"
-                      value={clientSearch}
-                      onChange={(event) => setClientSearch(event.target.value)}
-                    />
+                        <div className="cc-field">
+                          <label className="cc-label">CPF <span className="cc-required">*</span></label>
+                          <input className="cc-input" placeholder="000.000.000-00" value={novoCliente.cpfCnpj} onChange={(e) => setNovoCliente(prev => ({ ...prev, cpfCnpj: maskCpf(e.target.value) }))} />
+                        </div>
+
+                        <div className="cc-address-block">
+                          <p className="cc-section-label">Endereço completo <span className="cc-required">*</span></p>
+
+                          <div className="cc-row cc-row-rua">
+                            <div className="cc-field">
+                              <label className="cc-label">Rua <span className="cc-required">*</span></label>
+                              <input className="cc-input" placeholder="Digite o nome da rua" value={novoCliente.endereco} onChange={(e) => setNovoCliente(prev => ({ ...prev, endereco: e.target.value }))} />
+                            </div>
+                            <div className="cc-field">
+                              <label className="cc-label">Número <span className="cc-required">*</span></label>
+                              <input className="cc-input" placeholder="Digite o número" value={novoCliente.numero} onChange={(e) => setNovoCliente(prev => ({ ...prev, numero: e.target.value }))} />
+                            </div>
+                          </div>
+
+                          <div className="cc-row cc-row-2">
+                            <div className="cc-field">
+                              <label className="cc-label">Bairro <span className="cc-required">*</span></label>
+                              <input className="cc-input" placeholder="Digite o bairro" value={novoCliente.bairro} onChange={(e) => setNovoCliente(prev => ({ ...prev, bairro: e.target.value }))} />
+                            </div>
+                            <div className="cc-field">
+                              <label className="cc-label">Complemento</label>
+                              <input className="cc-input" placeholder="Digite o complemento" value={novoCliente.complemento} onChange={(e) => setNovoCliente(prev => ({ ...prev, complemento: e.target.value }))} />
+                            </div>
+                          </div>
+
+                          <div className="cc-row cc-row-3">
+                            <div className="cc-field">
+                              <label className="cc-label">CEP <span className="cc-required">*</span></label>
+                              <input className="cc-input" placeholder="00000-000" value={novoCliente.cep} onChange={(e) => setNovoCliente(prev => ({ ...prev, cep: maskCep(e.target.value) }))} />
+                            </div>
+                            <div className="cc-field">
+                              <label className="cc-label">Cidade <span className="cc-required">*</span></label>
+                              <input className="cc-input" placeholder="Digite a cidade" value={novoCliente.cidade} onChange={(e) => setNovoCliente(prev => ({ ...prev, cidade: e.target.value }))} required />
+                            </div>
+                            <div className="cc-field">
+                              <label className="cc-label">Estado <span className="cc-required">*</span></label>
+                              <select className="cc-input" value={novoCliente.estado} onChange={(e) => setNovoCliente(prev => ({ ...prev, estado: e.target.value }))}>
+                                <option value="">Selecione</option>
+                                {ESTADOS_BR.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="cc-field">
+                          <label className="cc-label">WhatsApp <span className="cc-required">*</span></label>
+                          <input className="cc-input" placeholder="(00) 00000-0000" value={novoCliente.whatsapp} onChange={(e) => setNovoCliente(prev => ({ ...prev, whatsapp: maskWhatsapp(e.target.value) }))} required />
+                        </div>
+
+                        <div className="cc-field">
+                          <label className="cc-label">E-mail</label>
+                          <input className="cc-input" type="email" placeholder="exemplo@email.com" value={novoCliente.email} onChange={(e) => setNovoCliente(prev => ({ ...prev, email: e.target.value }))} />
+                        </div>
+
+                        <div className="cc-field">
+                          <label className="cc-label">Observações</label>
+                          <textarea className="cc-input cc-textarea" placeholder="Digite observações adicionais sobre o cliente (opcional)" value={novoCliente.observacoes} onChange={(e) => setNovoCliente(prev => ({ ...prev, observacoes: e.target.value }))} />
+                        </div>
+                      </div>
+
+                      <div className="cc-footer">
+                        <button type="button" className="cc-btn-cancel" onClick={() => { setClientView('list'); setNovoCliente(emptyClientForm); }}>
+                          <span aria-hidden="true">✕</span> Cancelar
+                        </button>
+                        <button type="submit" className="cc-btn-save">
+                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4Zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm3-10H5V5h10v4Z" fill="currentColor" /></svg>
+                          Salvar Cliente
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
-                <div className="table-container">
-                  <table className="modern-table client-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Cliente</th>
-                        <th>Whatsapp</th>
-                        <th>Localização</th>
-                        <th>Cadastro</th>
-                        <th>Status</th>
-                        <th>Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {clientSummary.filtered.map(c => {
-                        const whatsappDigits = String(c.whatsapp || '').replace(/\D/g, '');
-                        const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}?text=${whatsappClientMessage(c)}` : '';
-                        return (
-                          <tr key={c.id}>
-                            <td data-label="ID">#{c.id}</td>
-                            <td data-label="Cliente" className="font-medium">{c.nome}</td>
-                            <td data-label="WhatsApp">{c.whatsapp || 'Não informado'}</td>
-                            <td data-label="Localização">{[c.cidade, c.estado].filter(Boolean).join(' / ') || 'Não informada'}</td>
-                            <td data-label="Cadastro">{c.dataCadastro || 'Sem data'}</td>
-                            <td data-label="Status"><span className="status-badge success">Ativo</span></td>
-                            <td data-label="Ações">
-                              <div className="table-actions">
-                                {whatsappHref && <a className="btn btn-primary btn-sm-admin" href={whatsappHref} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
-                                {hasPermission('orcamentos') && <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openBudgetFormForClient(c)}>Fazer orçamento</button>}
-                                {hasPermission('contratos') && <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => openClientContractModal(c)}>Contrato direto</button>}
-                                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setNovoCliente({ ...emptyClientForm, ...c, password: '' })}>Usar dados</button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {clientSummary.filtered.length === 0 && (
-                    <div className="empty-state-orcamento client-empty-state">
-                      <div className="icon">CL</div>
-                      <h4>Nenhum cliente encontrado</h4>
-                      <p>Ajuste a busca ou cadastre um novo cliente acima.</p>
+              ) : (
+                <>
+                  <div className="section-heading">
+                    <div>
+                      <span className="section-kicker">Base comercial</span>
+                      <h3>Clientes</h3>
+                      <p>Cadastre, encontre e fale com clientes sem sair da tela.</p>
+                    </div>
+                    <div className="section-stats">
+                      <div><strong>{clientes.length}</strong><span>clientes</span></div>
+                      <div><strong>{clientSummary.withWhatsApp}</strong><span>com WhatsApp</span></div>
+                      <div><strong>{clientSummary.withCity}</strong><span>com cidade</span></div>
+                    </div>
+                  </div>
+
+                  {hasPermission('gerenciarClientes') && (
+                    <div className="cc-list-actions">
+                      <button type="button" className="btn btn-primary cc-new-btn" onClick={() => { setNovoCliente(emptyClientForm); setClientView('new'); }}>
+                        + Cadastrar Cliente
+                      </button>
                     </div>
                   )}
-                </div>
-              </div>
+
+                  <div className="admin-card">
+                    <div className="card-header-flex">
+                      <div>
+                        <h3>Clientes cadastrados</h3>
+                        <p className="muted-text">{clientSummary.filtered.length} encontrado{clientSummary.filtered.length === 1 ? '' : 's'} na busca atual.</p>
+                      </div>
+                      <div className="client-search-box">
+                        <input
+                          placeholder="Buscar por nome, WhatsApp, cidade ou e-mail"
+                          value={clientSearch}
+                          onChange={(event) => setClientSearch(event.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="table-container">
+                      <table className="modern-table client-table">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Whatsapp</th>
+                            <th>Localização</th>
+                            <th>Cadastro</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {clientSummary.filtered.map(c => {
+                            const whatsappDigits = String(c.whatsapp || '').replace(/\D/g, '');
+                            const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}?text=${whatsappClientMessage(c)}` : '';
+                            return (
+                              <tr key={c.id}>
+                                <td data-label="ID">#{c.id}</td>
+                                <td data-label="Cliente" className="font-medium">{c.nome}</td>
+                                <td data-label="WhatsApp">{c.whatsapp || 'Não informado'}</td>
+                                <td data-label="Localização">{[c.cidade, c.estado].filter(Boolean).join(' / ') || 'Não informada'}</td>
+                                <td data-label="Cadastro">{c.dataCadastro || 'Sem data'}</td>
+                                <td data-label="Status"><span className="status-badge success">Ativo</span></td>
+                                <td data-label="Ações">
+                                  <div className="table-actions">
+                                    {whatsappHref && <a className="btn btn-primary btn-sm-admin" href={whatsappHref} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                                    {hasPermission('orcamentos') && <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openBudgetFormForClient(c)}>Fazer orçamento</button>}
+                                    {hasPermission('contratos') && <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => openClientContractModal(c)}>Contrato direto</button>}
+                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>Usar dados</button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      {clientSummary.filtered.length === 0 && (
+                        <div className="empty-state-orcamento client-empty-state">
+                          <div className="icon">CL</div>
+                          <h4>Nenhum cliente encontrado</h4>
+                          <p>Ajuste a busca ou cadastre um novo cliente acima.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
