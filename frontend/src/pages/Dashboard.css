@@ -1456,6 +1456,38 @@
   color: #64748b;
 }
 
+.homologation-client-grid {
+  margin-top: 1rem;
+}
+
+.client-pendency-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.client-pendency-list article {
+  padding: 0.85rem;
+  border: 1px solid #e5eaf2;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.client-pendency-list strong,
+.client-pendency-list p,
+.client-pendency-list small {
+  display: block;
+}
+
+.client-pendency-list p {
+  margin: 0.35rem 0;
+  color: #334155;
+}
+
+.client-pendency-list small {
+  color: #64748b;
+  font-weight: 800;
+}
+
 .activity-stream {
   display: grid;
   gap: 0.2rem;
@@ -2237,6 +2269,20 @@
 }
 
 @media (max-width: 920px) {
+  .portal-topbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .portal-logo-link img {
+    width: 100px;
+    max-height: 52px;
+  }
+
+  .portal-main {
+    width: min(100% - 1.5rem, 1180px);
+    padding: 1rem 0 2rem;
+  }
+
   .portal-hero,
   .portal-grid,
   .portal-timeline,

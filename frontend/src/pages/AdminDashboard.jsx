@@ -82,6 +82,9 @@ const SidebarIcon = ({ name }) => {
     projetos: (
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z" /></svg>
     ),
+    homologacao: (
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v4H4V4Zm1 6h14v10H5V10Zm3 2v2h8v-2H8Zm0 4v2h5v-2H8Zm9.7-3.2-3 3-1.4-1.4-1.3 1.3 2.7 2.7 4.3-4.3-1.3-1.3Z" /></svg>
+    ),
     ordensServico: (
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 4h6V5H9v2Zm-.5 4h7v2h-7v-2Zm0 4h5v2h-5v-2Z" /></svg>
     ),
@@ -211,11 +214,71 @@ const emptyClientForm = {
   observacoes: '',
 };
 
-const projectStages = ['Documentação', 'Vistoria', 'Projeto técnico', 'Homologação', 'Instalação', 'Vistoria final', 'Concluído'];
+const projectStages = [
+  'Novo projeto',
+  'Análise inicial',
+  'Erro documentação',
+  'Corrigir documentação',
+  'Gerar ART',
+  'Aguardar TRT',
+  'Elaborar projeto',
+  'Projeto para envio',
+  'Projeto enviado',
+  'Pendência da concessionária',
+  'Corrigir projeto',
+  'Reenviar projeto',
+  'Aguardando parecer de acesso',
+  'Parecer emitido',
+  'Com obra',
+  'Sem obra',
+  'Aguardando finalização da obra',
+  'Solicitar vistoria',
+  'Aguardando protocolo de vistoria',
+  'Vistoria em prazo',
+  'Vistoria atrasada',
+  'Vistoria reprovada',
+  'Vistoria concluída',
+  'Projeto concluído',
+];
+const projectOperationColumns = [
+  {
+    id: 'homologacao',
+    label: 'Em homologação',
+    matches: (projeto) => !projeto.checklist?.instalacao && !['Solicitar vistoria', 'Aguardando protocolo de vistoria', 'Vistoria em prazo', 'Vistoria atrasada', 'Vistoria reprovada', 'Vistoria concluída', 'Projeto concluído'].includes(projeto.etapa),
+  },
+  {
+    id: 'vistoria',
+    label: 'Vistoria',
+    matches: (projeto) => !projeto.checklist?.instalacao && ['Solicitar vistoria', 'Aguardando protocolo de vistoria', 'Vistoria em prazo', 'Vistoria atrasada', 'Vistoria reprovada', 'Vistoria concluída'].includes(projeto.etapa),
+  },
+  {
+    id: 'instalacao',
+    label: 'Instalação',
+    matches: (projeto) => projeto.etapa !== 'Projeto concluído' && Boolean(projeto.instalacaoAgendada || projeto.checklist?.instalacao),
+  },
+  {
+    id: 'concluido',
+    label: 'Concluídos',
+    matches: (projeto) => projeto.etapa === 'Projeto concluído',
+  },
+];
 const projectChecklistLabels = {
   documentacaoRecebida: 'Documentação recebida',
+  documentacaoCorrigida: 'Documentação corrigida',
   vistoriaRealizada: 'Vistoria realizada',
+  artGerada: 'ART gerada',
+  trtPaga: 'TRT paga',
   projetoTecnico: 'Projeto técnico',
+  projetoParaEnvio: 'Projeto pronto para envio',
+  projetoEnviado: 'Projeto enviado',
+  pendenciaConcessionaria: 'Pendência da concessionária',
+  projetoCorrigido: 'Projeto corrigido',
+  projetoReenviado: 'Projeto reenviado',
+  parecerAcesso: 'Parecer de acesso emitido',
+  obraConcessionaria: 'Obra da concessionária',
+  vistoriaSolicitada: 'Vistoria solicitada',
+  protocoloVistoria: 'Protocolo de vistoria recebido',
+  vistoriaReprovada: 'Vistoria reprovada',
   homologacao: 'Homologação',
   instalacao: 'Instalação',
   vistoriaFinal: 'Vistoria final',
@@ -223,8 +286,22 @@ const projectChecklistLabels = {
   sistemaLigado: 'Sistema ligado',
 };
 
-const streetChecklistKeys = ['vistoriaRealizada', 'instalacao', 'vistoriaFinal', 'medidorTrocado', 'sistemaLigado'];
-const officeChecklistKeys = ['documentacaoRecebida', 'projetoTecnico', 'homologacao'];
+const streetChecklistKeys = ['vistoriaRealizada', 'instalacao', 'vistoriaFinal', 'vistoriaSolicitada', 'protocoloVistoria', 'vistoriaReprovada', 'medidorTrocado', 'sistemaLigado'];
+const officeChecklistKeys = ['documentacaoRecebida', 'documentacaoCorrigida', 'artGerada', 'trtPaga', 'projetoTecnico', 'projetoParaEnvio', 'projetoEnviado', 'pendenciaConcessionaria', 'projetoCorrigido', 'projetoReenviado', 'parecerAcesso', 'obraConcessionaria', 'homologacao'];
+const emptyPendenciaForm = {
+  tipo: 'Pendência da concessionária',
+  descricao: '',
+  origem: 'Concessionária',
+  prazo: '',
+  responsavel: '',
+  observacoes: '',
+};
+const emptyEnvioHomologacaoForm = {
+  protocolo: '',
+  tipo: 'Envio inicial',
+  status: 'Enviado',
+  resposta: '',
+};
 const emptyPriceForm = {
   valorKitSolar: '',
   custoInstalacao: '',
@@ -233,6 +310,27 @@ const emptyPriceForm = {
   custoAdicional: '',
   margemEmpresa: '',
   comissaoPercentual: '',
+};
+
+const emptyBudgetForm = {
+  clienteId: '',
+  equipamentoId: '',
+  potenciaPlacaW: '600',
+  placaModelo: '',
+  numeroPaineis: '',
+  potenciaInversorKw: '',
+  inversorModelo: '',
+  quantidadeInversores: '1',
+  quantidadeCaboCc: '',
+  areaPorPainelM2: '2.6',
+  generationMode: 'manual',
+  irradiacaoSolar: '',
+  perdaPercentual: '20',
+  geracaoKwh: '',
+  valorSistema: '',
+  formaPagamentoTipo: 'avista',
+  condicoesPagamento: '',
+  observacoes: '',
 };
 
 const emptyUserForm = {
@@ -281,11 +379,16 @@ const AdminDashboard = () => {
   const [projectPhotos, setProjectPhotos] = useState({});
   const [projectSearch, setProjectSearch] = useState('');
   const [selectedProjeto, setSelectedProjeto] = useState(null);
+  const [pendenciaForm, setPendenciaForm] = useState(emptyPendenciaForm);
+  const [envioHomologacaoForm, setEnvioHomologacaoForm] = useState(emptyEnvioHomologacaoForm);
   const [atividades, setAtividades] = useState([]);
   const [novoCliente, setNovoCliente] = useState(emptyClientForm);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [orcamentos, setOrcamentos] = useState([]);
   const [selectedOrcamento, setSelectedOrcamento] = useState(null);
+  const [budgetForm, setBudgetForm] = useState(emptyBudgetForm);
+  const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(false);
+  const [budgetStatus, setBudgetStatus] = useState('');
   const [contratos, setContratos] = useState([]);
   const [ordensServico, setOrdensServico] = useState([]);
   const [selectedContrato, setSelectedContrato] = useState(null);
@@ -309,6 +412,7 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   const [comunicacoes, setComunicacoes] = useState(null);
   const [tabelasPrecos, setTabelasPrecos] = useState([]);
+  const [toasts, setToasts] = useState([]);
 
   const headers = useMemo(() => ({
     'Content-Type': 'application/json',
@@ -319,32 +423,65 @@ const AdminDashboard = () => {
     adminUser.role === 'ADM' || adminUser.permissions?.[permission]
   ), [adminUser.permissions, adminUser.role]);
 
-  const tabs = [
-    { id: 'dashboard', label: 'Painel geral', permission: 'dashboard' },
-    { id: 'clientes', label: 'Clientes', permission: 'clientes' },
-    { id: 'leads', label: 'Leads', permission: 'leads' },
-    { id: 'orcamentos', label: 'Orçamentos', permission: 'orcamentos' },
-    { id: 'contratos', label: 'Contratos', permission: 'contratos' },
-    { id: 'produtosPacotes', label: 'Produtos e Pacotes', permission: 'contratos' },
-    { id: 'projetos', label: 'Projetos', permission: 'equipeTecnica' },
-    { id: 'ordensServico', label: 'O.S', permission: 'ordensServico' },
-    { id: 'precosSistemas', label: 'Preço dos Sistemas', permission: 'precosSistemas' },
-    { id: 'financeiro', label: 'Financeiro', permission: 'financeiro' },
-    { id: 'usuarios', label: 'Acessos', permission: 'usuarios' },
-    { id: 'comunicacoes', label: 'Comunicações', permission: 'usuarios' },
-  ].filter(tab => hasPermission(tab.permission));
+  const showToast = useCallback((message, type = 'info') => {
+    const id = Date.now() + Math.random();
+    const icons = { success: '✓', error: '✕', warning: '!', info: 'i' };
+    setToasts(prev => [...prev, { id, message, type, icon: icons[type] || 'i' }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4800);
+  }, []);
+
+  const navigationGroups = [
+    {
+      title: 'Início',
+      tabs: [
+        { id: 'dashboard', label: 'Painel geral', permission: 'dashboard' },
+      ],
+    },
+    {
+      title: 'Comercial',
+      tabs: [
+        { id: 'clientes', label: 'Clientes', permission: 'clientes' },
+        { id: 'leads', label: 'Leads', permission: 'leads' },
+        { id: 'orcamentos', label: 'Orçamentos', permission: 'orcamentos' },
+        { id: 'contratos', label: 'Contratos', permission: 'contratos' },
+      ],
+    },
+    {
+      title: 'Operação',
+      tabs: [
+        { id: 'homologacao', label: 'Homologação', permission: 'equipeTecnica' },
+        { id: 'projetos', label: 'Instalações', permission: 'equipeTecnica' },
+        { id: 'ordensServico', label: 'O.S e suporte', permission: 'ordensServico' },
+      ],
+    },
+    {
+      title: 'Catálogo e preços',
+      tabs: [
+        { id: 'produtosPacotes', label: 'Produtos e kits', permission: 'contratos' },
+        { id: 'precosSistemas', label: 'Preço dos sistemas', permission: 'precosSistemas' },
+      ],
+    },
+    {
+      title: 'Gestão',
+      tabs: [
+        { id: 'financeiro', label: 'Financeiro', permission: 'financeiro' },
+        { id: 'comunicacoes', label: 'Comunicações', permission: 'usuarios' },
+        { id: 'usuarios', label: 'Acessos', permission: 'usuarios' },
+      ],
+    },
+  ].map(group => ({
+    ...group,
+    tabs: group.tabs.filter(tab => hasPermission(tab.permission)),
+  })).filter(group => group.tabs.length);
+
+  const tabs = navigationGroups.flatMap(group => group.tabs);
 
   const quickActions = [
-    { id: 'qa-leads', label: 'Atender lead', tab: 'leads', permission: 'leads' },
-    { id: 'qa-orcamentos', label: 'Ver orçamentos', tab: 'orcamentos', permission: 'orcamentos' },
-    { id: 'qa-novo-contrato', label: 'Gerar contrato', tab: 'novoContrato', permission: 'contratos', badge: clientes.length },
+    { id: 'qa-novo-orcamento', label: 'Novo orçamento', tab: 'orcamentos', action: 'newBudget', permission: 'orcamentos', badge: clientes.length },
+    { id: 'qa-leads', label: 'Atender lead', tab: 'leads', permission: 'leads', badge: leads.filter(item => item.status === 'Novo').length },
     { id: 'qa-contratos', label: 'Aprovar contrato', tab: 'contratos', permission: 'contratos', badge: contratos.filter(item => item.status === 'Pendente').length },
-    { id: 'qa-produtos-pacotes', label: 'Produtos/pacotes', tab: 'produtosPacotes', permission: 'contratos', badge: equipamentos.length },
-    { id: 'qa-projetos', label: 'Projeto/visita', tab: 'projetos', permission: 'equipeTecnica', badge: projetos.filter(item => item.etapa !== 'Concluído').length },
-    { id: 'qa-os', label: 'Abrir O.S', tab: 'ordensServico', permission: 'ordensServico', badge: ordensServico.filter(item => item.status === 'Aberta').length },
-    { id: 'qa-precos', label: 'Calcular preço', tab: 'precosSistemas', permission: 'precosSistemas' },
-    { id: 'qa-financeiro', label: 'Financeiro', tab: 'financeiro', permission: 'financeiro' },
-    { id: 'qa-acessos', label: 'Acessos', tab: 'usuarios', permission: 'usuarios' },
+    { id: 'qa-homologacao', label: 'Homologação', tab: 'homologacao', permission: 'equipeTecnica', badge: projetos.filter(item => ['Pendência da concessionária', 'Reenviar projeto', 'Aguardando parecer de acesso', 'Vistoria reprovada'].includes(item.etapa)).length },
+    { id: 'qa-os', label: 'O.S abertas', tab: 'ordensServico', permission: 'ordensServico', badge: ordensServico.filter(item => item.status === 'Aberta').length },
   ].filter(action => hasPermission(action.permission));
 
   const leadSummary = useMemo(() => {
@@ -453,6 +590,34 @@ const AdminDashboard = () => {
     ].some(value => String(value || '').toLowerCase().includes(search)));
   }, [orcamentoSearch, orcamentos]);
 
+  const budgetClient = useMemo(
+    () => clientes.find(cliente => String(cliente.id) === String(budgetForm.clienteId)) || null,
+    [budgetForm.clienteId, clientes]
+  );
+
+  const budgetCalculations = useMemo(() => {
+    const potenciaPlacaW = Number(String(budgetForm.potenciaPlacaW || '0').replace(',', '.')) || 0;
+    const numeroPaineis = Number(String(budgetForm.numeroPaineis || '0').replace(',', '.')) || 0;
+    const areaPorPainelM2 = Number(String(budgetForm.areaPorPainelM2 || '2.6').replace(',', '.')) || 2.6;
+    const potenciaKwp = (potenciaPlacaW * numeroPaineis) / 1000;
+    const areaOcupadaM2 = numeroPaineis * areaPorPainelM2;
+    const irradiacaoSolar = Number(String(budgetForm.irradiacaoSolar || '0').replace(',', '.')) || 0;
+    const perdaPercentual = Number(String(budgetForm.perdaPercentual || '20').replace(',', '.')) || 0;
+    const geracaoCalculada = potenciaKwp && irradiacaoSolar
+      ? potenciaKwp * irradiacaoSolar * 30 * (1 - perdaPercentual / 100)
+      : 0;
+    const geracaoKwh = budgetForm.generationMode === 'auto'
+      ? geracaoCalculada
+      : Number(String(budgetForm.geracaoKwh || '0').replace(',', '.')) || 0;
+    return {
+      potenciaKwp: Number(potenciaKwp.toFixed(2)),
+      areaOcupadaM2: Number(areaOcupadaM2.toFixed(2)),
+      geracaoCalculada: Number(geracaoCalculada.toFixed(2)),
+      geracaoKwh: Number(geracaoKwh.toFixed(2)),
+      geracaoAnualKwh: Number((geracaoKwh * 12).toFixed(2)),
+    };
+  }, [budgetForm]);
+
   const filteredContratos = useMemo(() => {
     const filteredByStatus = contratoStatusFilter === 'todos'
       ? contratos
@@ -496,6 +661,25 @@ const AdminDashboard = () => {
   }, [projectSearch, projetos]);
 
   const selectedProjectPhotos = selectedProjeto ? (projectPhotos[selectedProjeto.id] || []) : [];
+  const homologacaoSummary = useMemo(() => {
+    const abertas = projetos.filter(projeto => projeto.etapa !== 'Projeto concluído');
+    const pendencias = projetos.reduce((total, projeto) => (
+      total + (projeto.pendenciasHomologacao || []).filter(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status)).length
+    ), 0);
+    return {
+      ativos: abertas.length,
+      pendencias,
+      enviados: projetos.filter(projeto => (projeto.enviosHomologacao || []).length > 0).length,
+      parecer: projetos.filter(projeto => ['Aguardando parecer de acesso', 'Parecer emitido', 'Com obra', 'Sem obra'].includes(projeto.etapa)).length,
+      vistoria: projetos.filter(projeto => String(projeto.etapa || '').includes('Vistoria')).length,
+      concluidos: projetos.filter(projeto => projeto.etapa === 'Projeto concluído').length,
+    };
+  }, [projetos]);
+
+  const filteredHomologacaoProjetos = useMemo(() => (
+    filteredProjetos.filter(projeto => projeto.etapa !== 'Projeto concluído' || (projeto.enviosHomologacao || []).length || (projeto.pendenciasHomologacao || []).length)
+  ), [filteredProjetos]);
+
   const osSummary = useMemo(() => ({
     total: ordensServico.length,
     abertas: ordensServico.filter(item => item.status === 'Aberta').length,
@@ -609,7 +793,10 @@ const AdminDashboard = () => {
       return;
     }
 
-    loadData(loggedInUser).catch(err => setError(err.message));
+    loadData(loggedInUser).catch(err => {
+      setError(err.message);
+      showToast(err.message, 'error');
+    });
 
     const handleNewOrcamento = (novoOrcamento) => {
       const canSee = loggedInUser.permissions?.verTodosLeads || novoOrcamento.assignedUserId === loggedInUser.id;
@@ -701,26 +888,73 @@ const AdminDashboard = () => {
   const registrarAtividade = async (event) => {
     event.preventDefault();
     if (!activityForm.leadId) return;
-    const atividade = await request(`/api/admin/leads/${activityForm.leadId}/atividades`, {
-      method: 'POST',
-      body: JSON.stringify(activityForm),
-    });
-    setAtividades(prev => [atividade, ...prev].slice(0, 120));
-    setLeads(prev => prev.map(lead => (
-      lead.id === Number(activityForm.leadId)
-        ? { ...lead, ultimoContato: new Date().toISOString().split('T')[0], proximoRetorno: activityForm.proximoRetorno || lead.proximoRetorno, observacoes: activityForm.resultado || lead.observacoes }
-        : lead
-    )));
-    setActivityForm({ leadId: '', tipo: 'Ligação', descricao: '', resultado: '', proximoRetorno: '' });
-    request('/api/admin/resumo').then(setResumo).catch(() => {});
+    try {
+      const atividade = await request(`/api/admin/leads/${activityForm.leadId}/atividades`, {
+        method: 'POST',
+        body: JSON.stringify(activityForm),
+      });
+      setAtividades(prev => [atividade, ...prev].slice(0, 120));
+      setLeads(prev => prev.map(lead => (
+        lead.id === Number(activityForm.leadId)
+          ? { ...lead, ultimoContato: new Date().toISOString().split('T')[0], proximoRetorno: activityForm.proximoRetorno || lead.proximoRetorno, observacoes: activityForm.resultado || lead.observacoes }
+          : lead
+      )));
+      setActivityForm({ leadId: '', tipo: 'Ligação', descricao: '', resultado: '', proximoRetorno: '' });
+      request('/api/admin/resumo').then(setResumo).catch(() => {});
+      showToast('Atividade registrada com sucesso.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const updateProjeto = async (projetoId, payload) => {
-    const projeto = await request(`/api/admin/projetos/${projetoId}`, {
+    try {
+      const projeto = await request(`/api/admin/projetos/${projetoId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      setProjetos(prev => prev.map(item => item.id === projeto.id ? projeto : item));
+      setSelectedProjeto(prev => prev?.id === projeto.id ? projeto : prev);
+      request('/api/admin/resumo').then(setResumo).catch(() => {});
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const registerHomologacaoPendencia = async (event) => {
+    event.preventDefault();
+    if (!selectedProjeto) return;
+    const projeto = await request(`/api/admin/projetos/${selectedProjeto.id}/pendencias`, {
+      method: 'POST',
+      body: JSON.stringify(pendenciaForm),
+    });
+    setProjetos(prev => prev.map(item => item.id === projeto.id ? projeto : item));
+    setSelectedProjeto(projeto);
+    setPendenciaForm(emptyPendenciaForm);
+    request('/api/admin/resumo').then(setResumo).catch(() => {});
+  };
+
+  const updateHomologacaoPendencia = async (pendenciaId, payload) => {
+    if (!selectedProjeto) return;
+    const projeto = await request(`/api/admin/projetos/${selectedProjeto.id}/pendencias/${pendenciaId}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
     setProjetos(prev => prev.map(item => item.id === projeto.id ? projeto : item));
+    setSelectedProjeto(projeto);
+    request('/api/admin/resumo').then(setResumo).catch(() => {});
+  };
+
+  const registerHomologacaoEnvio = async (event) => {
+    event.preventDefault();
+    if (!selectedProjeto) return;
+    const projeto = await request(`/api/admin/projetos/${selectedProjeto.id}/envios-homologacao`, {
+      method: 'POST',
+      body: JSON.stringify(envioHomologacaoForm),
+    });
+    setProjetos(prev => prev.map(item => item.id === projeto.id ? projeto : item));
+    setSelectedProjeto(projeto);
+    setEnvioHomologacaoForm(emptyEnvioHomologacaoForm);
     request('/api/admin/resumo').then(setResumo).catch(() => {});
   };
 
@@ -750,12 +984,17 @@ const AdminDashboard = () => {
 
   const createOrdemServico = async (event) => {
     event.preventDefault();
-    const os = await request('/api/admin/ordens-servico', {
-      method: 'POST',
-      body: JSON.stringify(osForm),
-    });
-    setOrdensServico(prev => [os, ...prev]);
-    setOsForm({ clienteNome: '', clienteTelefone: '', contratoId: '', origem: 'WhatsApp', problema: '', categoria: 'Suporte', prioridade: 'Normal', responsavelId: '', observacoes: '' });
+    try {
+      const os = await request('/api/admin/ordens-servico', {
+        method: 'POST',
+        body: JSON.stringify(osForm),
+      });
+      setOrdensServico(prev => [os, ...prev]);
+      setOsForm({ clienteNome: '', clienteTelefone: '', contratoId: '', origem: 'WhatsApp', problema: '', categoria: 'Suporte', prioridade: 'Normal', responsavelId: '', observacoes: '' });
+      showToast('O.S. criada com sucesso.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const updateOrdemServico = async (osId, payload) => {
@@ -1012,6 +1251,7 @@ const AdminDashboard = () => {
 
   const createUsuario = async (event) => {
     event.preventDefault();
+    try {
     const user = await request('/api/admin/usuarios', {
       method: 'POST',
       body: JSON.stringify({
@@ -1042,16 +1282,112 @@ const AdminDashboard = () => {
     });
     setUsuarios(prev => [...prev, user]);
     setNewUserForm(emptyUserForm);
+    showToast('Usuário criado com sucesso.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const createCliente = async (event) => {
     event.preventDefault();
-    const cliente = await request('/api/admin/clientes', {
-      method: 'POST',
-      body: JSON.stringify(novoCliente),
+    try {
+      const cliente = await request('/api/admin/clientes', {
+        method: 'POST',
+        body: JSON.stringify(novoCliente),
+      });
+      setClientes(prev => [cliente, ...prev]);
+      setNovoCliente(emptyClientForm);
+      showToast('Cliente cadastrado com sucesso.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const openBudgetFormForClient = (cliente = null) => {
+    setBudgetStatus('');
+    setBudgetForm({
+      ...emptyBudgetForm,
+      clienteId: cliente?.id ? String(cliente.id) : '',
+      placaModelo: equipamentos.find(item => item.active)?.placaModelo || '',
+      inversorModelo: equipamentos.find(item => item.active)?.inversorModelo || '',
+      potenciaPlacaW: equipamentos.find(item => item.active)?.potenciaPlacaW || emptyBudgetForm.potenciaPlacaW,
+      potenciaInversorKw: equipamentos.find(item => item.active)?.potenciaInversorKw || '',
+      equipamentoId: equipamentos.find(item => item.active)?.id ? String(equipamentos.find(item => item.active).id) : '',
     });
-    setClientes(prev => [cliente, ...prev]);
-    setNovoCliente(emptyClientForm);
+    setIsBudgetFormOpen(true);
+    setActiveTab('orcamentos');
+  };
+
+  const applyEquipmentToBudget = (equipamentoId) => {
+    const equipamento = equipamentos.find(item => String(item.id) === String(equipamentoId));
+    setBudgetForm(prev => ({
+      ...prev,
+      equipamentoId,
+      placaModelo: equipamento?.placaModelo || prev.placaModelo,
+      inversorModelo: equipamento?.inversorModelo || prev.inversorModelo,
+      potenciaPlacaW: equipamento?.potenciaPlacaW || prev.potenciaPlacaW,
+      potenciaInversorKw: equipamento?.potenciaInversorKw || prev.potenciaInversorKw,
+      numeroPaineis: equipamento?.numeroPaineis || prev.numeroPaineis,
+      quantidadeCaboCc: equipamento?.quantidadeCabo || prev.quantidadeCaboCc,
+      geracaoKwh: equipamento?.geracaoKwh || prev.geracaoKwh,
+      valorSistema: equipamento?.valorSistema || prev.valorSistema,
+      formaPagamentoTipo: equipamento?.formaPagamentoTipo || prev.formaPagamentoTipo,
+      condicoesPagamento: equipamento?.formaPagamento || prev.condicoesPagamento,
+    }));
+  };
+
+  const createManualBudget = async (event) => {
+    event.preventDefault();
+    setBudgetStatus('Salvando orçamento...');
+    try {
+      const orcamento = await request('/api/admin/orcamentos', {
+        method: 'POST',
+        body: JSON.stringify({
+          clienteId: budgetForm.clienteId,
+          status: 'Orçamento interno',
+          dimensionamento: {
+            potencia_placa_w: budgetForm.potenciaPlacaW,
+            placa_modelo: budgetForm.placaModelo,
+            numero_paineis_necessarios: budgetForm.numeroPaineis,
+            potencia_real_instalada_kwp: budgetCalculations.potenciaKwp,
+            area_ocupada_m2: budgetCalculations.areaOcupadaM2,
+            potencia_inversor_kw: budgetForm.potenciaInversorKw,
+            inversor_modelo: budgetForm.inversorModelo,
+            quantidade_inversores: budgetForm.quantidadeInversores,
+            quantidade_cabo_cc: budgetForm.quantidadeCaboCc,
+            irradiacao_solar: budgetForm.irradiacaoSolar,
+            perda_percentual: budgetForm.perdaPercentual,
+            geracao_estimada_kwh: budgetCalculations.geracaoKwh,
+            geracao_anual_kwh: budgetCalculations.geracaoAnualKwh,
+            cidade_base: budgetClient?.cidade,
+            observacoes: budgetForm.observacoes,
+            modelo_orcamento: 'Solaris',
+          },
+          financeiro: {
+            preco_final_cliente_rs: budgetForm.valorSistema,
+            forma_pagamento: budgetForm.formaPagamentoTipo,
+            condicoes_pagamento: budgetForm.condicoesPagamento,
+          },
+        }),
+      });
+      setOrcamentos(prev => [orcamento, ...prev.filter(item => item.id !== orcamento.id)]);
+      setSelectedOrcamento(orcamento);
+      setBudgetForm(emptyBudgetForm);
+      setBudgetStatus('Orçamento criado. Agora você pode gerar o contrato a partir dele.');
+      setIsBudgetFormOpen(false);
+      request('/api/admin/resumo').then(setResumo).catch(() => {});
+    } catch (err) {
+      setBudgetStatus(err.message);
+    }
+  };
+
+  const handleQuickAction = (action) => {
+    setQuickModal(null);
+    if (action.action === 'newBudget') {
+      openBudgetFormForClient();
+      return;
+    }
+    setActiveTab(action.tab);
   };
 
   const openContractModal = (orcamento) => {
@@ -1062,8 +1398,12 @@ const AdminDashboard = () => {
       geracaoAnualKwh: orcamento.dimensionamento?.geracao_estimada_kwh ? Number(orcamento.dimensionamento.geracao_estimada_kwh) * 12 : '',
       potenciaKwp: orcamento.dimensionamento?.potencia_real_instalada_kwp || '',
       numeroPaineis: orcamento.dimensionamento?.numero_paineis_necessarios || '',
+      painel: orcamento.dimensionamento?.placa_modelo || '',
+      inversor: orcamento.dimensionamento?.inversor_modelo || '',
+      quantidadeCabo: orcamento.dimensionamento?.quantidade_cabo_cc || '',
       valorSistema: orcamento.financeiro?.preco_final_cliente_rs || '',
-      formaPagamentoTipo: 'avista',
+      formaPagamentoTipo: orcamento.financeiro?.forma_pagamento || 'avista',
+      formaPagamento: orcamento.financeiro?.condicoes_pagamento || '',
     };
     setContractModal({
       open: true,
@@ -1140,9 +1480,14 @@ const AdminDashboard = () => {
     `${withApiBase(`/api/admin/contratos/${contratoId}/download`)}?token=${localStorage.getItem('token')}`
   );
 
+  const getOrcamentoDownloadUrl = (orcamentoId) => (
+    `${withApiBase(`/api/admin/orcamentos/${orcamentoId}/download`)}?token=${localStorage.getItem('token')}`
+  );
+
   const startNewEquipamento = () => {
     setEditingEquipamentoId(null);
     setEquipamentoForm(emptyEquipamentoForm);
+    setProdutoSearch('');
   };
 
   const editEquipamento = (item) => {
@@ -1163,16 +1508,21 @@ const AdminDashboard = () => {
   const saveEquipamento = async (event) => {
     event.preventDefault();
     const isEditing = Boolean(editingEquipamentoId);
-    const equipamento = await request(isEditing ? `/api/admin/equipamentos/${editingEquipamentoId}` : '/api/admin/equipamentos', {
-      method: isEditing ? 'PUT' : 'POST',
-      body: JSON.stringify(equipamentoForm),
-    });
-    setEquipamentos(prev => {
-      const exists = prev.some(item => item.id === equipamento.id);
-      return exists ? prev.map(item => item.id === equipamento.id ? equipamento : item) : [equipamento, ...prev];
-    });
-    setEditingEquipamentoId(equipamento.id);
-    setEquipamentoForm(equipamentoToForm(equipamento));
+    try {
+      const equipamento = await request(isEditing ? `/api/admin/equipamentos/${editingEquipamentoId}` : '/api/admin/equipamentos', {
+        method: isEditing ? 'PUT' : 'POST',
+        body: JSON.stringify(equipamentoForm),
+      });
+      setEquipamentos(prev => {
+        const exists = prev.some(item => item.id === equipamento.id);
+        return exists ? prev.map(item => item.id === equipamento.id ? equipamento : item) : [equipamento, ...prev];
+      });
+      setEditingEquipamentoId(equipamento.id);
+      setEquipamentoForm(equipamentoToForm(equipamento));
+      showToast(isEditing ? 'Produto atualizado.' : 'Produto criado com sucesso.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const toggleEquipamentoActive = async (item) => {
@@ -1187,22 +1537,32 @@ const AdminDashboard = () => {
 
   const saveContractConfig = async (event) => {
     event.preventDefault();
-    const config = await request('/api/admin/contrato-config', {
-      method: 'PUT',
-      body: JSON.stringify(contractConfig),
-    });
-    setContractConfig(config);
+    try {
+      const config = await request('/api/admin/contrato-config', {
+        method: 'PUT',
+        body: JSON.stringify(contractConfig),
+      });
+      setContractConfig(config);
+      showToast('Configuração do contrato salva.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const createDespesaFixa = async (event) => {
     event.preventDefault();
-    await request('/api/admin/despesas-fixas', {
-      method: 'POST',
-      body: JSON.stringify(despesaForm),
-    });
-    setDespesaForm({ nome: '', valor: '', categoria: '' });
-    const updated = await request('/api/admin/financeiro');
-    setFinanceiro(updated);
+    try {
+      await request('/api/admin/despesas-fixas', {
+        method: 'POST',
+        body: JSON.stringify(despesaForm),
+      });
+      setDespesaForm({ nome: '', valor: '', categoria: '' });
+      const updated = await request('/api/admin/financeiro');
+      setFinanceiro(updated);
+      showToast('Despesa fixá adicionada.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const updateDespesaFixa = async (item, payload) => {
@@ -1215,6 +1575,17 @@ const AdminDashboard = () => {
 
   return (
     <div className={`admin-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* Toast notifications */}
+      <div className="toast-container" aria-live="polite">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`toast toast-${toast.type}`} role="alert">
+            <span className="toast-icon">{toast.icon}</span>
+            <span className="toast-body"><span className="toast-title">{toast.message}</span></span>
+            <button className="toast-close" onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))} aria-label="Fechar">×</button>
+          </div>
+        ))}
+      </div>
+
       {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
       <aside className="admin-sidebar">
         <div className="sidebar-header">
@@ -1222,20 +1593,27 @@ const AdminDashboard = () => {
             <img src="/assets/logo.png" alt="DRM Admin" className="sidebar-logo-img" />
           </Link>
           <span className="sidebar-badge">{adminUser.role}</span>
+          <button type="button" className="sidebar-close-button" onClick={() => setIsSidebarOpen(false)} aria-label="Fechar menu">×</button>
         </div>
 
         <nav className="sidebar-nav">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab(tab.id);
-                setIsSidebarOpen(false);
-              }}
-            >
-              <span className="icon"><SidebarIcon name={tab.id} /></span> {tab.label}
-            </button>
+          {navigationGroups.map(group => (
+            <div className="nav-group" key={group.title}>
+              <span className="nav-group-label">{group.title}</span>
+              {group.tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setIsSidebarOpen(false);
+                  }}
+                >
+                  <span className="icon"><SidebarIcon name={tab.id} /></span>
+                  <span className="nav-label">{tab.label}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -1261,8 +1639,8 @@ const AdminDashboard = () => {
               {quickActions.map(action => (
                 <button
                   key={action.id}
-                  className={`quick-action-btn ${quickModal === action.tab ? 'active' : ''}`}
-                  onClick={() => setQuickModal(action.tab)}
+                  className={`quick-action-btn ${activeTab === action.tab ? 'active' : ''}`}
+                  onClick={() => handleQuickAction(action)}
                   type="button"
                 >
                   <span className="quick-action-icon"><SidebarIcon name={action.tab} /></span>
@@ -1584,7 +1962,8 @@ const AdminDashboard = () => {
                             <td data-label="Ações">
                               <div className="table-actions">
                                 {whatsappHref && <a className="btn btn-primary btn-sm-admin" href={whatsappHref} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
-                                {hasPermission('contratos') && <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openClientContractModal(c)}>Gerar contrato</button>}
+                                {hasPermission('orcamentos') && <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openBudgetFormForClient(c)}>Fazer orçamento</button>}
+                                {hasPermission('contratos') && <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => openClientContractModal(c)}>Contrato direto</button>}
                                 <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setNovoCliente({ ...emptyClientForm, ...c, password: '' })}>Usar dados</button>
                               </div>
                             </td>
@@ -1758,12 +2137,141 @@ const AdminDashboard = () => {
 
           {activeTab === 'orcamentos' && (
             <div className="orcamentos-view-grid">
+              {isBudgetFormOpen && (
+                <form className="admin-card budget-builder-card" onSubmit={createManualBudget}>
+                  <div className="card-header-flex">
+                    <div>
+                      <span className="section-kicker">Fazer orçamento</span>
+                      <h3>Proposta modelo Solaris</h3>
+                      <p className="muted-text">Escolha placa, inversor, quantidade, geração e condições comerciais antes de gerar contrato.</p>
+                    </div>
+                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setIsBudgetFormOpen(false)}>Fechar</button>
+                  </div>
+
+                  <div className="budget-form-grid">
+                    <label className="span-2">
+                      Cliente cadastrado
+                      <select value={budgetForm.clienteId} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteId: event.target.value }))} required>
+                        <option value="">Selecione o cliente</option>
+                        {clientes.map(cliente => (
+                          <option key={cliente.id} value={cliente.id}>{cliente.nome} • {cliente.cidade || 'sem cidade'}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Kit/catálogo base
+                      <select value={budgetForm.equipamentoId} onChange={(event) => applyEquipmentToBudget(event.target.value)}>
+                        <option value="">Preencher manualmente</option>
+                        {equipamentos.filter(item => item.active).map(item => (
+                          <option key={item.id} value={item.id}>{item.nome}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Potência da placa
+                      <select value={budgetForm.potenciaPlacaW} onChange={(event) => setBudgetForm(prev => ({ ...prev, potenciaPlacaW: event.target.value }))}>
+                        {[550, 560, 570, 580, 590, 600, 605, 610, 615, 620, 630, 650, 700].map(value => <option key={value} value={value}>{value} W</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      Modelo da placa
+                      <input value={budgetForm.placaModelo} onChange={(event) => setBudgetForm(prev => ({ ...prev, placaModelo: event.target.value }))} placeholder="Ex: JA Solar 610 W" required />
+                    </label>
+                    <label>
+                      Quantidade de placas
+                      <input type="number" min="1" value={budgetForm.numeroPaineis} onChange={(event) => setBudgetForm(prev => ({ ...prev, numeroPaineis: event.target.value }))} required />
+                    </label>
+                    <label>
+                      Potência do inversor
+                      <input type="number" min="0" step="0.01" value={budgetForm.potenciaInversorKw} onChange={(event) => setBudgetForm(prev => ({ ...prev, potenciaInversorKw: event.target.value }))} placeholder="Ex: 8" required />
+                    </label>
+                    <label>
+                      Modelo do inversor
+                      <input value={budgetForm.inversorModelo} onChange={(event) => setBudgetForm(prev => ({ ...prev, inversorModelo: event.target.value }))} placeholder="Ex: Growatt 8 kW" required />
+                    </label>
+                    <label>
+                      Quantidade de inversores
+                      <input type="number" min="1" value={budgetForm.quantidadeInversores} onChange={(event) => setBudgetForm(prev => ({ ...prev, quantidadeInversores: event.target.value }))} />
+                    </label>
+                    <label>
+                      Cabo CC
+                      <input value={budgetForm.quantidadeCaboCc} onChange={(event) => setBudgetForm(prev => ({ ...prev, quantidadeCaboCc: event.target.value }))} placeholder="Ex: 60 m cabo solar 6 mm preto/vermelho" />
+                    </label>
+                    <label>
+                      Área por placa
+                      <input type="number" min="0" step="0.01" value={budgetForm.areaPorPainelM2} onChange={(event) => setBudgetForm(prev => ({ ...prev, areaPorPainelM2: event.target.value }))} />
+                    </label>
+                    <label>
+                      Geração
+                      <select value={budgetForm.generationMode} onChange={(event) => setBudgetForm(prev => ({ ...prev, generationMode: event.target.value }))}>
+                        <option value="manual">Informar manualmente</option>
+                        <option value="auto">Calcular por irradiação</option>
+                      </select>
+                    </label>
+                    {budgetForm.generationMode === 'auto' ? (
+                      <>
+                        <label>
+                          Irradiação solar
+                          <input type="number" step="0.01" value={budgetForm.irradiacaoSolar} onChange={(event) => setBudgetForm(prev => ({ ...prev, irradiacaoSolar: event.target.value }))} placeholder="Ex: 5.2" required />
+                        </label>
+                        <label>
+                          Perda média
+                          <select value={budgetForm.perdaPercentual} onChange={(event) => setBudgetForm(prev => ({ ...prev, perdaPercentual: event.target.value }))}>
+                            <option value="15">15%</option>
+                            <option value="20">20%</option>
+                            <option value="25">25%</option>
+                          </select>
+                        </label>
+                      </>
+                    ) : (
+                      <label className="span-2">
+                        Geração mensal kWh
+                        <input type="number" min="0" step="0.01" value={budgetForm.geracaoKwh} onChange={(event) => setBudgetForm(prev => ({ ...prev, geracaoKwh: event.target.value }))} required />
+                      </label>
+                    )}
+                    <label>
+                      Valor do sistema
+                      <input type="number" min="0" step="0.01" value={budgetForm.valorSistema} onChange={(event) => setBudgetForm(prev => ({ ...prev, valorSistema: event.target.value }))} required />
+                    </label>
+                    <label>
+                      Forma de pagamento
+                      <select value={budgetForm.formaPagamentoTipo} onChange={(event) => setBudgetForm(prev => ({ ...prev, formaPagamentoTipo: event.target.value }))}>
+                        {pagamentoTypeOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      </select>
+                    </label>
+                    <label className="span-2">
+                      Condições
+                      <textarea value={budgetForm.condicoesPagamento} onChange={(event) => setBudgetForm(prev => ({ ...prev, condicoesPagamento: event.target.value }))} placeholder="Ex: entrada + saldo financiado, validade da proposta, parcelas..." required />
+                    </label>
+                    <label className="span-2">
+                      Observações
+                      <textarea value={budgetForm.observacoes} onChange={(event) => setBudgetForm(prev => ({ ...prev, observacoes: event.target.value }))} placeholder="Detalhes técnicos, observações comerciais ou premissas da proposta." />
+                    </label>
+                  </div>
+
+                  <div className="budget-result-strip">
+                    <div><span>Cliente</span><strong>{budgetClient?.nome || 'A selecionar'}</strong></div>
+                    <div><span>Potência</span><strong>{budgetCalculations.potenciaKwp} kWp</strong></div>
+                    <div><span>Área ocupada</span><strong>{budgetCalculations.areaOcupadaM2} m²</strong></div>
+                    <div><span>Geração</span><strong>{budgetCalculations.geracaoKwh} kWh/mês</strong></div>
+                    <div><span>Valor</span><strong>{money(budgetForm.valorSistema)}</strong></div>
+                  </div>
+
+                  <div className="actions-footer">
+                    <button type="button" className="btn btn-outline" onClick={() => setBudgetForm(emptyBudgetForm)}>Limpar</button>
+                    <button type="submit" className="btn btn-primary">Salvar orçamento</button>
+                  </div>
+                  {budgetStatus && <p className="muted-text">{budgetStatus}</p>}
+                </form>
+              )}
+
               <div className="admin-card list-orcamentos">
                 <div className="card-header-flex compact">
                   <div>
                     <h3>Simulações</h3>
                     <p className="muted-text">{filteredOrcamentos.length} de {orcamentos.length} orçamento{orcamentos.length === 1 ? '' : 's'} na lista.</p>
                   </div>
+                  <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openBudgetFormForClient()}>Novo orçamento</button>
                 </div>
                 <div className="ops-toolbar single">
                   <div className="lead-search-box">
@@ -1783,7 +2291,7 @@ const AdminDashboard = () => {
                     >
                       <div className="orc-info">
                         <strong>{orc.clienteNome}</strong>
-                        <span className="kwp-tag">{orc.dimensionamento.potencia_real_instalada_kwp} kWp • {getResponsibleName(orc.assignedUserName)}</span>
+                        <span className="kwp-tag">{orc.dimensionamento?.potencia_real_instalada_kwp || 0} kWp • {getResponsibleName(orc.assignedUserName)}</span>
                       </div>
                       <span className="orc-date">{orc.data}</span>
                     </div>
@@ -1810,13 +2318,18 @@ const AdminDashboard = () => {
                     <div className="detalhes-grid">
                       <div className="detalhe-item highlight">
                         <span className="detalhe-titulo">Preço Final Cliente</span>
-                        <span className="detalhe-valor">{money(selectedOrcamento.financeiro.preco_final_cliente_rs)}</span>
+                        <span className="detalhe-valor">{money(selectedOrcamento.financeiro?.preco_final_cliente_rs)}</span>
                       </div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Potência Instalada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento.potencia_real_instalada_kwp} kWp</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Nº de Painéis</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento.numero_paineis_necessarios}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Geração Estimada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento.geracao_estimada_kwh} kWh</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Conta Informada</span><span className="detalhe-valor">{money(selectedOrcamento.dimensionamento.valor_conta_reais)}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Potência Instalada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Nº de Painéis</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.numero_paineis_necessarios || 0}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Área ocupada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.area_ocupada_m2 || 0} m²</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Geração Estimada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.geracao_estimada_kwh || 0} kWh</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Conta Informada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.valor_conta_reais ? money(selectedOrcamento.dimensionamento.valor_conta_reais) : 'Manual'}</span></div>
                       <div className="detalhe-item"><span className="detalhe-titulo">Responsável</span><span className="detalhe-valor">{getResponsibleName(selectedOrcamento.assignedUserName)}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Placa</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.placa_modelo || 'Não informado'}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Inversor</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.inversor_modelo || 'Não informado'}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Cabo CC</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.quantidade_cabo_cc || 'Não informado'}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Pagamento</span><span className="detalhe-valor">{selectedOrcamento.financeiro?.condicoes_pagamento || selectedOrcamento.financeiro?.forma_pagamento || 'Não informado'}</span></div>
                     </div>
                     {hasPermission('contratos') && (
                       <div className="contract-generation-panel">
@@ -1837,6 +2350,7 @@ const AdminDashboard = () => {
                       </div>
                     )}
                     <div className="actions-footer">
+                      <a className="btn btn-outline" href={getOrcamentoDownloadUrl(selectedOrcamento.id)} target="_blank" rel="noopener noreferrer">Baixar orçamento</a>
                       {hasPermission('contratos') && (
                         <button className="btn btn-outline" onClick={() => openContractModal(selectedOrcamento)}>Gerar contrato</button>
                       )}
@@ -2085,18 +2599,245 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {activeTab === 'homologacao' && (
+            <div className="admin-section homologation-screen">
+              <div className="section-heading homologation-heading">
+                <div>
+                  <span className="section-kicker">Workflow operacional</span>
+                  <h3>Homologação</h3>
+                  <p>Controle análise, ART/TRT, envios, pendências, parecer, obra, vistoria e conclusão em uma tela dedicada.</p>
+                </div>
+                <div className="section-stats">
+                  <div><strong>{homologacaoSummary.ativos}</strong><span>ativos</span></div>
+                  <div><strong>{homologacaoSummary.pendencias}</strong><span>pendências</span></div>
+                  <div><strong>{homologacaoSummary.enviados}</strong><span>enviados</span></div>
+                </div>
+              </div>
+
+              <div className="homologation-quick-grid">
+                <button type="button" onClick={() => setSelectedProjeto(filteredHomologacaoProjetos.find(item => (item.pendenciasHomologacao || []).some(p => !['Corrigida', 'Concluída', 'Cancelada'].includes(p.status))) || filteredHomologacaoProjetos[0] || null)}>
+                  <span>Pendências abertas</span>
+                  <strong>{homologacaoSummary.pendencias}</strong>
+                  <p>Exigências da concessionária ou correções em andamento.</p>
+                </button>
+                <button type="button" onClick={() => setSelectedProjeto(filteredHomologacaoProjetos.find(item => item.etapa === 'Projeto para envio') || filteredHomologacaoProjetos[0] || null)}>
+                  <span>Prontos para envio</span>
+                  <strong>{projetos.filter(item => item.etapa === 'Projeto para envio').length}</strong>
+                  <p>Projetos técnicos aguardando protocolo.</p>
+                </button>
+                <button type="button" onClick={() => setSelectedProjeto(filteredHomologacaoProjetos.find(item => item.etapa === 'Aguardando parecer de acesso') || filteredHomologacaoProjetos[0] || null)}>
+                  <span>Parecer</span>
+                  <strong>{homologacaoSummary.parecer}</strong>
+                  <p>Projetos aguardando ou tratando parecer de acesso.</p>
+                </button>
+                <button type="button" onClick={() => setSelectedProjeto(filteredHomologacaoProjetos.find(item => String(item.etapa || '').includes('Vistoria')) || filteredHomologacaoProjetos[0] || null)}>
+                  <span>Vistoria</span>
+                  <strong>{homologacaoSummary.vistoria}</strong>
+                  <p>Solicitação, protocolo, prazo e resultado de vistoria.</p>
+                </button>
+              </div>
+
+              <div className="homologation-layout">
+                <section className="admin-card homologation-list-panel">
+                  <div className="card-header-flex compact">
+                    <div>
+                      <h3>Fila de homologação</h3>
+                      <p className="muted-text">{filteredHomologacaoProjetos.length} projeto{filteredHomologacaoProjetos.length === 1 ? '' : 's'} na visão atual.</p>
+                    </div>
+                    <input
+                      value={projectSearch}
+                      onChange={(event) => setProjectSearch(event.target.value)}
+                      placeholder="Buscar cliente, contrato, etapa..."
+                    />
+                  </div>
+                  <div className="homologation-project-list">
+                    {filteredHomologacaoProjetos.map(projeto => {
+                      const openPendencias = (projeto.pendenciasHomologacao || []).filter(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status)).length;
+                      return (
+                        <button
+                          type="button"
+                          key={projeto.id}
+                          className={`homologation-project-row ${selectedProjeto?.id === projeto.id ? 'active' : ''}`}
+                          onClick={() => setSelectedProjeto(projeto)}
+                        >
+                          <div>
+                            <strong>{projeto.clienteNome}</strong>
+                            <span>Contrato #{projeto.contratoId} • {getResponsibleName(projeto.responsavelNome)}</span>
+                          </div>
+                          <em>{projeto.etapa}</em>
+                          <small>{openPendencias} pend. • {(projeto.enviosHomologacao || []).length} envio{(projeto.enviosHomologacao || []).length === 1 ? '' : 's'}</small>
+                        </button>
+                      );
+                    })}
+                    {filteredHomologacaoProjetos.length === 0 && (
+                      <div className="empty-inline">
+                        <strong>Nenhum projeto encontrado</strong>
+                        <span>Limpe a busca para voltar a ver todos.</span>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="admin-card homologation-detail-panel">
+                  {selectedProjeto ? (
+                    <>
+                      <div className="contract-modal-header inline-header">
+                        <div>
+                          <span className="section-kicker">Contrato #{selectedProjeto.contratoId}</span>
+                          <h3>{selectedProjeto.clienteNome}</h3>
+                          <p>{selectedProjeto.clienteCidade || 'Cidade não informada'} • {selectedProjeto.etapa}</p>
+                        </div>
+                        <span className="status-badge warning">{(selectedProjeto.pendenciasHomologacao || []).filter(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status)).length} pendências</span>
+                      </div>
+
+                      <div className="homologation-action-strip">
+                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Gerar ART', checklist: { ...(selectedProjeto.checklist || {}), documentacaoRecebida: true } })}>Gerar ART</button>
+                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto para envio', checklist: { ...(selectedProjeto.checklist || {}), artGerada: true, trtPaga: true, projetoTecnico: true } })}>Pronto envio</button>
+                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Aguardando parecer de acesso', checklist: { ...(selectedProjeto.checklist || {}), projetoEnviado: true } })}>Aguardar parecer</button>
+                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Solicitar vistoria', checklist: { ...(selectedProjeto.checklist || {}), parecerAcesso: true } })}>Solicitar vistoria</button>
+                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto concluído', checklist: { ...(selectedProjeto.checklist || {}), sistemaLigado: true } })}>Concluir</button>
+                      </div>
+
+                      <div className="project-modal-controls homologation-controls">
+                        <label>
+                          Etapa atual
+                          <select value={selectedProjeto.etapa} onChange={(event) => updateProjeto(selectedProjeto.id, { etapa: event.target.value })}>
+                            {projectStages.map(option => <option key={option}>{option}</option>)}
+                          </select>
+                        </label>
+                        <label>
+                          Prazo previsto
+                          <input type="date" value={selectedProjeto.prazoPrevisto || ''} onChange={(event) => updateProjeto(selectedProjeto.id, { prazoPrevisto: event.target.value })} />
+                        </label>
+                        <label>
+                          Previsão concessionária
+                          <input type="date" value={selectedProjeto.previsaoLigacao || ''} onChange={(event) => updateProjeto(selectedProjeto.id, { previsaoLigacao: event.target.value })} />
+                        </label>
+                      </div>
+
+                      <div className="homologation-workflow-grid">
+                        <form className="project-modal-section homologation-form" onSubmit={registerHomologacaoEnvio}>
+                          <h4>Envio / reenvio</h4>
+                          <div className="homologation-form-grid">
+                            <label>
+                              Tipo
+                              <select value={envioHomologacaoForm.tipo} onChange={(event) => setEnvioHomologacaoForm(prev => ({ ...prev, tipo: event.target.value }))}>
+                                <option>Envio inicial</option>
+                                <option>Reenvio</option>
+                              </select>
+                            </label>
+                            <label>
+                              Protocolo
+                              <input value={envioHomologacaoForm.protocolo} onChange={(event) => setEnvioHomologacaoForm(prev => ({ ...prev, protocolo: event.target.value }))} placeholder="Número do protocolo" />
+                            </label>
+                            <label className="span-2">
+                              Resposta / observação
+                              <textarea value={envioHomologacaoForm.resposta} onChange={(event) => setEnvioHomologacaoForm(prev => ({ ...prev, resposta: event.target.value }))} placeholder="Retorno da concessionária ou observação interna" />
+                            </label>
+                          </div>
+                          <button className="btn btn-primary" type="submit">Registrar envio</button>
+                          <div className="homologation-list">
+                            {(selectedProjeto.enviosHomologacao || []).slice(0, 4).map(envio => (
+                              <article key={envio.id}>
+                                <strong>#{envio.numero} • {envio.tipo}</strong>
+                                <span>{envio.protocolo || 'Sem protocolo'} • {envio.status}</span>
+                                <p>{envio.resposta || 'Sem resposta registrada.'}</p>
+                              </article>
+                            ))}
+                          </div>
+                        </form>
+
+                        <form className="project-modal-section homologation-form" onSubmit={registerHomologacaoPendencia}>
+                          <h4>Pendência</h4>
+                          <div className="homologation-form-grid">
+                            <label>
+                              Tipo
+                              <input value={pendenciaForm.tipo} onChange={(event) => setPendenciaForm(prev => ({ ...prev, tipo: event.target.value }))} />
+                            </label>
+                            <label>
+                              Prazo
+                              <input type="date" value={pendenciaForm.prazo} onChange={(event) => setPendenciaForm(prev => ({ ...prev, prazo: event.target.value }))} />
+                            </label>
+                            <label className="span-2">
+                              Descrição
+                              <textarea value={pendenciaForm.descricao} onChange={(event) => setPendenciaForm(prev => ({ ...prev, descricao: event.target.value }))} placeholder="Descreva a exigência ou reprovação." required />
+                            </label>
+                          </div>
+                          <button className="btn btn-primary" type="submit">Registrar pendência</button>
+                          <div className="homologation-list">
+                            {(selectedProjeto.pendenciasHomologacao || []).slice(0, 5).map(pendencia => (
+                              <article key={pendencia.id} className={['Corrigida', 'Concluída', 'Cancelada'].includes(pendencia.status) ? 'resolved' : ''}>
+                                <strong>{pendencia.tipo}</strong>
+                                <span>{pendencia.status} • prazo {dateBr(pendencia.prazo)}</span>
+                                <p>{pendencia.descricao}</p>
+                                {!['Corrigida', 'Concluída', 'Cancelada'].includes(pendencia.status) && (
+                                  <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateHomologacaoPendencia(pendencia.id, { status: 'Corrigida', observacoes: 'Correção registrada pela equipe.' })}>Marcar corrigida</button>
+                                )}
+                              </article>
+                            ))}
+                          </div>
+                        </form>
+                      </div>
+
+                      <div className="homologation-bottom-grid">
+                        <section className="project-modal-section">
+                          <h4>Checklist de homologação</h4>
+                          <div className="project-checklist modal-checklist simple-checklist">
+                            {officeChecklistKeys.map(key => (
+                              <label key={key}>
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(selectedProjeto.checklist?.[key])}
+                                  onChange={(event) => updateProjeto(selectedProjeto.id, { checklist: { ...(selectedProjeto.checklist || {}), [key]: event.target.checked } })}
+                                />
+                                <span>{projectChecklistLabels[key]}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </section>
+
+                        <section className="project-modal-section homologation-timeline">
+                          <h4>Timeline</h4>
+                          <div className="homologation-timeline-list">
+                            {(selectedProjeto.timeline || []).slice(0, 10).map(item => (
+                              <article key={item.id}>
+                                <i></i>
+                                <div>
+                                  <strong>{item.titulo}</strong>
+                                  <p>{item.descricao}</p>
+                                  <span>{dateBr(item.data)} • {item.responsavel || 'Equipe DRM'}</span>
+                                </div>
+                              </article>
+                            ))}
+                            {(selectedProjeto.timeline || []).length === 0 && <p className="muted-text">Os movimentos importantes aparecerão aqui automaticamente.</p>}
+                          </div>
+                        </section>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="empty-state-orcamento">
+                      <span className="icon">HM</span>
+                      <h4>Selecione um projeto</h4>
+                      <p>Escolha um item da fila para registrar envios, pendências e movimentações.</p>
+                    </div>
+                  )}
+                </section>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'projetos' && (
             <div className="admin-section">
               <div className="section-heading">
                 <div>
                   <span className="section-kicker">Operação</span>
-                  <h3>Projetos e instalações</h3>
-                  <p>Pesquise o cliente, abra o projeto e registre etapa, fotos e observações em poucos toques.</p>
+                  <h3>Instalações e campo</h3>
+                  <p>Pesquise o cliente, abra a instalação e registre agenda, fotos e observações em poucos toques.</p>
                 </div>
                 <div className="section-stats">
                   <div><strong>{projetos.length}</strong><span>projetos</span></div>
-                  <div><strong>{projetos.filter(item => item.etapa !== 'Concluído').length}</strong><span>ativos</span></div>
-                  <div><strong>{projetos.filter(item => item.etapa === 'Concluído').length}</strong><span>concluídos</span></div>
+                  <div><strong>{projetos.filter(item => item.etapa !== 'Projeto concluído').length}</strong><span>ativos</span></div>
+                  <div><strong>{projetos.filter(item => item.etapa === 'Projeto concluído').length}</strong><span>concluídos</span></div>
                 </div>
               </div>
 
@@ -2114,13 +2855,13 @@ const AdminDashboard = () => {
               </div>
 
               <div className="project-board simple-project-board">
-                {projectStages.map(stage => (
-                  <div className="project-column" key={stage}>
+                {projectOperationColumns.map(column => (
+                  <div className="project-column" key={column.id}>
                     <div className="project-column-header">
-                      <strong>{stage}</strong>
-                      <span>{filteredProjetos.filter(projeto => projeto.etapa === stage).length}</span>
+                      <strong>{column.label}</strong>
+                      <span>{filteredProjetos.filter(column.matches).length}</span>
                     </div>
-                    {filteredProjetos.filter(projeto => projeto.etapa === stage).map(projeto => (
+                    {filteredProjetos.filter(column.matches).map(projeto => (
                       <button className="project-card" key={projeto.id} onClick={() => setSelectedProjeto(projeto)}>
                         <div className="project-card-top">
                           <strong>{projeto.clienteNome}</strong>
@@ -2132,7 +2873,7 @@ const AdminDashboard = () => {
                         <span className="project-open-hint">Abrir projeto</span>
                       </button>
                     ))}
-                    {filteredProjetos.filter(projeto => projeto.etapa === stage).length === 0 && (
+                    {filteredProjetos.filter(column.matches).length === 0 && (
                       <div className="empty-inline">
                         <strong>Nada nessa etapa</strong>
                         <span>Nenhum projeto encontrado aqui.</span>
@@ -2159,6 +2900,8 @@ const AdminDashboard = () => {
                       <div className="detalhe-item"><span className="detalhe-titulo">Etapa</span><span className="detalhe-valor">{selectedProjeto.etapa}</span></div>
                       <div className="detalhe-item"><span className="detalhe-titulo">Prazo</span><span className="detalhe-valor">{dateBr(selectedProjeto.prazoPrevisto)}</span></div>
                       <div className="detalhe-item"><span className="detalhe-titulo">Prioridade</span><span className="detalhe-valor">{selectedProjeto.prioridade || 'Normal'}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Pendências</span><span className="detalhe-valor">{selectedProjeto.pendenciasHomologacao?.filter(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status)).length || 0} abertas</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Envios</span><span className="detalhe-valor">{selectedProjeto.enviosHomologacao?.length || 0}</span></div>
                     </div>
 
                     <div className="project-modal-controls">
@@ -2187,10 +2930,10 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="quick-actions">
-                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Vistoria', checklist: { ...(selectedProjeto.checklist || {}), vistoriaRealizada: true } })}>Vistoria feita</button>
-                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto técnico', checklist: { ...(selectedProjeto.checklist || {}), projetoTecnico: true } })}>Projeto pronto</button>
-                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Instalação', checklist: { ...(selectedProjeto.checklist || {}), homologacao: true } })}>Liberado instalar</button>
-                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Concluído', checklist: { ...(selectedProjeto.checklist || {}), sistemaLigado: true } })}>Concluir</button>
+                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Análise inicial', checklist: { ...(selectedProjeto.checklist || {}), vistoriaRealizada: true } })}>Vistoria feita</button>
+                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto para envio', checklist: { ...(selectedProjeto.checklist || {}), projetoTecnico: true, projetoParaEnvio: true } })}>Projeto pronto</button>
+                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Parecer emitido', checklist: { ...(selectedProjeto.checklist || {}), parecerAcesso: true, homologacao: true } })}>Parecer emitido</button>
+                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto concluído', checklist: { ...(selectedProjeto.checklist || {}), sistemaLigado: true } })}>Concluir</button>
                     </div>
 
                     <div className="project-role-grid">
@@ -2199,23 +2942,6 @@ const AdminDashboard = () => {
                         <p className="muted-text">Use no cliente: fotos, vistoria, instalação e observações rápidas.</p>
                         <div className="project-checklist modal-checklist simple-checklist">
                           {streetChecklistKeys.map(key => (
-                            <label key={key}>
-                              <input
-                                type="checkbox"
-                                checked={Boolean(selectedProjeto.checklist?.[key])}
-                                onChange={(event) => updateProjeto(selectedProjeto.id, { checklist: { ...(selectedProjeto.checklist || {}), [key]: event.target.checked } })}
-                              />
-                              <span>{projectChecklistLabels[key]}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="project-modal-section">
-                        <h4>Escritório</h4>
-                        <p className="muted-text">Use para documentação, projeto técnico e homologação.</p>
-                        <div className="project-checklist modal-checklist simple-checklist">
-                          {officeChecklistKeys.map(key => (
                             <label key={key}>
                               <input
                                 type="checkbox"
@@ -2271,6 +2997,7 @@ const AdminDashboard = () => {
                         }}
                       />
                     </div>
+
                   </div>
                 </div>
               )}
@@ -2821,7 +3548,7 @@ const AdminDashboard = () => {
                       <strong>{cliente.nome}</strong>
                       <span>{cliente.cpfCnpj || 'Sem CPF/CNPJ'} • {cliente.cidade || 'Sem cidade'}</span>
                     </div>
-                    <button className="btn btn-primary btn-sm-admin" onClick={() => openClientContractModal(cliente)}>Gerar contrato</button>
+                    <button className="btn btn-primary btn-sm-admin" onClick={() => { setQuickModal(null); openBudgetFormForClient(cliente); }}>Fazer orçamento</button>
                   </div>
                 ))}
                 {clientes.length === 0 && (
@@ -2854,7 +3581,7 @@ const AdminDashboard = () => {
 
             {quickModal === 'projetos' && (
               <div className="quick-modal-list">
-                {projetos.filter(item => item.etapa !== 'Concluído').slice(0, 8).map(projeto => (
+                {projetos.filter(item => item.etapa !== 'Projeto concluído').slice(0, 8).map(projeto => (
                   <div className="quick-modal-item quick-project-item" key={projeto.id}>
                     <div className="quick-project-head">
                       <div>
@@ -2864,9 +3591,9 @@ const AdminDashboard = () => {
                       <button className="btn btn-outline btn-sm-admin" onClick={() => { setSelectedProjeto(projeto); setQuickModal(null); }}>Detalhes</button>
                     </div>
                     <div className="quick-project-actions">
-                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Vistoria', checklist: { ...(projeto.checklist || {}), vistoriaRealizada: true } })}>Vistoria feita</button>
-                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Instalação', checklist: { ...(projeto.checklist || {}), homologacao: true } })}>Liberar instalação</button>
-                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Concluído', checklist: { ...(projeto.checklist || {}), sistemaLigado: true } })}>Concluir</button>
+                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Análise inicial', checklist: { ...(projeto.checklist || {}), vistoriaRealizada: true } })}>Vistoria feita</button>
+                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Solicitar vistoria', checklist: { ...(projeto.checklist || {}), homologacao: true, parecerAcesso: true } })}>Liberar vistoria</button>
+                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Projeto concluído', checklist: { ...(projeto.checklist || {}), sistemaLigado: true } })}>Concluir</button>
                       <label>
                         Enviar fotos
                         <input type="file" accept="image/*" capture="environment" multiple onChange={(event) => { uploadProjetoFotos(projeto.id, event.target.files); event.target.value = ''; }} />

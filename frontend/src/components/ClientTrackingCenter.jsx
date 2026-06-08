@@ -9,8 +9,11 @@ const dateBr = (value, withTime = false) => {
 
 const stageNotes = {
   contrato: 'Documentação comercial aprovada e projeto liberado para execução.',
-  equipamento: 'Kit separado, transportado e conferido no endereço da instalação.',
-  instalacao: 'Equipe técnica executa a montagem, proteção e testes do sistema.',
+  documentacao: 'A equipe confere os dados do titular, unidade consumidora e documentos necessários.',
+  art: 'Responsável técnico gera ART/TRT e acompanha a etapa administrativa.',
+  envio: 'Projeto técnico enviado para análise da concessionária, com histórico de protocolos.',
+  parecer: 'A concessionária emite o parecer de acesso e informa se existe obra ou exigência.',
+  vistoria: 'A DRM acompanha solicitação, protocolo e resultado da vistoria.',
   equatorial: 'Distribuidora troca o medidor e libera a geração conectada à rede.',
 };
 
@@ -26,12 +29,21 @@ function ClientTrackingCenter({
   const progress = Math.round((completed / progressSteps.length) * 100);
   const nextStep = progressSteps.find(step => !step.done);
   const photos = projeto?.fotos || [];
+  const pendencias = projeto?.pendenciasHomologacao || [];
+  const openPendencias = pendencias.filter(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status));
+  const envios = projeto?.enviosHomologacao || [];
+  const timeline = projeto?.timeline || [];
   const activities = [
     contrato?.dataCriacao && { date: contrato.dataCriacao, title: 'Contrato criado', text: 'A jornada do seu sistema começou.' },
     contrato?.dataAnalise && { date: contrato.dataAnalise, title: 'Contrato analisado', text: `Status definido como ${contrato.status}.` },
     projeto?.dataInicio && { date: projeto.dataInicio, title: 'Projeto iniciado', text: `Etapa atual: ${projeto.etapa || 'Em andamento'}.` },
     projeto?.equipamentoEntregueAt && { date: projeto.equipamentoEntregueAt, title: 'Equipamento entregue', text: 'Confirmação de recebimento registrada.' },
     projeto?.medidorTrocadoAt && { date: projeto.medidorTrocadoAt, title: 'Medidor trocado', text: 'Etapa da Equatorial confirmada.' },
+    ...timeline.map(item => ({
+      date: item.data,
+      title: item.titulo,
+      text: item.descricao,
+    })),
     ...complaints.map(item => ({
       date: item.dataAtualizacao || item.dataAbertura,
       title: `Atendimento O.S #${item.id}`,
@@ -98,8 +110,46 @@ function ClientTrackingCenter({
             <div><dt>Entrega prevista</dt><dd>{dateBr(projeto?.prazoPrevisto)}</dd></div>
             <div><dt>Instalação</dt><dd>{dateBr(projeto?.instalacaoAgendada, true)}</dd></div>
             <div><dt>Ligação</dt><dd>{dateBr(projeto?.previsaoLigacao)}</dd></div>
+            <div><dt>Pendências abertas</dt><dd>{openPendencias.length}</dd></div>
+            <div><dt>Envios à concessionária</dt><dd>{envios.length}</dd></div>
           </dl>
           {contrato?.status === 'Aprovado' && <button type="button" onClick={onDownloadContract}>Baixar contrato em PDF</button>}
+        </section>
+      </div>
+
+      <div className="tracking-grid homologation-client-grid">
+        <section className="tracking-panel">
+          <div className="tracking-panel-head"><span>Homologação</span><h3>Pendências e documentos</h3></div>
+          {openPendencias.length ? (
+            <div className="client-pendency-list">
+              {openPendencias.map(item => (
+                <article key={item.id}>
+                  <strong>{item.tipo}</strong>
+                  <p>{item.descricao}</p>
+                  <small>{item.status} • prazo {dateBr(item.prazo)} • responsável {item.responsavel || 'Equipe DRM'}</small>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="tracking-empty">Nenhuma pendência aberta no momento.</p>
+          )}
+        </section>
+
+        <section className="tracking-panel">
+          <div className="tracking-panel-head"><span>Concessionária</span><h3>Histórico de envios</h3></div>
+          {envios.length ? (
+            <div className="client-pendency-list">
+              {envios.slice(0, 5).map(item => (
+                <article key={item.id}>
+                  <strong>Envio #{item.numero} • {item.tipo}</strong>
+                  <p>{item.resposta || 'Aguardando resposta da concessionária.'}</p>
+                  <small>{item.protocolo || 'Sem protocolo'} • {item.status} • {dateBr(item.dataEnvio, true)}</small>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="tracking-empty">O histórico de protocolos aparecerá aqui quando a DRM registrar o envio.</p>
+          )}
         </section>
       </div>
 

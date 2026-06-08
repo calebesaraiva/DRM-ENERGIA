@@ -778,11 +778,25 @@ const createProjetoFromContrato = async (contrato) => {
 
   const checklist = {
     documentacaoRecebida: false,
+    documentacaoCorrigida: false,
     vistoriaRealizada: false,
+    artGerada: false,
+    trtPaga: false,
     projetoTecnico: false,
+    projetoParaEnvio: false,
+    projetoEnviado: false,
+    pendenciaConcessionaria: false,
+    projetoCorrigido: false,
+    projetoReenviado: false,
+    parecerAcesso: false,
+    obraConcessionaria: false,
+    vistoriaSolicitada: false,
+    protocoloVistoria: false,
+    vistoriaReprovada: false,
     homologacao: false,
     instalacao: false,
     vistoriaFinal: false,
+    medidorTrocado: false,
     sistemaLigado: false,
   };
   const now = new Date();
@@ -791,14 +805,14 @@ const createProjetoFromContrato = async (contrato) => {
 
   const result = await db.run(
     `INSERT INTO projetos
-      (contratoId, clienteNome, clienteTelefone, clienteCidade, valorProjeto, etapa, prioridade, responsavelId, responsavelNome, checklist, observacoes, dataInicio, prazoPrevisto, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (contratoId, clienteNome, clienteTelefone, clienteCidade, valorProjeto, etapa, prioridade, responsavelId, responsavelNome, checklist, observacoes, dataInicio, prazoPrevisto, pendenciasHomologacao, enviosHomologacao, documentosHomologacao, timeline, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     contrato.id,
     contrato.clienteNome,
     contrato.clienteTelefone,
     contrato.clienteCidade,
     Number(contrato.valorProjeto) || 0,
-    PROJECT_STAGES[0],
+    'Novo projeto',
     'Normal',
     contrato.assignedUserId || contrato.criadoPorId || null,
     contrato.assignedUserName || contrato.criadoPorNome || null,
@@ -806,6 +820,17 @@ const createProjetoFromContrato = async (contrato) => {
     'Projeto criado automaticamente após aprovação do contrato.',
     now.toISOString(),
     prazo.toISOString().split('T')[0],
+    JSON.stringify([]),
+    JSON.stringify([]),
+    JSON.stringify([]),
+    JSON.stringify([{
+      id: `tl-${now.getTime()}`,
+      tipo: 'projeto',
+      titulo: 'Projeto criado',
+      descricao: 'Projeto criado automaticamente após aprovação do contrato.',
+      responsavel: contrato.assignedUserName || contrato.criadoPorNome || 'Equipe DRM',
+      data: now.toISOString(),
+    }]),
     now.toISOString()
   );
 
@@ -934,19 +959,67 @@ const mergeManualWithEquipamento = (manual = {}, equipamento = {}) => ({
 });
 
 const PROJECT_STAGES = [
-  'Documentação',
-  'Vistoria',
-  'Projeto técnico',
-  'Homologação',
-  'Instalação',
-  'Vistoria final',
-  'Concluído',
+  'Novo projeto',
+  'Análise inicial',
+  'Erro documentação',
+  'Corrigir documentação',
+  'Gerar ART',
+  'Aguardar TRT',
+  'Elaborar projeto',
+  'Projeto para envio',
+  'Projeto enviado',
+  'Pendência da concessionária',
+  'Corrigir projeto',
+  'Reenviar projeto',
+  'Aguardando parecer de acesso',
+  'Parecer emitido',
+  'Com obra',
+  'Sem obra',
+  'Aguardando finalização da obra',
+  'Solicitar vistoria',
+  'Aguardando protocolo de vistoria',
+  'Vistoria em prazo',
+  'Vistoria atrasada',
+  'Vistoria reprovada',
+  'Vistoria concluída',
+  'Projeto concluído',
 ];
+
+const LEGACY_PROJECT_STAGE_MAP = {
+  Documentação: 'Novo projeto',
+  Vistoria: 'Análise inicial',
+  'Projeto técnico': 'Elaborar projeto',
+  Homologação: 'Aguardando parecer de acesso',
+  Instalação: 'Solicitar vistoria',
+  'Vistoria final': 'Vistoria em prazo',
+  Concluído: 'Projeto concluído',
+};
+
+const normalizeProjectStage = (stage) => LEGACY_PROJECT_STAGE_MAP[stage] || stage || PROJECT_STAGES[0];
 
 const parseProjeto = (projeto) => ({
   ...projeto,
+  etapa: normalizeProjectStage(projeto.etapa),
   checklist: parseJsonField(projeto.checklist, {}),
+  pendenciasHomologacao: parseJsonField(projeto.pendenciasHomologacao, []),
+  enviosHomologacao: parseJsonField(projeto.enviosHomologacao, []),
+  documentosHomologacao: parseJsonField(projeto.documentosHomologacao, []),
+  timeline: parseJsonField(projeto.timeline, []),
 });
+
+const timelineEvent = ({ tipo, titulo, descricao, responsavel }) => ({
+  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  tipo,
+  titulo,
+  descricao,
+  responsavel,
+  data: new Date().toISOString(),
+});
+
+const appendProjetoTimeline = (projeto, event) => [
+  event,
+  ...parseJsonField(projeto.timeline, []).slice(0, 79),
+];
 
 const parseOs = (os = {}) => ({
   ...os,
@@ -1551,6 +1624,118 @@ const sendContratoPdf = async (res, contrato) => {
   res.send(pdf);
 };
 
+const buildOrcamentoPdf = async (orcamento) => {
+  const dimensionamento = parseJsonField(orcamento.dimensionamento, {});
+  const financeiro = parseJsonField(orcamento.financeiro, {});
+  const template = await getContractTemplate();
+  const logoPath = path.join(__dirname, '../frontend/public/assets/logo.png');
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 44, info: { Title: `Orçamento Solar #${orcamento.id}` } });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const orange = '#F97316';
+    const dark = '#111827';
+    const muted = '#64748B';
+    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const ensureSpace = (height = 70) => {
+      if (doc.y + height > doc.page.height - doc.page.margins.bottom) doc.addPage();
+    };
+    const sectionTitle = (title) => {
+      ensureSpace(40);
+      doc.moveDown(0.75).font('Helvetica-Bold').fontSize(12).fillColor(orange).text(title.toUpperCase());
+      doc.moveDown(0.25).strokeColor('#E2E8F0').moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.margins.left + pageWidth, doc.y).stroke();
+      doc.moveDown(0.55);
+    };
+    const infoRow = (label, value) => {
+      ensureSpace(30);
+      const startY = doc.y;
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(muted).text(String(label).toUpperCase(), doc.page.margins.left, startY, { width: 150 });
+      doc.font('Helvetica').fontSize(10).fillColor(dark).text(String(value || 'Não informado'), doc.page.margins.left + 155, startY, { width: pageWidth - 155 });
+      doc.y = Math.max(doc.y, startY + 22);
+      doc.strokeColor('#EEF2F7').moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.margins.left + pageWidth, doc.y).stroke();
+      doc.moveDown(0.35);
+    };
+    const metricCard = (x, y, width, label, value) => {
+      doc.roundedRect(x, y, width, 58, 8).fillAndStroke('#FFF7ED', '#FED7AA');
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#9A3412').text(label.toUpperCase(), x + 10, y + 10, { width: width - 20 });
+      doc.font('Helvetica-Bold').fontSize(15).fillColor(dark).text(String(value || '-'), x + 10, y + 28, { width: width - 20 });
+    };
+
+    if (fs.existsSync(logoPath)) doc.image(logoPath, doc.page.margins.left, 34, { fit: [110, 58] });
+    doc.font('Helvetica-Bold').fontSize(20).fillColor(dark).text('PROPOSTA COMERCIAL SOLAR', 170, 38, { width: pageWidth - 125, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(orange).text(`ORÇAMENTO #${orcamento.id} - ${formatDateBr(orcamento.data)}`, 170, 72, { width: pageWidth - 125, align: 'right' });
+    doc.font('Helvetica').fontSize(8.5).fillColor(muted).text(template.empresa.nome || 'DRM Energia Solar', 170, 88, { width: pageWidth - 125, align: 'right' });
+    doc.moveTo(doc.page.margins.left, 112).lineTo(doc.page.margins.left + pageWidth, 112).lineWidth(2).strokeColor(orange).stroke();
+    doc.y = 132;
+
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(dark).text(`Olá, ${orcamento.clienteNome || 'cliente'}!`);
+    doc.font('Helvetica').fontSize(10).fillColor(muted).text('Esta proposta apresenta o dimensionamento do sistema fotovoltaico, equipamentos previstos, geração estimada e condições comerciais para análise antes da emissão do contrato.', { lineGap: 3 });
+
+    const cardY = doc.y + 16;
+    const cardWidth = (pageWidth - 24) / 4;
+    metricCard(doc.page.margins.left, cardY, cardWidth, 'Potência', `${dimensionamento.potencia_real_instalada_kwp || 0} kWp`);
+    metricCard(doc.page.margins.left + cardWidth + 8, cardY, cardWidth, 'Geração', `${dimensionamento.geracao_estimada_kwh || 0} kWh/mês`);
+    metricCard(doc.page.margins.left + (cardWidth + 8) * 2, cardY, cardWidth, 'Área', `${dimensionamento.area_ocupada_m2 || 0} m²`);
+    metricCard(doc.page.margins.left + (cardWidth + 8) * 3, cardY, cardWidth, 'Valor', formatCurrency(financeiro.preco_final_cliente_rs));
+    doc.y = cardY + 76;
+
+    sectionTitle('Cliente');
+    infoRow('Nome', orcamento.clienteNome);
+    infoRow('Cidade', orcamento.clienteCidade);
+    infoRow('Contato', orcamento.clienteTelefone);
+    infoRow('E-mail', orcamento.clienteEmail);
+
+    sectionTitle('Sistema fotovoltaico');
+    infoRow('Potência da placa', `${dimensionamento.potencia_placa_w || 0} W`);
+    infoRow('Modelo da placa', dimensionamento.placa_modelo);
+    infoRow('Quantidade de placas', dimensionamento.numero_paineis_necessarios);
+    infoRow('Potência do inversor', `${dimensionamento.potencia_inversor_kw || 0} kW`);
+    infoRow('Modelo do inversor', dimensionamento.inversor_modelo);
+    infoRow('Quantidade de inversores', dimensionamento.quantidade_inversores || 1);
+    infoRow('Cabo CC', dimensionamento.quantidade_cabo_cc);
+    infoRow('Área ocupada', `${dimensionamento.area_ocupada_m2 || 0} m²`);
+
+    sectionTitle('Geração e premissas');
+    infoRow('Geração mensal estimada', `${dimensionamento.geracao_estimada_kwh || 0} kWh`);
+    infoRow('Geração anual estimada', `${dimensionamento.geracao_anual_kwh || 0} kWh`);
+    infoRow('Irradiação solar', dimensionamento.irradiacao_solar ? `${dimensionamento.irradiacao_solar} kWh/m²/dia` : 'Informada manualmente');
+    infoRow('Perda média considerada', `${dimensionamento.perda_percentual || 20}%`);
+    infoRow('Observações', dimensionamento.observacoes);
+
+    sectionTitle('Condições comerciais');
+    infoRow('Valor do sistema', formatCurrency(financeiro.preco_final_cliente_rs));
+    infoRow('Forma de pagamento', financeiro.forma_pagamento);
+    infoRow('Condições', financeiro.condicoes_pagamento);
+    infoRow('Validade', 'Condição sujeita à disponibilidade de equipamentos e análise final do local.');
+
+    ensureSpace(90);
+    doc.moveDown(1.2).font('Helvetica-Bold').fontSize(10).fillColor(dark).text('DRM Energia Solar', { align: 'center' });
+    doc.font('Helvetica').fontSize(8.5).fillColor(muted).text(`${template.empresa.telefone || ''} ${template.empresa.email ? `• ${template.empresa.email}` : ''}`, { align: 'center' });
+
+    doc.end();
+  });
+};
+
+const sendOrcamentoPdf = async (res, orcamento) => {
+  const safeClientName = String(orcamento.clienteNome || 'cliente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+  const fileName = `orcamento-solar-${orcamento.id}-${safeClientName || 'cliente'}.pdf`;
+  const pdf = await buildOrcamentoPdf(orcamento);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Length', pdf.length);
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.send(pdf);
+};
+
 (async () => {
   if (!fs.existsSync(DB_PATH) && fs.existsSync(TEMPLATE_DB_PATH)) {
     fs.copyFileSync(TEMPLATE_DB_PATH, DB_PATH);
@@ -1706,6 +1891,10 @@ const sendContratoPdf = async (res, contrato) => {
       previsaoLigacao TEXT,
       equipamentoEntregueAt TEXT,
       medidorTrocadoAt TEXT,
+      pendenciasHomologacao TEXT,
+      enviosHomologacao TEXT,
+      documentosHomologacao TEXT,
+      timeline TEXT,
       updatedAt TEXT,
       FOREIGN KEY (contratoId) REFERENCES contratos(id)
     );
@@ -1999,6 +2188,10 @@ const sendContratoPdf = async (res, contrato) => {
     ['previsaoLigacao', 'TEXT'],
     ['equipamentoEntregueAt', 'TEXT'],
     ['medidorTrocadoAt', 'TEXT'],
+    ['pendenciasHomologacao', 'TEXT'],
+    ['enviosHomologacao', 'TEXT'],
+    ['documentosHomologacao', 'TEXT'],
+    ['timeline', 'TEXT'],
   ]) {
     if (!existingProjetoColumns.includes(field)) {
       await db.exec(`ALTER TABLE projetos ADD COLUMN ${field} ${definition}`);
@@ -3059,6 +3252,97 @@ app.get('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'), 
   res.json(parsedOrcamentos);
 });
 
+app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'), async (req, res) => {
+  const { clienteId, dimensionamento = {}, financeiro = {}, status = 'Orçamento manual' } = req.body;
+  if (!clienteId) return res.status(400).json({ message: 'Selecione um cliente para criar o orçamento.' });
+
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', clienteId);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+
+  const potenciaPlacaW = Number(dimensionamento.potencia_placa_w || dimensionamento.potenciaPlacaW || 0);
+  const numeroPaineis = Number(dimensionamento.numero_paineis_necessarios || dimensionamento.numeroPaineis || 0);
+  const potenciaKwp = Number(dimensionamento.potencia_real_instalada_kwp || ((potenciaPlacaW * numeroPaineis) / 1000) || 0);
+  const areaOcupada = Number(dimensionamento.area_ocupada_m2 || (numeroPaineis * 2.6) || 0);
+  const irradiacao = Number(dimensionamento.irradiacao_solar || dimensionamento.irradiacaoSolar || 0);
+  const perdaPercentual = Number(dimensionamento.perda_percentual || dimensionamento.perdaPercentual || 20);
+  const geracaoCalculada = potenciaKwp && irradiacao
+    ? potenciaKwp * irradiacao * 30 * (1 - perdaPercentual / 100)
+    : 0;
+  const geracaoMensal = Number(dimensionamento.geracao_estimada_kwh || geracaoCalculada || 0);
+  const data = new Date().toISOString().split('T')[0];
+  const ownerId = req.user.id || null;
+  const ownerName = req.user.nome || req.user.username || null;
+
+  const normalizedDimensionamento = {
+    ...dimensionamento,
+    potencia_placa_w: potenciaPlacaW,
+    placa_modelo: dimensionamento.placa_modelo || dimensionamento.placaModelo || '',
+    numero_paineis_necessarios: numeroPaineis,
+    potencia_real_instalada_kwp: Number(potenciaKwp.toFixed(2)),
+    area_ocupada_m2: Number(areaOcupada.toFixed(2)),
+    potencia_inversor_kw: Number(dimensionamento.potencia_inversor_kw || dimensionamento.potenciaInversorKw || 0),
+    inversor_modelo: dimensionamento.inversor_modelo || dimensionamento.inversorModelo || '',
+    quantidade_inversores: Number(dimensionamento.quantidade_inversores || 1),
+    quantidade_cabo_cc: dimensionamento.quantidade_cabo_cc || dimensionamento.quantidadeCabo || '',
+    irradiacao_solar: irradiacao,
+    perda_percentual: perdaPercentual,
+    geracao_estimada_kwh: Number(geracaoMensal.toFixed(2)),
+    geracao_anual_kwh: Number((geracaoMensal * 12).toFixed(2)),
+    cidade_base: dimensionamento.cidade_base || cliente.cidade || '',
+    origem: 'Orçamento interno',
+  };
+  const normalizedFinanceiro = {
+    ...financeiro,
+    preco_final_cliente_rs: Number(financeiro.preco_final_cliente_rs || financeiro.valorSistema || 0),
+    forma_pagamento: financeiro.forma_pagamento || financeiro.formaPagamento || '',
+    condicoes_pagamento: financeiro.condicoes_pagamento || financeiro.condicoesPagamento || '',
+  };
+
+  const result = await db.run(
+    `INSERT INTO orcamentos
+      (clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, status, data, dimensionamento, financeiro, assignedUserId, assignedUserName)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    cliente.id,
+    cliente.nome,
+    cliente.whatsapp,
+    cliente.email,
+    cliente.cidade,
+    status,
+    data,
+    JSON.stringify(normalizedDimensionamento),
+    JSON.stringify(normalizedFinanceiro),
+    ownerId,
+    ownerName
+  );
+
+  const orcamento = {
+    id: result.lastID,
+    clienteId: cliente.id,
+    clienteNome: cliente.nome,
+    clienteTelefone: cliente.whatsapp,
+    clienteEmail: cliente.email,
+    clienteCidade: cliente.cidade,
+    status,
+    data,
+    dimensionamento: normalizedDimensionamento,
+    financeiro: normalizedFinanceiro,
+    assignedUserId: ownerId,
+    assignedUserName: ownerName,
+  };
+
+  io.emit('novo_orcamento', orcamento);
+  res.status(201).json(orcamento);
+});
+
+app.get('/api/admin/orcamentos/:id/download', authRequired, requirePermission('orcamentos'), async (req, res) => {
+  const orcamento = await db.get('SELECT * FROM orcamentos WHERE id = ?', req.params.id);
+  if (!orcamento) return res.status(404).json({ message: 'Orçamento não encontrado.' });
+  if (!can(req.user, 'verTodosLeads') && orcamento.assignedUserId !== req.user.id) {
+    return res.status(403).json({ message: 'Este orçamento pertence a outro responsável.' });
+  }
+  await sendOrcamentoPdf(res, orcamento);
+});
+
 app.get('/api/admin/contrato-config', authRequired, requirePermission('contratos'), async (req, res) => {
   res.json(await getContractTemplate());
 });
@@ -3616,7 +3900,8 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
   }
 
   const { etapa, prioridade, responsavelId, observacoes, prazoPrevisto, checklist, instalacaoAgendada, previsaoLigacao, equipamentoEntregueAt, medidorTrocadoAt } = req.body;
-  if (etapa && !PROJECT_STAGES.includes(etapa)) {
+  const normalizedEtapa = etapa ? normalizeProjectStage(etapa) : null;
+  if (normalizedEtapa && !PROJECT_STAGES.includes(normalizedEtapa)) {
     return res.status(400).json({ message: 'Etapa de projeto inválida.' });
   }
 
@@ -3625,6 +3910,16 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
     const user = await db.get('SELECT nome FROM usuarios WHERE id = ?', responsavelId);
     responsavelNome = user?.nome || null;
   }
+
+  const timeline = parseJsonField(projeto.timeline, []);
+  const nextTimeline = normalizedEtapa && normalizedEtapa !== normalizeProjectStage(projeto.etapa)
+    ? appendProjetoTimeline(projeto, timelineEvent({
+      tipo: 'etapa',
+      titulo: `Etapa alterada para ${normalizedEtapa}`,
+      descricao: `Movimento operacional registrado no workflow de homologação.`,
+      responsavel: req.user.nome || req.user.username || 'Equipe DRM',
+    }))
+    : timeline;
 
   await db.run(
     `UPDATE projetos
@@ -3639,9 +3934,10 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
          previsaoLigacao = COALESCE(?, previsaoLigacao),
          equipamentoEntregueAt = COALESCE(?, equipamentoEntregueAt),
          medidorTrocadoAt = COALESCE(?, medidorTrocadoAt),
+         timeline = COALESCE(?, timeline),
          updatedAt = ?
      WHERE id = ?`,
-    etapa || null,
+    normalizedEtapa || null,
     prioridade || null,
     responsavelId || null,
     responsavelNome,
@@ -3652,13 +3948,14 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
     previsaoLigacao || null,
     equipamentoEntregueAt || null,
     medidorTrocadoAt || null,
+    JSON.stringify(nextTimeline),
     new Date().toISOString(),
     req.params.id
   );
 
   const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id));
   const changeMessages = [];
-  if (etapa && etapa !== projeto.etapa) changeMessages.push(`Seu projeto avançou para a etapa: ${etapa}.`);
+  if (normalizedEtapa && normalizedEtapa !== normalizeProjectStage(projeto.etapa)) changeMessages.push(`Seu projeto avançou para a etapa: ${normalizedEtapa}.`);
   if (prazoPrevisto && prazoPrevisto !== projeto.prazoPrevisto) changeMessages.push(`A previsão de entrega foi atualizada para ${new Date(prazoPrevisto).toLocaleDateString('pt-BR')}.`);
   if (instalacaoAgendada && instalacaoAgendada !== projeto.instalacaoAgendada) changeMessages.push(`Sua instalação foi agendada para ${new Date(instalacaoAgendada).toLocaleString('pt-BR')}.`);
   if (previsaoLigacao && previsaoLigacao !== projeto.previsaoLigacao) changeMessages.push(`A previsão da ligação pela Equatorial foi atualizada para ${new Date(previsaoLigacao).toLocaleDateString('pt-BR')}.`);
@@ -3673,6 +3970,173 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
   }
   io.emit('projeto_atualizado', updated);
   res.json(updated);
+});
+
+app.post('/api/admin/projetos/:id/pendencias', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
+  if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
+  if (!can(req.user, 'verTodosLeads') && projeto.responsavelId !== req.user.id) {
+    return res.status(403).json({ message: 'Este projeto pertence a outro responsável.' });
+  }
+
+  const now = new Date().toISOString();
+  const pendencia = {
+    id: `pend-${Date.now()}`,
+    tipo: String(req.body.tipo || 'Pendência da concessionária').trim(),
+    descricao: String(req.body.descricao || '').trim(),
+    origem: String(req.body.origem || 'Concessionária').trim(),
+    prazo: req.body.prazo || '',
+    responsavel: String(req.body.responsavel || req.user.nome || req.user.username || 'Equipe DRM').trim(),
+    anexos: Array.isArray(req.body.anexos) ? req.body.anexos : [],
+    status: String(req.body.status || 'Aberta').trim(),
+    dataAbertura: now,
+    dataCorrecao: '',
+    observacoes: String(req.body.observacoes || '').trim(),
+  };
+
+  if (!pendencia.descricao) {
+    return res.status(400).json({ message: 'Descreva a pendência antes de salvar.' });
+  }
+
+  const pendencias = [pendencia, ...parseJsonField(projeto.pendenciasHomologacao, [])];
+  const checklist = {
+    ...parseJsonField(projeto.checklist, {}),
+    pendenciaConcessionaria: true,
+  };
+  const timeline = appendProjetoTimeline(projeto, timelineEvent({
+    tipo: 'pendencia',
+    titulo: `${pendencia.tipo} registrada`,
+    descricao: pendencia.descricao,
+    responsavel: pendencia.responsavel,
+  }));
+
+  await db.run(
+    `UPDATE projetos
+     SET etapa = ?, pendenciasHomologacao = ?, checklist = ?, timeline = ?, updatedAt = ?
+     WHERE id = ?`,
+    'Pendência da concessionária',
+    JSON.stringify(pendencias),
+    JSON.stringify(checklist),
+    JSON.stringify(timeline),
+    now,
+    req.params.id
+  );
+
+  await notifyClientByContract(projeto.contratoId, {
+    projetoId: projeto.id,
+    type: 'homologacao',
+    title: 'Pendência na homologação',
+    message: `Registramos uma pendência: ${pendencia.tipo}. A equipe DRM já está acompanhando a correção.`,
+  });
+
+  const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id));
+  io.emit('projeto_atualizado', updated);
+  res.status(201).json(updated);
+});
+
+app.put('/api/admin/projetos/:id/pendencias/:pendenciaId', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
+  if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
+  if (!can(req.user, 'verTodosLeads') && projeto.responsavelId !== req.user.id) {
+    return res.status(403).json({ message: 'Este projeto pertence a outro responsável.' });
+  }
+
+  const now = new Date().toISOString();
+  const pendencias = parseJsonField(projeto.pendenciasHomologacao, []);
+  let found = false;
+  const updatedPendencias = pendencias.map(item => {
+    if (item.id !== req.params.pendenciaId) return item;
+    found = true;
+    const status = req.body.status || item.status;
+    return {
+      ...item,
+      ...req.body,
+      status,
+      dataCorrecao: status === 'Corrigida' || status === 'Concluída' ? (item.dataCorrecao || now) : item.dataCorrecao,
+      updatedAt: now,
+    };
+  });
+  if (!found) return res.status(404).json({ message: 'Pendência não encontrada.' });
+
+  const hasOpenPendencias = updatedPendencias.some(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status));
+  const timeline = appendProjetoTimeline(projeto, timelineEvent({
+    tipo: 'pendencia',
+    titulo: `Pendência ${req.body.status || 'atualizada'}`,
+    descricao: req.body.observacoes || req.body.descricao || 'Atualização registrada no workflow.',
+    responsavel: req.user.nome || req.user.username || 'Equipe DRM',
+  }));
+
+  await db.run(
+    `UPDATE projetos
+     SET etapa = ?, pendenciasHomologacao = ?, timeline = ?, updatedAt = ?
+     WHERE id = ?`,
+    hasOpenPendencias ? 'Pendência da concessionária' : 'Corrigir projeto',
+    JSON.stringify(updatedPendencias),
+    JSON.stringify(timeline),
+    now,
+    req.params.id
+  );
+
+  const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id));
+  io.emit('projeto_atualizado', updated);
+  res.json(updated);
+});
+
+app.post('/api/admin/projetos/:id/envios-homologacao', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
+  if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
+  if (!can(req.user, 'verTodosLeads') && projeto.responsavelId !== req.user.id) {
+    return res.status(403).json({ message: 'Este projeto pertence a outro responsável.' });
+  }
+
+  const now = new Date().toISOString();
+  const envios = parseJsonField(projeto.enviosHomologacao, []);
+  const envio = {
+    id: `envio-${Date.now()}`,
+    numero: envios.length + 1,
+    protocolo: String(req.body.protocolo || '').trim(),
+    tipo: String(req.body.tipo || (envios.length ? 'Reenvio' : 'Envio inicial')).trim(),
+    status: String(req.body.status || 'Enviado').trim(),
+    resposta: String(req.body.resposta || '').trim(),
+    responsavel: String(req.body.responsavel || req.user.nome || req.user.username || 'Equipe DRM').trim(),
+    dataEnvio: req.body.dataEnvio || now,
+    anexos: Array.isArray(req.body.anexos) ? req.body.anexos : [],
+  };
+  const nextEtapa = envio.tipo.toLowerCase().includes('reenvio') ? 'Reenviar projeto' : 'Projeto enviado';
+  const checklist = {
+    ...parseJsonField(projeto.checklist, {}),
+    projetoEnviado: true,
+    projetoReenviado: envios.length > 0 || undefined,
+  };
+  const timeline = appendProjetoTimeline(projeto, timelineEvent({
+    tipo: 'envio',
+    titulo: `${envio.tipo} #${envio.numero}`,
+    descricao: envio.protocolo ? `Protocolo ${envio.protocolo}` : 'Envio registrado para a concessionária.',
+    responsavel: envio.responsavel,
+  }));
+
+  await db.run(
+    `UPDATE projetos
+     SET etapa = ?, enviosHomologacao = ?, checklist = ?, timeline = ?, updatedAt = ?
+     WHERE id = ?`,
+    nextEtapa,
+    JSON.stringify([envio, ...envios]),
+    JSON.stringify(checklist),
+    JSON.stringify(timeline),
+    now,
+    req.params.id
+  );
+
+  await notifyClientByContract(projeto.contratoId, {
+    projetoId: projeto.id,
+    type: 'homologacao',
+    title: 'Projeto enviado para homologação',
+    message: envio.protocolo ? `Envio registrado com protocolo ${envio.protocolo}.` : 'O projeto foi enviado para análise da concessionária.',
+  });
+
+  const updated = parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id));
+  io.emit('projeto_atualizado', updated);
+  res.status(201).json(updated);
 });
 
 const getAuthorizedProjeto = async (req, res) => {
@@ -3867,7 +4331,7 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
   }, {});
   const projetosPorEtapa = PROJECT_STAGES.map(etapa => ({
     etapa,
-    total: projetos.filter(projeto => projeto.etapa === etapa).length,
+    total: projetos.filter(projeto => normalizeProjectStage(projeto.etapa) === etapa).length,
   }));
   const analyticsByType = siteEvents.reduce((acc, event) => {
     acc[event.type] = (acc[event.type] || 0) + 1;
@@ -3915,7 +4379,7 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
       valorPendenteContratos,
       osAbertas,
       osEmAtendimento,
-      projetosAtivos: projetos.filter(projeto => projeto.etapa !== 'Concluído').length,
+      projetosAtivos: projetos.filter(projeto => normalizeProjectStage(projeto.etapa) !== 'Projeto concluído').length,
       valorAprovadoMes,
       retornosSemana: leads.filter(lead => isBetween(lead.proximoRetorno, fimSemana)).length,
       clientesSemEmailVerificado: emailsPendentesClientes,
@@ -3961,7 +4425,7 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
       .sort((a, b) => new Date(a.proximoRetorno) - new Date(b.proximoRetorno))
       .slice(0, 8),
     projetosCriticos: projetos
-      .filter(projeto => projeto.etapa !== 'Concluído')
+      .filter(projeto => normalizeProjectStage(projeto.etapa) !== 'Projeto concluído')
       .sort((a, b) => new Date(a.prazoPrevisto || '2999-01-01') - new Date(b.prazoPrevisto || '2999-01-01'))
       .slice(0, 6)
       .map(parseProjeto),

@@ -161,9 +161,12 @@ function Dashboard() {
   const contractualDeadline = currentManual.prazoExecucao || currentEquipamento.prazoExecucao || 40;
   const progressSteps = [
     { key: 'contrato', label: 'Contrato DRM', done: selectedContrato?.status === 'Aprovado', detail: selectedContrato?.status === 'Aprovado' ? `Aprovado em ${dateBr(signedAt)}` : selectedContrato?.status || 'Pendente' },
-    { key: 'equipamento', label: 'Entrega do equipamento', done: Boolean(selectedProjeto?.equipamentoEntregueAt), detail: selectedProjeto?.equipamentoEntregueAt ? dateBr(selectedProjeto.equipamentoEntregueAt) : dateBr(selectedProjeto?.prazoPrevisto) },
-    { key: 'instalacao', label: 'Instalação', done: selectedProjeto?.checklist?.instalacao, detail: dateTimeBr(selectedProjeto?.instalacaoAgendada) },
-    { key: 'equatorial', label: 'Troca do medidor / ligação Equatorial', done: Boolean(selectedProjeto?.medidorTrocadoAt || selectedProjeto?.checklist?.medidorTrocado || selectedProjeto?.checklist?.sistemaLigado), detail: selectedProjeto?.medidorTrocadoAt ? dateBr(selectedProjeto.medidorTrocadoAt) : dateBr(selectedProjeto?.previsaoLigacao) },
+    { key: 'documentacao', label: 'Documentação', done: Boolean(selectedProjeto?.checklist?.documentacaoRecebida), detail: selectedProjeto?.checklist?.documentacaoRecebida ? 'Documentação recebida pela DRM.' : 'Aguardando validação dos documentos.' },
+    { key: 'art', label: 'ART/TRT', done: Boolean(selectedProjeto?.checklist?.artGerada && selectedProjeto?.checklist?.trtPaga), detail: selectedProjeto?.checklist?.trtPaga ? 'ART gerada e TRT paga.' : 'Etapa técnica/administrativa em andamento.' },
+    { key: 'envio', label: 'Envio à concessionária', done: Boolean(selectedProjeto?.checklist?.projetoEnviado || selectedProjeto?.enviosHomologacao?.length), detail: selectedProjeto?.enviosHomologacao?.[0]?.protocolo ? `Protocolo ${selectedProjeto.enviosHomologacao[0].protocolo}` : 'Aguardando envio ou protocolo.' },
+    { key: 'parecer', label: 'Parecer de acesso', done: Boolean(selectedProjeto?.checklist?.parecerAcesso), detail: selectedProjeto?.checklist?.parecerAcesso ? 'Parecer emitido.' : selectedProjeto?.etapa || 'Aguardando retorno.' },
+    { key: 'vistoria', label: 'Vistoria', done: Boolean(selectedProjeto?.checklist?.vistoriaFinal || selectedProjeto?.checklist?.protocoloVistoria), detail: selectedProjeto?.checklist?.vistoriaFinal ? 'Vistoria concluída.' : dateBr(selectedProjeto?.previsaoLigacao) },
+    { key: 'equatorial', label: 'Ligação / conclusão', done: Boolean(selectedProjeto?.medidorTrocadoAt || selectedProjeto?.checklist?.medidorTrocado || selectedProjeto?.checklist?.sistemaLigado), detail: selectedProjeto?.medidorTrocadoAt ? dateBr(selectedProjeto.medidorTrocadoAt) : dateBr(selectedProjeto?.previsaoLigacao) },
   ];
 
   const handleFiles = async (event) => {
