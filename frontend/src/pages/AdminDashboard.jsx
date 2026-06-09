@@ -423,6 +423,10 @@ const AdminDashboard = () => {
   const [orcClientPage, setOrcClientPage] = useState(1);
   const [selectedOrcClient, setSelectedOrcClient] = useState(null);
   const [contratoStatusFilter, setContratoStatusFilter] = useState('todos');
+  const [contratoSearch, setContratoSearch] = useState('');
+  const [contratoDateFrom, setContratoDateFrom] = useState('');
+  const [contratoDateTo, setContratoDateTo] = useState('');
+  const [contratoPage, setContratoPage] = useState(1);
   const [osStatusFilter, setOsStatusFilter] = useState('todos');
   const [userSearch, setUserSearch] = useState('');
   const [newUserForm, setNewUserForm] = useState(emptyUserForm);
@@ -704,13 +708,28 @@ const AdminDashboard = () => {
     };
   }, [budgetForm]);
 
-  const filteredContratos = useMemo(() => {
-    const filteredByStatus = contratoStatusFilter === 'todos'
-      ? contratos
-      : contratos.filter(contrato => contrato.status === contratoStatusFilter);
+  const CONTRATOS_PER_PAGE = 10;
 
-    return filteredByStatus;
-  }, [contratoStatusFilter, contratos]);
+  const filteredContratos = useMemo(() => {
+    let list = contratoStatusFilter === 'todos' ? contratos : contratos.filter(c => c.status === contratoStatusFilter);
+    if (contratoSearch.trim()) {
+      const q = contratoSearch.trim().toLowerCase();
+      list = list.filter(c => {
+        const num = `CT-${String(c.dataCriacao || '').slice(0, 4)}-${String(c.id).padStart(4, '0')}`.toLowerCase();
+        return String(c.clienteNome || '').toLowerCase().includes(q) || num.includes(q);
+      });
+    }
+    if (contratoDateFrom) list = list.filter(c => (c.dataCriacao || '') >= contratoDateFrom);
+    if (contratoDateTo)   list = list.filter(c => (c.dataCriacao || '') <= contratoDateTo);
+    return list;
+  }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo, contratos]);
+
+  const paginatedContratos = useMemo(() => {
+    const start = (contratoPage - 1) * CONTRATOS_PER_PAGE;
+    return filteredContratos.slice(start, start + CONTRATOS_PER_PAGE);
+  }, [filteredContratos, contratoPage]);
+
+  const contratoTotalPages = Math.max(1, Math.ceil(filteredContratos.length / CONTRATOS_PER_PAGE));
 
   const filteredProdutosPacotes = useMemo(() => {
     const search = produtoSearch.trim().toLowerCase();
@@ -867,6 +886,7 @@ const AdminDashboard = () => {
 
   useEffect(() => { setLeadsPage(1); }, [leadSearch, leadStatusFilter, leadOwnerFilter]);
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
+  useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
 
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
@@ -2727,165 +2747,290 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'contratos' && (
-            <div className="admin-section">
-              <div className="section-heading">
-                <div>
-                  <span className="section-kicker">Aprovação comercial</span>
-                  <h3>Contratos</h3>
-                  <p>A equipe pode gerar contratos, mas somente o Deivson/ADM aprova ou recusa antes de seguir com o cliente.</p>
+            <div className="ctr-screen">
+              <h3 className="ctr-page-title">Contratos</h3>
+
+              {/* ── Stats cards ── */}
+              <div className="ctr-stats-grid">
+                <div className="ctr-stat-card">
+                  <div className="ctr-stat-num">{contratoSummary.total}</div>
+                  <div className="ctr-stat-label">CONTRATOS</div>
+                  <div className="ctr-stat-desc">Total de contratos gerados</div>
                 </div>
-                <div className="section-stats">
-                  <div>
-                    <strong>{contratoSummary.total}</strong>
-                    <span>contratos</span>
+                <div className="ctr-stat-card ctr-stat-card-blue">
+                  <div className="ctr-stat-row">
+                    <div className="ctr-stat-num">{contratoSummary.pendentes}</div>
+                    <div className="ctr-stat-icon ctr-icon-blue">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z" fill="currentColor"/></svg>
+                    </div>
                   </div>
-                  <div>
-                    <strong>{contratoSummary.pendentes}</strong>
-                    <span>pendentes</span>
+                  <div className="ctr-stat-label">PENDENTES DE APROVAÇÃO</div>
+                  <div className="ctr-stat-desc">Aguardando validação do Sr. DRM</div>
+                </div>
+                <div className="ctr-stat-card ctr-stat-card-red">
+                  <div className="ctr-stat-row">
+                    <div className="ctr-stat-num">{contratoSummary.recusados}</div>
+                    <div className="ctr-stat-icon ctr-icon-red">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2Zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59Z" fill="currentColor"/></svg>
+                    </div>
                   </div>
-                  <div>
-                    <strong>{contratoSummary.aprovados}</strong>
-                    <span>aprovados</span>
+                  <div className="ctr-stat-label">REJEITADOS</div>
+                  <div className="ctr-stat-desc">Precisam de ajustes</div>
+                </div>
+                <div className="ctr-stat-card ctr-stat-card-green">
+                  <div className="ctr-stat-row">
+                    <div className="ctr-stat-num">{contratoSummary.aprovados}</div>
+                    <div className="ctr-stat-icon ctr-icon-green">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9Z" fill="currentColor"/></svg>
+                    </div>
+                  </div>
+                  <div className="ctr-stat-label">APROVADOS</div>
+                  <div className="ctr-stat-desc">Contratos disponíveis</div>
+                </div>
+              </div>
+
+              {/* ── Filters bar ── */}
+              <div className="admin-card ctr-filters-card">
+                <div className="ctr-filters-row">
+                  <div className="ctr-filter-group">
+                    <label className="ctr-filter-label">Filtros</label>
+                    <div className="ctr-filter-status-wrap">
+                      <span className="ctr-filter-status-label">Status</span>
+                      <select
+                        className="ctr-filter-select"
+                        value={contratoStatusFilter}
+                        onChange={(e) => setContratoStatusFilter(e.target.value)}
+                      >
+                        <option value="todos">Todos</option>
+                        <option value="Pendente">Pendente</option>
+                        <option value="Aprovado">Aprovado</option>
+                        <option value="Recusado">Recusado</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="ctr-filter-dates">
+                    <div className="ctr-filter-date-field">
+                      <label className="ctr-filter-label">Data inicial</label>
+                      <div className="ctr-date-input-wrap">
+                        <input
+                          type="date"
+                          className="ctr-date-input"
+                          value={contratoDateFrom}
+                          onChange={(e) => setContratoDateFrom(e.target.value)}
+                          placeholder="dd/mm/aaaa"
+                        />
+                      </div>
+                    </div>
+                    <div className="ctr-filter-date-field">
+                      <label className="ctr-filter-label">Data final</label>
+                      <div className="ctr-date-input-wrap">
+                        <input
+                          type="date"
+                          className="ctr-date-input"
+                          value={contratoDateTo}
+                          onChange={(e) => setContratoDateTo(e.target.value)}
+                          placeholder="dd/mm/aaaa"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="ctr-filter-search-wrap">
+                    <input
+                      className="ctr-filter-search"
+                      placeholder="Buscar por cliente ou número do contrato..."
+                      value={contratoSearch}
+                      onChange={(e) => setContratoSearch(e.target.value)}
+                    />
+                    <svg className="ctr-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12A6 6 0 0 1 10 4Z" fill="currentColor"/></svg>
                   </div>
                 </div>
               </div>
 
-              <div className="contratos-grid">
-                <div className="admin-card list-orcamentos">
-                  <div className="card-header-flex compact">
-                    <h3>Fila de análise</h3>
-                    <span className="status-badge warning">{contratoSummary.pendentes} pendentes</span>
-                  </div>
-                  <div className="ops-toolbar single">
-                    <div className="lead-filter-pills" aria-label="Filtros de contrato">
-                      {['todos', 'Pendente', 'Aprovado', 'Recusado'].map(status => (
-                        <button
-                          type="button"
-                          key={status}
-                          className={contratoStatusFilter === status ? 'active' : ''}
-                          onClick={() => setContratoStatusFilter(status)}
-                        >
-                          {status === 'todos' ? 'Todos' : status}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="orcamentos-scroll contratos-scroll">
-                    {filteredContratos.map(contrato => (
-                      <button
-                        key={contrato.id}
-                        className={`contrato-item ${selectedContrato?.id === contrato.id ? 'active' : ''}`}
-                        onClick={() => setSelectedContrato(contrato)}
-                      >
-                        <div>
-                          <strong>{contrato.clienteNome}</strong>
-                          <span>{money(contrato.valorProjeto)} • {contrato.criadoPorNome}</span>
-                        </div>
-                        <span className={`status-badge ${contrato.status === 'Aprovado' ? 'success' : contrato.status === 'Recusado' ? 'danger' : 'warning'}`}>
-                          {contrato.status}
-                        </span>
-                      </button>
-                    ))}
-                    {filteredContratos.length === 0 && (
-                      <div className="empty-inline">
-                        <strong>Nenhum contrato nesta visão</strong>
-                        <span>Mude o filtro ou abra uma simulação para gerar contrato.</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="admin-card contrato-detalhes">
-                  {selectedContrato ? (
-                    <>
-                      <div className="contract-header">
-                        <div>
-                          <span className="section-kicker">Contrato #{selectedContrato.id}</span>
-                          <h3>{selectedContrato.clienteNome}</h3>
-                          <p>Gerado por {selectedContrato.criadoPorNome} e aguardando validação administrativa.</p>
-                        </div>
-                        <span className={`status-badge ${selectedContrato.status === 'Aprovado' ? 'success' : selectedContrato.status === 'Recusado' ? 'danger' : 'warning'}`}>
-                          {selectedContrato.status}
-                        </span>
-                      </div>
-
-                      <div className="lead-contact-summary">
-                        <div><span>Telefone</span><strong>{selectedContrato.clienteTelefone || 'Não informado'}</strong></div>
-                        <div><span>E-mail</span><strong>{selectedContrato.clienteEmail || 'Não informado'}</strong></div>
-                        <div><span>Cidade</span><strong>{selectedContrato.clienteCidade || 'Não informado'}</strong></div>
-                        <div><span>Responsável</span><strong>{getResponsibleName(selectedContrato.assignedUserName)}</strong></div>
-                      </div>
-
-                      <div className="detalhes-grid">
-                        <div className="detalhe-item highlight"><span className="detalhe-titulo">Valor do contrato</span><span className="detalhe-valor">{money(selectedContrato.valorProjeto)}</span></div>
-                        <div className="detalhe-item"><span className="detalhe-titulo">Potência</span><span className="detalhe-valor">{selectedContrato.dados?.manual?.potenciaKwp || selectedContrato.dados?.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</span></div>
-                        <div className="detalhe-item"><span className="detalhe-titulo">Painéis</span><span className="detalhe-valor">{selectedContrato.dados?.dimensionamento?.numero_paineis_necessarios || 0}</span></div>
-                        <div className="detalhe-item"><span className="detalhe-titulo">Geração estimada</span><span className="detalhe-valor">{selectedContrato.dados?.manual?.geracaoKwh || selectedContrato.dados?.dimensionamento?.geracao_estimada_kwh || 0} kWh</span></div>
-                        <div className="detalhe-item"><span className="detalhe-titulo">Placa</span><span className="detalhe-valor">{selectedContrato.equipamentoDados?.placaModelo || 'Não informado'}</span></div>
-                        <div className="detalhe-item"><span className="detalhe-titulo">Inversor</span><span className="detalhe-valor">{selectedContrato.equipamentoDados?.inversorModelo || 'Não informado'}</span></div>
-                        <div className="detalhe-item"><span className="detalhe-titulo">Cabo</span><span className="detalhe-valor">{selectedContrato.dados?.manual?.quantidadeCabo || 'Não informado'}</span></div>
-                        <div className="detalhe-item"><span className="detalhe-titulo">Pagamento</span><span className="detalhe-valor">{selectedContrato.dados?.manual?.formaPagamento || 'Não informado'}</span></div>
-                      </div>
-
-                      {selectedContrato.observacaoAnalise && (
-                        <div className="contract-note">
-                          <span>Observação da análise</span>
-                          <p>{selectedContrato.observacaoAnalise}</p>
-                        </div>
-                      )}
-
-                      {adminUser.role === 'ADM' && selectedContrato.status === 'Pendente' && (
-                        <div className="review-box">
-                          <label htmlFor="review-note">Observação para a equipe</label>
-                          <textarea
-                            id="review-note"
-                            placeholder="Ex: revisar condição de pagamento, documentação ok, valor aprovado..."
-                            value={reviewNote}
-                            onChange={(event) => {
-                              setReviewNote(event.target.value);
-                              if (reviewError) setReviewError('');
-                            }}
-                          />
-                          {reviewError && <p className="review-error">{reviewError}</p>}
-                          <div className="actions-footer">
-                            <button className="btn btn-outline" onClick={() => revisarContrato(selectedContrato.id, 'Recusado')}>Recusar</button>
-                            <button className="btn btn-primary" onClick={() => revisarContrato(selectedContrato.id, 'Aprovado')}>Aprovar contrato</button>
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedContrato.status === 'Aprovado' && (
-                        <div className="approved-actions">
-                          <div>
-                            <strong>Contrato liberado</strong>
-                            <span>Agora o arquivo pode ser baixado e enviado para o cliente.</span>
-                          </div>
-                          <div className="approved-actions-buttons">
-                            <a className="btn btn-outline" href={getContratoDownloadUrl(selectedContrato.id)} target="_blank" rel="noopener noreferrer">
-                              Baixar contrato
-                            </a>
-                            <a
-                              className="btn btn-primary"
-                              href={`https://wa.me/55${String(selectedContrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência e te orientar nos próximos passos da instalação.')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Enviar ao cliente
-                            </a>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="empty-state-orcamento">
-                      <span className="icon">CT</span>
-                      <h4>Selecione um contrato</h4>
-                      <p>Escolha um contrato na fila para ver detalhes e análise.</p>
+              {/* ── Table ── */}
+              <div className="admin-card ctr-table-card">
+                <div className="ctr-table-wrap">
+                  <table className="ctr-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Nº CONTRATO</th>
+                        <th>CLIENTE</th>
+                        <th>DATA DO CONTRATO</th>
+                        <th>VALOR TOTAL</th>
+                        <th>STATUS</th>
+                        <th>RESPONSÁVEL</th>
+                        <th>AÇÕES</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedContratos.map((contrato, idx) => {
+                        const year = String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear();
+                        const numContrato = `CT-${year}-${String(contrato.id).padStart(4, '0')}`;
+                        const dataFormatada = contrato.dataCriacao
+                          ? contrato.dataCriacao.split('-').reverse().join('/')
+                          : '—';
+                        const isSelected = selectedContrato?.id === contrato.id;
+                        return (
+                          <tr
+                            key={contrato.id}
+                            className={isSelected ? 'ctr-row-selected' : ''}
+                            onClick={() => setSelectedContrato(isSelected ? null : contrato)}
+                          >
+                            <td className="ctr-td-id">#{String((contratoPage - 1) * CONTRATOS_PER_PAGE + idx + 1).padStart(4, '0').replace(/^0+/, '') || 1}</td>
+                            <td className="ctr-td-num">{numContrato}</td>
+                            <td className="ctr-td-cliente">{contrato.clienteNome}</td>
+                            <td>{dataFormatada}</td>
+                            <td className="ctr-td-valor">{money(contrato.valorProjeto)}</td>
+                            <td>
+                              <span className={`ctr-status-badge ${contrato.status === 'Aprovado' ? 'ctr-status-aprovado' : contrato.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente'}`}>
+                                {contrato.status}
+                              </span>
+                            </td>
+                            <td>{getResponsibleName(contrato.assignedUserName) || contrato.criadoPorNome}</td>
+                            <td>
+                              <div className="ctr-table-actions" onClick={e => e.stopPropagation()}>
+                                {contrato.status === 'Aprovado' && (
+                                  <a
+                                    className="orc-action-btn"
+                                    href={getContratoDownloadUrl(contrato.id)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Baixar contrato PDF"
+                                  >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-18v12l-5-5-1.4 1.4L12 17l6.4-6.6L17 9l-5 5V2h-2Z" fill="currentColor"/></svg>
+                                  </a>
+                                )}
+                                <a
+                                  className="orc-action-btn orc-action-wa"
+                                  href={`https://wa.me/55${String(contrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência.')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Enviar via WhatsApp"
+                                >
+                                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" fill="currentColor"/></svg>
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {paginatedContratos.length === 0 && (
+                    <div className="ctr-empty">
+                      <p>Nenhum contrato encontrado para os filtros selecionados.</p>
                     </div>
                   )}
                 </div>
+
+                {/* Pagination */}
+                <div className="ctr-pagination">
+                  <span>Exibindo {filteredContratos.length === 0 ? 0 : Math.min((contratoPage - 1) * CONTRATOS_PER_PAGE + 1, filteredContratos.length)} a {Math.min(contratoPage * CONTRATOS_PER_PAGE, filteredContratos.length)} de {filteredContratos.length} contrato{filteredContratos.length !== 1 ? 's' : ''}</span>
+                  <div className="orc-pagination-btns">
+                    <button type="button" className="orc-page-btn orc-page-nav" disabled={contratoPage <= 1} onClick={() => setContratoPage(p => Math.max(1, p - 1))}>‹</button>
+                    {Array.from({ length: contratoTotalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === contratoTotalPages || Math.abs(p - contratoPage) <= 1)
+                      .reduce((acc, p, idx, arr) => {
+                        if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((item, idx) => item === '...'
+                        ? <span key={`dots-${idx}`} className="orc-page-dots">…</span>
+                        : <button key={item} type="button" className={`orc-page-btn ${item === contratoPage ? 'active' : ''}`} onClick={() => setContratoPage(item)}>{item}</button>
+                      )}
+                    <button type="button" className="orc-page-btn orc-page-nav" disabled={contratoPage >= contratoTotalPages} onClick={() => setContratoPage(p => Math.min(contratoTotalPages, p + 1))}>›</button>
+                  </div>
+                </div>
               </div>
 
+              {/* ── Selected contract detail / ADM review ── */}
+              {selectedContrato && (
+                <div className="admin-card ctr-detail-panel">
+                  <div className="ctr-detail-header">
+                    <div>
+                      <p className="ctr-detail-num">CT-{String(selectedContrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-{String(selectedContrato.id).padStart(4, '0')}</p>
+                      <h4>{selectedContrato.clienteNome}</h4>
+                      <p className="ctr-detail-meta">{[selectedContrato.clienteTelefone, selectedContrato.clienteEmail, selectedContrato.clienteCidade].filter(Boolean).join(' · ')}</p>
+                    </div>
+                    <div className="ctr-detail-header-right">
+                      <span className={`ctr-status-badge ${selectedContrato.status === 'Aprovado' ? 'ctr-status-aprovado' : selectedContrato.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente'}`}>
+                        {selectedContrato.status}
+                      </span>
+                      <button type="button" className="ctr-close-btn" onClick={() => setSelectedContrato(null)} aria-label="Fechar">✕</button>
+                    </div>
+                  </div>
+
+                  <div className="ctr-detail-grid">
+                    <div><span>Valor</span><strong>{money(selectedContrato.valorProjeto)}</strong></div>
+                    <div><span>Potência</span><strong>{selectedContrato.dados?.manual?.potenciaKwp || selectedContrato.dados?.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</strong></div>
+                    <div><span>Placa</span><strong>{selectedContrato.equipamentoDados?.placaModelo || '—'}</strong></div>
+                    <div><span>Inversor</span><strong>{selectedContrato.equipamentoDados?.inversorModelo || '—'}</strong></div>
+                    <div><span>Geração</span><strong>{selectedContrato.dados?.manual?.geracaoKwh || selectedContrato.dados?.dimensionamento?.geracao_estimada_kwh || 0} kWh/mês</strong></div>
+                    <div><span>Responsável</span><strong>{getResponsibleName(selectedContrato.assignedUserName)}</strong></div>
+                  </div>
+
+                  {selectedContrato.observacaoAnalise && (
+                    <div className="contract-note">
+                      <span>Observação da análise</span>
+                      <p>{selectedContrato.observacaoAnalise}</p>
+                    </div>
+                  )}
+
+                  {adminUser.role === 'ADM' && selectedContrato.status === 'Pendente' && (
+                    <div className="review-box">
+                      <label htmlFor="review-note">Observação para a equipe</label>
+                      <textarea
+                        id="review-note"
+                        placeholder="Ex: revisar condição de pagamento, documentação ok, valor aprovado..."
+                        value={reviewNote}
+                        onChange={(event) => { setReviewNote(event.target.value); if (reviewError) setReviewError(''); }}
+                      />
+                      {reviewError && <p className="review-error">{reviewError}</p>}
+                      <div className="actions-footer">
+                        <button className="btn btn-outline" onClick={() => revisarContrato(selectedContrato.id, 'Recusado')}>Recusar</button>
+                        <button className="btn btn-primary" onClick={() => revisarContrato(selectedContrato.id, 'Aprovado')}>Aprovar contrato</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedContrato.status === 'Aprovado' && (
+                    <div className="approved-actions">
+                      <div><strong>Contrato liberado</strong><span>O arquivo pode ser baixado e enviado para o cliente.</span></div>
+                      <div className="approved-actions-buttons">
+                        <a className="btn btn-outline" href={getContratoDownloadUrl(selectedContrato.id)} target="_blank" rel="noopener noreferrer">Baixar contrato</a>
+                        <a className="btn btn-primary" href={`https://wa.me/55${String(selectedContrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência e te orientar nos próximos passos da instalação.')}`} target="_blank" rel="noopener noreferrer">Enviar ao cliente</a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Bottom legend ── */}
+              <div className="ctr-legend">
+                <div className="ctr-legend-item">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="ctr-legend-icon ctr-legend-green"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9Z" fill="currentColor"/></svg>
+                  <div><strong>Aprovado</strong><p>Contrato validado pelo Sr. DRM e disponível para download/envio.</p></div>
+                </div>
+                <div className="ctr-legend-item">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="ctr-legend-icon ctr-legend-blue"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z" fill="currentColor"/></svg>
+                  <div><strong>Pendente</strong><p>Contrato aguardando validação do Sr. DRM.</p></div>
+                </div>
+                <div className="ctr-legend-item">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="ctr-legend-icon ctr-legend-red"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2Zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59Z" fill="currentColor"/></svg>
+                  <div><strong>Rejeitado</strong><p>Contrato recusado e retornado para ajustes.</p></div>
+                </div>
+                <div className="ctr-legend-item">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="ctr-legend-icon ctr-legend-gray"><path d="M5 20h14v-2H5v2Zm7-18v12l-5-5-1.4 1.4L12 17l6.4-6.6L17 9l-5 5V2h-2Z" fill="currentColor"/></svg>
+                  <div><strong>Baixar (PDF)</strong><p>Download do contrato em formato PDF.</p></div>
+                </div>
+                <div className="ctr-legend-item">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="ctr-legend-icon ctr-legend-wa"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" fill="currentColor"/></svg>
+                  <div><strong>Enviar via WhatsApp</strong><p>Envio o contrato diretamente para o cliente.</p></div>
+                </div>
+              </div>
+
+              {/* ── ADM only: contract template editor ── */}
               {adminUser.role === 'ADM' && (
                 <div className="contract-admin-grid">
                   <div className="admin-card catalog-shortcut-card">
