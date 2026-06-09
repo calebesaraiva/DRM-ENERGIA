@@ -1,3 +1,4 @@
+import { FaInstagram, FaMapMarkerAlt } from 'react-icons/fa';
 import './Footer.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
 import WhatsAppIcon from './WhatsAppIcon';
@@ -31,11 +32,11 @@ const Footer = () => {
                 <span><strong>WhatsApp</strong><small>(99) 99167-5608</small></span>
               </a>
               <a className="contact-card" href="https://www.instagram.com/drm.energia.solar/" target="_blank" rel="noopener noreferrer">
-                <span className="contact-icon">◎</span>
+                <span className="contact-icon contact-icon-instagram"><FaInstagram /></span>
                 <span><strong>Instagram</strong><small>@drm.energia.solar</small></span>
               </a>
               <a className="contact-card" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer">
-                <span className="contact-icon">⌖</span>
+                <span className="contact-icon contact-icon-location"><FaMapMarkerAlt /></span>
                 <span><strong>Endereço</strong><small>{address}</small></span>
               </a>
             </div>
