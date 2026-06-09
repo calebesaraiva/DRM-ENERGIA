@@ -101,15 +101,17 @@ const ProjectGallery = () => {
         </div>
       </div>
 
-      {/* Dots */}
-      <div className="gallery-dots">
+      {/* Dots — decorativos, índice começa em 0 */}
+      <div className="gallery-dots" role="tablist" aria-label="Projetos">
         {[0, 1, 2, 3].map((i) => (
           <button
             key={i}
             type="button"
-            className={`gallery-dot ${dotIndex === i ? 'active' : ''}`}
+            role="tab"
+            aria-selected={dotIndex === i}
+            className={`gallery-dot${dotIndex === i ? ' active' : ''}`}
             onClick={() => setDotIndex(i)}
-            aria-label={`Slide ${i + 1}`}
+            aria-label={`Página ${i + 1}`}
           />
         ))}
       </div>

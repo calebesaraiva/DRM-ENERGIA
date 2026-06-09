@@ -13,7 +13,6 @@ const energyOptions = [
         <path d="M9 22V12h6v10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     ),
-    message: 'Olá! Pago até R$300/mês de energia. Quero saber quanto posso economizar com energia solar.',
   },
   {
     id: '300a700',
@@ -25,7 +24,6 @@ const energyOptions = [
         <path d="M12 12v4M10 14h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
       </svg>
     ),
-    message: 'Olá! Pago entre R$300 e R$700/mês de energia. Quero saber quanto posso economizar com energia solar.',
   },
   {
     id: 'acima700',
@@ -36,7 +34,6 @@ const energyOptions = [
         <circle cx="12" cy="14" r="3" stroke="currentColor" strokeWidth="1.8"/>
       </svg>
     ),
-    message: 'Olá! Pago acima de R$700/mês de energia. Quero saber quanto posso economizar com energia solar.',
   },
   {
     id: 'empresa',
@@ -47,16 +44,20 @@ const energyOptions = [
         <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
       </svg>
     ),
-    message: 'Olá! Tenho uma empresa, fazenda ou comércio e quero saber quanto posso economizar com energia solar.',
   },
 ];
 
-const Hero = () => {
+const Hero = ({ onOpenSimulation = () => {} }) => {
   const [selected, setSelected] = useState(null);
 
-  const ctaLink = selected
-    ? makeWhatsAppLink('hero_simulator', energyOptions.find((o) => o.id === selected)?.message)
-    : makeWhatsAppLink('hero_cta');
+  const handleSimulate = () => {
+    onOpenSimulation();
+  };
+
+  const handleOptionClick = (id) => {
+    setSelected(id);
+    onOpenSimulation();
+  };
 
   const heroSimularLink = makeWhatsAppLink('hero_simular');
 
@@ -101,10 +102,10 @@ const Hero = () => {
           </div>
 
           <div className="hero-lp-actions">
-            <a href={heroSimularLink} target="_blank" rel="noopener noreferrer" className="btn-lp-green">
+            <button type="button" className="btn-lp-green" onClick={handleSimulate}>
               <WhatsAppIcon />
-              Simular economia no WhatsApp
-            </a>
+              Simular economia agora
+            </button>
             <a href="#projetos" className="btn-lp-outline">
               Ver projetos entregues
             </a>
@@ -124,7 +125,7 @@ const Hero = () => {
                 <button
                   type="button"
                   className={`hero-sim-opt ${selected === opt.id ? 'selected' : ''}`}
-                  onClick={() => setSelected(opt.id)}
+                  onClick={() => handleOptionClick(opt.id)}
                 >
                   <span className="hero-sim-opt-icon">{opt.icon}</span>
                   <span className="hero-sim-opt-label">{opt.label}</span>
@@ -135,10 +136,10 @@ const Hero = () => {
               </li>
             ))}
           </ul>
-          <a href={ctaLink} target="_blank" rel="noopener noreferrer" className="hero-sim-cta">
+          <button type="button" className="hero-sim-cta" onClick={handleSimulate}>
             <WhatsAppIcon />
             Quero calcular minha economia
-          </a>
+          </button>
         </div>
       </div>
     </section>
