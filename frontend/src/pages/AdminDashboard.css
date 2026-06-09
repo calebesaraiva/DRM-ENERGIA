@@ -6019,6 +6019,8 @@
 }
 
 /* === ORCAMENTOS TWO-PANEL REDESIGN === */
+
+/* ── Layout ── */
 .orc-layout {
   display: grid;
   grid-template-columns: 340px 1fr;
@@ -6026,12 +6028,12 @@
   align-items: start;
 }
 
-/* Left panel */
+/* ── Left panel ── */
 .orc-client-panel {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1.25rem;
+  gap: 0.875rem;
+  padding: 1.5rem;
 }
 
 .orc-panel-title {
@@ -6044,7 +6046,7 @@
 .orc-panel-sub {
   font-size: 0.8125rem;
   color: #64748b;
-  margin: 0;
+  margin: -0.25rem 0 0;
 }
 
 .orc-search-wrap {
@@ -6056,15 +6058,15 @@
   left: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   fill: #94a3b8;
   pointer-events: none;
 }
 
 .orc-search-input {
   width: 100%;
-  padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+  padding: 0.55rem 0.875rem 0.55rem 2.25rem;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -6076,13 +6078,13 @@
 }
 
 .orc-search-input:focus {
-  border-color: #22c55e;
+  border-color: #f97316;
   background: #fff;
 }
 
 .orc-client-list-header {
   border-top: 1px solid #f1f5f9;
-  padding-top: 0.75rem;
+  padding-top: 0.625rem;
 }
 
 .orc-client-list-title {
@@ -6101,27 +6103,27 @@
 .orc-client-table {
   display: flex;
   flex-direction: column;
-  border: 1px solid #f1f5f9;
+  border: 1px solid #e8eef4;
   border-radius: 8px;
   overflow: hidden;
 }
 
 .orc-client-thead {
   background: #f8fafc;
-  padding: 0.5rem 0.875rem;
+  padding: 0.45rem 0.875rem;
   font-size: 0.6875rem;
   font-weight: 600;
   color: #94a3b8;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #e8eef4;
 }
 
 .orc-client-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.6875rem 0.875rem;
+  padding: 0.6rem 0.875rem;
   background: #fff;
   border: none;
   border-bottom: 1px solid #f8fafc;
@@ -6139,24 +6141,22 @@
 }
 
 .orc-client-row:hover {
-  background: #f0fdf4;
+  background: #fff7ed;
 }
 
 .orc-client-row.active {
-  background: #f0fdf4;
-  color: #16a34a;
+  background: #fff7ed;
+  color: #ea580c;
   font-weight: 600;
 }
 
 .orc-client-row svg {
-  width: 16px;
-  height: 16px;
   flex-shrink: 0;
   color: #cbd5e1;
 }
 
 .orc-client-row.active svg {
-  color: #16a34a;
+  color: #f97316;
 }
 
 .orc-client-empty {
@@ -6173,10 +6173,9 @@
   gap: 0.5rem;
 }
 
-.orc-client-pagination > p {
+.orc-client-pagination > span {
   font-size: 0.75rem;
   color: #94a3b8;
-  margin: 0;
   text-align: center;
 }
 
@@ -6201,17 +6200,26 @@
   transition: all 0.12s;
 }
 
-.orc-page-btn:hover {
-  background: #f0fdf4;
-  border-color: #22c55e;
-  color: #16a34a;
+.orc-page-btn:hover:not(:disabled) {
+  background: #fff7ed;
+  border-color: #f97316;
+  color: #ea580c;
 }
 
 .orc-page-btn.active {
-  background: #22c55e;
-  border-color: #22c55e;
+  background: #f97316;
+  border-color: #f97316;
   color: #fff;
   font-weight: 600;
+}
+
+.orc-page-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.orc-page-nav {
+  font-size: 1rem;
 }
 
 .orc-page-dots {
@@ -6220,27 +6228,28 @@
   padding: 0 0.125rem;
 }
 
-/* Right panel */
+/* ── Right panel ── */
 .orc-right-panel {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0;
 }
 
+/* Empty state */
 .orc-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem 1.5rem;
-  gap: 0.75rem;
+  padding: 3.5rem 1.5rem;
+  gap: 0.875rem;
   text-align: center;
 }
 
 .orc-empty-icon {
-  width: 56px;
-  height: 56px;
-  background: #f0fdf4;
+  width: 60px;
+  height: 60px;
+  background: #fff7ed;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -6248,9 +6257,9 @@
 }
 
 .orc-empty-icon svg {
-  width: 26px;
-  height: 26px;
-  fill: #22c55e;
+  width: 28px;
+  height: 28px;
+  fill: #f97316;
 }
 
 .orc-empty-state h4 {
@@ -6264,97 +6273,284 @@
   font-size: 0.875rem;
   color: #64748b;
   margin: 0;
-  max-width: 320px;
+  max-width: 300px;
 }
 
-/* Client view */
-.orc-client-view {
+/* Detail card */
+.orc-detail-card {
   display: flex;
   flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Client info header */
+.orc-detail-top {
+  padding: 1.25rem 1.5rem 1rem;
+}
+
+.orc-selected-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0 0 0.625rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.orc-detail-client-row {
+  display: flex;
+  align-items: flex-start;
   gap: 1rem;
 }
 
-.orc-client-header-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  flex-wrap: wrap;
-}
-
-.orc-client-header-info {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.orc-client-avatar {
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(135deg, #22c55e, #16a34a);
+.orc-detail-avatar {
+  width: 48px;
+  height: 48px;
+  background: #fff7ed;
+  border: 2px solid #fed7aa;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #fff;
   flex-shrink: 0;
 }
 
-.orc-client-header-info h4 {
-  font-size: 1rem;
+.orc-detail-avatar svg {
+  width: 24px;
+  height: 24px;
+  fill: #f97316;
+}
+
+.orc-detail-info {
+  flex: 1;
+}
+
+.orc-detail-info h3 {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.25rem;
+}
+
+.orc-detail-info p {
+  font-size: 0.8125rem;
+  color: #475569;
+  margin: 0 0 0.125rem;
+}
+
+.orc-novo-btn {
+  background: #f97316;
+  color: #fff;
+  border: none;
+  padding: 0.55rem 1.125rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  margin-left: auto;
+}
+
+.orc-novo-btn:hover {
+  background: #ea580c;
+}
+
+.orc-detail-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0.5rem 0;
+}
+
+/* Budgets section */
+.orc-budgets-section {
+  padding: 0.75rem 1.5rem 1rem;
+}
+
+.orc-budgets-title {
+  font-size: 0.9375rem;
   font-weight: 700;
   color: #0f172a;
   margin: 0 0 0.125rem;
 }
 
-.orc-client-header-info p {
+.orc-budgets-sub {
   font-size: 0.8125rem;
   color: #64748b;
-  margin: 0;
+  margin: 0 0 1rem;
 }
 
-.orc-client-header-actions {
-  display: flex;
-  gap: 0.625rem;
-  flex-shrink: 0;
+/* Budget table */
+.orc-table-wrap {
+  border: 1px solid #e8eef4;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 0.625rem;
 }
 
-/* Budget form within client view */
-.orc-budget-form {
-  padding: 1.25rem;
-}
-
-/* Budget list card */
-.orc-list-card {
-  padding: 1.25rem;
-}
-
-.orc-list-header {
-  margin-bottom: 1rem;
-}
-
-.orc-list-header h4 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0;
-}
-
-.orc-count {
-  font-weight: 400;
-  color: #94a3b8;
+.orc-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 0.875rem;
 }
 
+.orc-table thead tr {
+  background: #f8fafc;
+}
+
+.orc-table th {
+  padding: 0.6rem 0.875rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  border-bottom: 1px solid #e8eef4;
+}
+
+.orc-table td {
+  padding: 0.75rem 0.875rem;
+  color: #334155;
+  border-bottom: 1px solid #f8fafc;
+  vertical-align: middle;
+}
+
+.orc-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.orc-table tbody tr {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.orc-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.orc-table tbody tr.orc-row-selected {
+  background: #fff7ed;
+}
+
+.orc-td-id {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.orc-td-valor {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* Status badges */
+.orc-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.orc-status-atendimento {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.orc-status-proposta {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.orc-status-aguardando {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.orc-status-venda {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.orc-status-cancelado {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.orc-status-aberto {
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+/* Action icons */
+.orc-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.orc-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+
+.orc-action-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.orc-action-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.orc-action-wa {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+
+.orc-action-wa:hover {
+  background: #bbf7d0;
+  color: #15803d;
+}
+
+.orc-table-count {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* Empty list */
 .orc-list-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.625rem;
-  padding: 2rem 1rem;
+  padding: 2.5rem 1rem;
   text-align: center;
 }
 
@@ -6370,83 +6566,93 @@
   margin: 0;
 }
 
-/* Budget cards */
-.orc-cards-list {
+/* Budget form */
+.orc-budget-form {
+  padding: 1.5rem;
+}
+
+/* Bottom action bar */
+.orc-actions-bar {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 0.75rem;
-}
-
-.orc-card-item {
-  border: 1px solid #f1f5f9;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.orc-card-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.125rem;
-  gap: 1rem;
+  padding: 0.875rem 1.5rem;
+  background: #f8fafc;
+  border-top: 1px solid #e8eef4;
   flex-wrap: wrap;
 }
 
-.orc-card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.orc-card-info strong {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.orc-card-info span {
-  font-size: 0.8125rem;
-  color: #475569;
-}
-
-.orc-card-info em {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  font-style: normal;
-}
-
-.orc-card-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.orc-equip-select select {
-  padding: 0.375rem 0.625rem;
+.orc-bar-equip-select {
+  padding: 0.4rem 0.625rem;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  border-radius: 7px;
   font-size: 0.8125rem;
   color: #334155;
-  background: #f8fafc;
+  background: #fff;
   cursor: pointer;
+  max-width: 220px;
+}
+
+.orc-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.875rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 7px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.orc-bar-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.orc-bar-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.orc-bar-btn-wa {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.orc-bar-btn-wa:hover {
+  background: #bbf7d0;
 }
 
 /* Responsive */
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .orc-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: 300px 1fr;
   }
 }
 
-@media (max-width: 600px) {
-  .orc-card-main {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 768px) {
+  .orc-layout {
+    grid-template-columns: 1fr;
   }
-
-  .orc-client-header-card {
+  .orc-detail-client-row {
+    flex-wrap: wrap;
+  }
+  .orc-novo-btn {
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
+  }
+  .orc-actions-bar {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
   }
 }
