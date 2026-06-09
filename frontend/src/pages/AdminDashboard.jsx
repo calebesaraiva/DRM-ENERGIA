@@ -99,6 +99,19 @@ const SidebarIcon = ({ name }) => {
   return icons[name] || icons.leads;
 };
 
+const LEADS_PER_PAGE = 8;
+
+const getLeadStatusClass = (status) => {
+  switch (String(status || '')) {
+    case 'Novo': return 'lead-status-novo';
+    case 'Em atendimento': return 'lead-status-atendimento';
+    case 'Proposta enviada': return 'lead-status-proposta';
+    case 'Sem retorno': return 'lead-status-sem-retorno';
+    case 'Convertido': return 'lead-status-convertido';
+    default: return 'lead-status-default';
+  }
+};
+
 const ESTADOS_BR = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO',
   'MA','MT','MS','MG','PA','PB','PR','PE','PI',
@@ -431,7 +444,8 @@ const AdminDashboard = () => {
   const [contractModal, setContractModal] = useState({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
   const [contractConfig, setContractConfig] = useState(defaultContractConfig);
   const [despesaForm, setDespesaForm] = useState({ nome: '', valor: '', categoria: '' });
-  const [activityForm, setActivityForm] = useState({ leadId: '', tipo: 'Ligação', descricao: '', resultado: '', proximoRetorno: '' });
+  const [activityForm, setActivityForm] = useState({ leadId: '', tipo: 'Ligação', origem: 'Ligação', descricao: '', resultado: '', proximoRetorno: '' });
+  const [leadsPage, setLeadsPage] = useState(1);
   const [osForm, setOsForm] = useState({ clienteNome: '', clienteTelefone: '', contratoId: '', origem: 'WhatsApp', problema: '', categoria: 'Suporte', prioridade: 'Normal', responsavelId: '', observacoes: '' });
   const [priceForm, setPriceForm] = useState(emptyPriceForm);
   const [priceResult, setPriceResult] = useState(null);
@@ -573,6 +587,13 @@ const AdminDashboard = () => {
         .some(value => String(value || '').toLowerCase().includes(search));
     });
   }, [leadOwnerFilter, leadSearch, leadStatusFilter, leads, hasPermission]);
+
+  const paginatedLeads = useMemo(() => {
+    const start = (leadsPage - 1) * LEADS_PER_PAGE;
+    return filteredLeads.slice(start, start + LEADS_PER_PAGE);
+  }, [filteredLeads, leadsPage]);
+
+  const leadsTotalPages = Math.max(1, Math.ceil(filteredLeads.length / LEADS_PER_PAGE));
 
   const clientSummary = useMemo(() => {
     const search = clientSearch.trim().toLowerCase();
@@ -808,6 +829,8 @@ const AdminDashboard = () => {
     if (failed) throw failed.reason;
   }, [request]);
 
+  useEffect(() => { setLeadsPage(1); }, [leadSearch, leadStatusFilter, leadOwnerFilter]);
+
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
     const token = localStorage.getItem('token');
@@ -928,7 +951,7 @@ const AdminDashboard = () => {
           ? { ...lead, ultimoContato: new Date().toISOString().split('T')[0], proximoRetorno: activityForm.proximoRetorno || lead.proximoRetorno, observacoes: activityForm.resultado || lead.observacoes }
           : lead
       )));
-      setActivityForm({ leadId: '', tipo: 'Ligação', descricao: '', resultado: '', proximoRetorno: '' });
+      setActivityForm({ leadId: '', tipo: 'Ligação', origem: 'Ligação', descricao: '', resultado: '', proximoRetorno: '' });
       request('/api/admin/resumo').then(setResumo).catch(() => {});
       showToast('Atividade registrada com sucesso.', 'success');
     } catch (err) {
@@ -2099,37 +2122,58 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'leads' && (
-            <div className="admin-card">
-              <div className="card-header-flex">
-                <h3>{hasPermission('verTodosLeads') ? 'Todos os leads' : 'Meus leads'}</h3>
-                <span className="status-badge success">{leads.length} leads</span>
-              </div>
-              <div className="leads-summary">
-                <div className="lead-summary-card lead-summary-card-total">
-                  <span>Total captado</span>
-                  <strong>{leadSummary.total}</strong>
-                  <p>Leads recebidos pelo site.</p>
+            <div className="admin-section leads-screen">
+
+              {/* ── 1. Resumo geral ── */}
+              <div className="admin-card leads-resumo-card">
+                <div className="leads-resumo-header">
+                  <h3>Resumo geral</h3>
+                  {hasPermission('verTodosLeads') && (
+                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Ver todos os leads</button>
+                  )}
                 </div>
-                <div className="lead-summary-card">
-                  <span>Novos</span>
-                  <strong>{leadSummary.novos}</strong>
-                  <p>Aguardando atendimento.</p>
-                </div>
-                <div className="lead-summary-card">
-                  <span>Em atendimento</span>
-                  <strong>{leadSummary.emAtendimento}</strong>
-                  <p>Já assumidos pela equipe.</p>
+                <div className="leads-stats-grid">
+                  <div className="lead-stat-item">
+                    <div className="lead-stat-icon lead-stat-icon-orange">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-3.2-6.4A5 5 0 0 1 15 9c0 .7-.1 1.4-.4 2H16Zm-8 0a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V19h12v-2.2C14 14.7 11.3 13 8 13Zm8 0c-.6 0-1.1.1-1.7.2 1.1.9 1.7 2.1 1.7 3.6V19h6v-2.2c0-2.1-2.7-3.8-6-3.8Z" /></svg>
+                    </div>
+                    <div>
+                      <p className="lead-stat-label">TOTAL CAPTADO</p>
+                      <strong className="lead-stat-num">{leadSummary.total}</strong>
+                      <p className="lead-stat-desc">Leads recebidos pelo site.</p>
+                    </div>
+                  </div>
+                  <div className="lead-stat-item">
+                    <div className="lead-stat-icon lead-stat-icon-green">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-9 0a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4Zm9 0c-.3 0-.7 0-1 .1 1.2.8 2 2 2 3.9V20h6v-2c0-2.7-5.3-4-7-4Z" /></svg>
+                    </div>
+                    <div>
+                      <p className="lead-stat-label">NOVOS</p>
+                      <strong className="lead-stat-num">{leadSummary.novos}</strong>
+                      <p className="lead-stat-desc">Aguardando atendimento.</p>
+                    </div>
+                  </div>
+                  <div className="lead-stat-item">
+                    <div className="lead-stat-icon lead-stat-icon-blue">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9 9 0 0 0-9 9c0 2.4 1 4.7 2.6 6.3l-1.4 1.4A11 11 0 0 1 1 11 11 11 0 0 1 12 0a11 11 0 0 1 11 11 11 11 0 0 1-3.2 7.7l-1.4-1.4A9 9 0 0 0 21 11a9 9 0 0 0-9-9Zm0 4a5 5 0 0 0-5 5 5 5 0 0 0 5 5 5 5 0 0 0 5-5 5 5 0 0 0-5-5Zm0 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3Z" /></svg>
+                    </div>
+                    <div>
+                      <p className="lead-stat-label">EM ATENDIMENTO</p>
+                      <strong className="lead-stat-num">{leadSummary.emAtendimento}</strong>
+                      <p className="lead-stat-desc">Já assumidos pela equipe.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {hasPermission('verTodosLeads') && (
-                <div className="consultant-summary">
+              {/* ── 2. Distribuição por consultor ── */}
+              {hasPermission('verTodosLeads') && leadSummary.porResponsavel.length > 0 && (
+                <div className="admin-card">
                   <div className="consultant-summary-header">
                     <div>
                       <h4>Distribuição por consultor</h4>
                       <p>Clique em um consultor para ver somente os leads atribuídos a ele.</p>
                     </div>
-                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Ver todos os leads</button>
                   </div>
                   <div className="consultant-summary-grid">
                     {leadSummary.porResponsavel.map(user => (
@@ -2148,103 +2192,169 @@ const AdminDashboard = () => {
                 </div>
               )}
 
-              <div className="lead-toolbar">
-                <div className="lead-search-box">
-                  <input
-                    placeholder="Buscar lead por nome, telefone, cidade, status ou responsável"
-                    value={leadSearch}
-                    onChange={(event) => setLeadSearch(event.target.value)}
-                  />
-                </div>
-                <div className="lead-filter-pills" aria-label="Filtros de status">
-                  <button type="button" className={leadStatusFilter === 'todos' ? 'active' : ''} onClick={() => setLeadStatusFilter('todos')}>Todos</button>
-                  {leadStatusOptions.map(status => (
-                    <button type="button" key={status} className={leadStatusFilter === status ? 'active' : ''} onClick={() => setLeadStatusFilter(status)}>{status}</button>
-                  ))}
-                </div>
-              </div>
-
-              <form className="activity-panel" onSubmit={registrarAtividade}>
-                <div>
-                  <h4>Registrar contato</h4>
-                  <p>Salve ligação, WhatsApp, visita e próximo retorno para não perder nenhum cliente.</p>
-                </div>
-                <select value={activityForm.leadId} onChange={(event) => setActivityForm(prev => ({ ...prev, leadId: event.target.value }))} required>
-                  <option value="">Escolha o lead</option>
-                  {filteredLeads.map(lead => <option key={lead.id} value={lead.id}>{lead.nome} - {lead.telefone}</option>)}
-                </select>
-                <select value={activityForm.tipo} onChange={(event) => setActivityForm(prev => ({ ...prev, tipo: event.target.value }))}>
-                  <option>Ligação</option>
-                  <option>WhatsApp</option>
-                  <option>Visita</option>
-                  <option>Proposta</option>
-                  <option>Pós-venda</option>
-                </select>
-                <input placeholder="O que foi feito?" value={activityForm.descricao} onChange={(event) => setActivityForm(prev => ({ ...prev, descricao: event.target.value }))} required />
-                <input placeholder="Resultado / observação" value={activityForm.resultado} onChange={(event) => setActivityForm(prev => ({ ...prev, resultado: event.target.value }))} />
-                <input type="date" value={activityForm.proximoRetorno} onChange={(event) => setActivityForm(prev => ({ ...prev, proximoRetorno: event.target.value }))} />
-                <button className="btn btn-primary" type="submit">Salvar contato</button>
-              </form>
-
-              <div className="list-section-header">
-                <div>
-                  <h4>Lista de atendimento</h4>
-                  <p>{filteredLeads.length} lead{filteredLeads.length === 1 ? '' : 's'} na visão atual. Consultores veem apenas os próprios leads.</p>
-                </div>
-              </div>
-              <div className="table-container leads-table-container">
-                <table className="modern-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Nome</th>
-                      <th>Telefone</th>
-                      <th>E-mail</th>
-                      <th>Cidade</th>
-                      <th>Responsável</th>
-                      <th>Status</th>
-                      <th>Retorno</th>
-                      <th>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLeads.map(lead => (
-                      <tr key={lead.id}>
-                        <td data-label="ID">#{lead.id}</td>
-                        <td data-label="Nome" className="font-medium">{lead.nome}</td>
-                        <td data-label="Telefone">{lead.telefone}</td>
-                        <td data-label="E-mail">{lead.email}</td>
-                        <td data-label="Cidade">{lead.cidade}</td>
-                        <td data-label="Responsável">{getResponsibleName(lead.assignedUserName)}</td>
-                        <td data-label="Status"><span className="status-badge success">{lead.status}</span></td>
-                        <td data-label="Retorno">{lead.proximoRetorno ? dateBr(lead.proximoRetorno) : 'Sem retorno'}</td>
-                        <td data-label="Ações">
-                          <div className="table-actions">
-                            <button className="btn btn-outline btn-sm-admin" onClick={() => updateLeadStatus(lead.id, 'Em atendimento')}>Atender</button>
-                            <button className="btn btn-outline btn-sm-admin" onClick={() => updateLeadStatus(lead.id, 'Proposta enviada')}>Proposta</button>
-                            <a className="btn btn-primary btn-sm-admin" href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
-                          </div>
-                        </td>
-                      </tr>
+              {/* ── 3. Buscar leads ── */}
+              <div className="admin-card leads-search-card">
+                <h4 className="leads-search-title">Buscar leads</h4>
+                <div className="leads-search-row">
+                  <div className="leads-search-input-wrap">
+                    <svg className="leads-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12A6 6 0 0 1 10 4Z" /></svg>
+                    <input
+                      className="leads-search-input"
+                      placeholder="Buscar lead por nome, telefone, cidade, status da negociação..."
+                      value={leadSearch}
+                      onChange={(event) => setLeadSearch(event.target.value)}
+                    />
+                  </div>
+                  <div className="leads-filter-group" aria-label="Filtros de status">
+                    <button type="button" className={`leads-filter-btn ${leadStatusFilter === 'todos' ? 'active' : ''}`} onClick={() => setLeadStatusFilter('todos')}>
+                      Todos os status <span className="leads-filter-arrow">▾</span>
+                    </button>
+                    {leadStatusOptions.map(status => (
+                      <button type="button" key={status} className={`leads-filter-btn ${leadStatusFilter === status ? 'active' : ''}`} onClick={() => setLeadStatusFilter(status)}>
+                        {status} <span className="leads-filter-arrow">▾</span>
+                      </button>
                     ))}
-                  </tbody>
-                </table>
-                {filteredLeads.length === 0 && (
-                  <div className="empty-state-orcamento lead-empty-state">
-                    <div className="icon">LD</div>
-                    <h4>Nenhum lead encontrado</h4>
-                    <p>Ajuste a busca, mude o status ou volte para todos os leads.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 4. Registrar contato ── */}
+              <div className="admin-card leads-rc-card">
+                <h4>Registrar contato</h4>
+                <p className="leads-rc-subtitle">Salve ligação, WhatsApp, visita e próximo retorno para não perder nenhum cliente.</p>
+                <form className="rc-form" onSubmit={registrarAtividade}>
+                  <div className="rc-form-grid">
+                    <div className="rc-field">
+                      <label className="rc-label">Lead</label>
+                      <select className="rc-input" value={activityForm.leadId} onChange={(event) => setActivityForm(prev => ({ ...prev, leadId: event.target.value }))} required>
+                        <option value="">Escolha o lead</option>
+                        {filteredLeads.map(lead => <option key={lead.id} value={lead.id}>{lead.nome} — {lead.telefone}</option>)}
+                      </select>
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">Tipo de contato</label>
+                      <select className="rc-input" value={activityForm.tipo} onChange={(event) => setActivityForm(prev => ({ ...prev, tipo: event.target.value }))}>
+                        <option value="">Escolha o tipo</option>
+                        <option>Ligação</option>
+                        <option>WhatsApp</option>
+                        <option>Visita</option>
+                        <option>Proposta</option>
+                        <option>Reunião</option>
+                        <option>Pós-venda</option>
+                      </select>
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">Origem</label>
+                      <select className="rc-input" value={activityForm.origem} onChange={(event) => setActivityForm(prev => ({ ...prev, origem: event.target.value }))}>
+                        <option>Ligação</option>
+                        <option>WhatsApp</option>
+                        <option>E-mail</option>
+                        <option>Presencial</option>
+                        <option>Indicação</option>
+                        <option>Site</option>
+                      </select>
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">O que foi feito</label>
+                      <input className="rc-input" placeholder="Descreva o contato realizado" value={activityForm.descricao} onChange={(event) => setActivityForm(prev => ({ ...prev, descricao: event.target.value }))} required />
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">Resultado / Observação</label>
+                      <input className="rc-input" placeholder="Resultado ou observação" value={activityForm.resultado} onChange={(event) => setActivityForm(prev => ({ ...prev, resultado: event.target.value }))} />
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">Data</label>
+                      <input className="rc-input rc-input-date" type="date" value={activityForm.proximoRetorno} onChange={(event) => setActivityForm(prev => ({ ...prev, proximoRetorno: event.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="rc-form-footer">
+                    <button className="btn btn-primary rc-save-btn" type="submit">Salvar contato</button>
+                  </div>
+                </form>
+              </div>
+
+              {/* ── 5. Lista de atendimento ── */}
+              <div className="admin-card leads-list-card">
+                <div className="list-section-header">
+                  <div>
+                    <h4>Lista de atendimento</h4>
+                    <p>{filteredLeads.length} lead{filteredLeads.length === 1 ? '' : 's'} na visão atual. Consultores veem apenas os próprios leads.</p>
+                  </div>
+                </div>
+                <div className="table-container leads-table-container">
+                  <table className="modern-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>NOME</th>
+                        <th>TELEFONE</th>
+                        <th>E-MAIL</th>
+                        <th>CIDADE</th>
+                        <th>RESPONSÁVEL</th>
+                        <th>STATUS</th>
+                        <th>RETORNO</th>
+                        <th>AÇÕES</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedLeads.map(lead => (
+                        <tr key={lead.id}>
+                          <td data-label="ID">#{lead.id}</td>
+                          <td data-label="NOME" className="font-medium">{lead.nome}</td>
+                          <td data-label="TELEFONE">{lead.telefone}</td>
+                          <td data-label="E-MAIL">{lead.email}</td>
+                          <td data-label="CIDADE">{lead.cidade}</td>
+                          <td data-label="RESPONSÁVEL">{getResponsibleName(lead.assignedUserName)}</td>
+                          <td data-label="STATUS">
+                            <span className={`lead-status-badge ${getLeadStatusClass(lead.status)}`}>{lead.status || 'Novo'}</span>
+                          </td>
+                          <td data-label="RETORNO">{lead.proximoRetorno ? dateBr(lead.proximoRetorno) : 'Sem retorno'}</td>
+                          <td data-label="AÇÕES">
+                            <div className="table-actions">
+                              <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateLeadStatus(lead.id, 'Em atendimento')}>Atender</button>
+                              <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateLeadStatus(lead.id, 'Proposta enviada')}>Proposta</button>
+                              <a
+                                className="leads-wa-btn"
+                                href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="WhatsApp"
+                              >
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" /></svg>
+                              </a>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filteredLeads.length === 0 && (
+                    <div className="empty-state-orcamento lead-empty-state">
+                      <div className="icon">LD</div>
+                      <h4>Nenhum lead encontrado</h4>
+                      <p>Ajuste a busca, mude o status ou volte para todos os leads.</p>
+                    </div>
+                  )}
+                </div>
+
+                {filteredLeads.length > LEADS_PER_PAGE && (
+                  <div className="leads-pagination">
+                    <p>Exibindo {Math.min((leadsPage - 1) * LEADS_PER_PAGE + 1, filteredLeads.length)} a {Math.min(leadsPage * LEADS_PER_PAGE, filteredLeads.length)} de {filteredLeads.length} leads</p>
+                    <div className="leads-pagination-btns">
+                      {Array.from({ length: leadsTotalPages }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          type="button"
+                          className={`leads-page-btn ${page === leadsPage ? 'active' : ''}`}
+                          onClick={() => setLeadsPage(page)}
+                        >{page}</button>
+                      ))}
+                      {leadsPage < leadsTotalPages && (
+                        <button type="button" className="leads-page-btn" onClick={() => setLeadsPage(p => p + 1)}>›</button>
+                      )}
+                    </div>
                   </div>
                 )}
-              </div>
-              <div className="activity-feed compact-feed">
-                {atividades.slice(0, 5).map(atividade => (
-                  <div className="activity-feed-item" key={atividade.id}>
-                    <strong>{atividade.tipo} • {atividade.clienteNome}</strong>
-                    <span>{atividade.descricao}</span>
-                    <em>{atividade.criadoPorNome} em {dateBr(atividade.createdAt)}</em>
-                  </div>
-                ))}
               </div>
             </div>
           )}

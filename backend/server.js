@@ -3844,7 +3844,7 @@ app.post('/api/admin/leads/:id/atividades', authRequired, requirePermission('lea
     return res.status(403).json({ message: 'Este lead pertence a outro usuário.' });
   }
 
-  const { tipo = 'Contato', descricao, resultado = '', proximoRetorno } = req.body;
+  const { tipo = 'Contato', origem = '', descricao, resultado = '', proximoRetorno } = req.body;
   if (!String(descricao || '').trim()) {
     return res.status(400).json({ message: 'Descreva a atividade realizada.' });
   }
@@ -3852,11 +3852,12 @@ app.post('/api/admin/leads/:id/atividades', authRequired, requirePermission('lea
   const now = new Date().toISOString();
   const result = await db.run(
     `INSERT INTO atividades
-      (leadId, clienteNome, tipo, descricao, resultado, proximoRetorno, criadoPorId, criadoPorNome, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (leadId, clienteNome, tipo, origem, descricao, resultado, proximoRetorno, criadoPorId, criadoPorNome, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     lead.id,
     lead.nome,
     tipo,
+    origem,
     descricao,
     resultado,
     proximoRetorno || null,
