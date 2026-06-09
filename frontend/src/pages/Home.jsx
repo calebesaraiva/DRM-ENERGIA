@@ -1,27 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Hero from '../components/Hero';
 import Benefits from '../components/Benefits';
 import ProjectGallery from '../components/ProjectGallery';
 import HowItWorks from '../components/HowItWorks';
-import LeadSimulationModal from '../components/LeadSimulationModal';
-import { OfferBanner, ObjectionBreakers, SocialProof, TrustBar } from '../components/ConversionSections';
+import { TrustBar, SocialProof } from '../components/ConversionSections';
 
 const Home = () => {
-  const [isSimulationOpen, setIsSimulationOpen] = useState(
-    () => localStorage.getItem('openSimulationOnHome') === '1'
-  );
-
-  useEffect(() => {
-    const openFromGlobal = () => setIsSimulationOpen(true);
-    window.addEventListener('open-simulation-request', openFromGlobal);
-
-    if (localStorage.getItem('openSimulationOnHome') === '1') {
-      localStorage.removeItem('openSimulationOnHome');
-    }
-
-    return () => window.removeEventListener('open-simulation-request', openFromGlobal);
-  }, []);
-
   useEffect(() => {
     const sections = document.querySelectorAll('.reveal-section');
     if (!sections.length) return undefined;
@@ -35,7 +19,7 @@ const Home = () => {
           }
         });
       },
-      { threshold: 0.16, rootMargin: '0px 0px -8% 0px' },
+      { threshold: 0.1, rootMargin: '0px 0px -6% 0px' },
     );
 
     sections.forEach((section) => observer.observe(section));
@@ -44,15 +28,23 @@ const Home = () => {
 
   return (
     <main>
-      <div className="reveal-section"><Hero onOpenSimulation={() => setIsSimulationOpen(true)} /></div>
+      {/* 1. Hero with inline simulator */}
+      <div className="reveal-section"><Hero /></div>
+
+      {/* 2. Trust bar stats */}
       <div className="reveal-section"><TrustBar /></div>
-      <div className="reveal-section"><OfferBanner onOpenSimulation={() => setIsSimulationOpen(true)} /></div>
-      <div className="reveal-section"><Benefits onOpenSimulation={() => setIsSimulationOpen(true)} /></div>
-      <div className="reveal-section"><ProjectGallery onOpenSimulation={() => setIsSimulationOpen(true)} /></div>
+
+      {/* 3. Social proof — before/after */}
       <div className="reveal-section"><SocialProof /></div>
-      <div className="reveal-section"><HowItWorks onOpenSimulation={() => setIsSimulationOpen(true)} /></div>
-      <div className="reveal-section"><ObjectionBreakers onOpenSimulation={() => setIsSimulationOpen(true)} /></div>
-      <LeadSimulationModal isOpen={isSimulationOpen} onClose={() => setIsSimulationOpen(false)} />
+
+      {/* 4. Portfolio */}
+      <div className="reveal-section"><ProjectGallery /></div>
+
+      {/* 5. Benefits — 6 cards */}
+      <div className="reveal-section"><Benefits /></div>
+
+      {/* 6. How it works + FAQ + dark CTA */}
+      <div className="reveal-section"><HowItWorks /></div>
     </main>
   );
 };

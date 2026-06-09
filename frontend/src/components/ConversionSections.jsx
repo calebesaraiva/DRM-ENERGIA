@@ -4,11 +4,99 @@ import './ConversionSections.css';
 
 export const TrustBar = () => (
   <section className="trust-bar">
-    <div className="container trust-grid">
-      <div><strong>+1300</strong><span>projetos entregues</span></div>
-      <div><strong>até 82%</strong><span>de economia na conta</span></div>
-      <div><strong>25 anos</strong><span>de vida útil dos paineis</span></div>
-      <div><strong>100%</strong><span>homologação cuidada pela DRM</span></div>
+    <div className="container">
+      <div className="trust-grid">
+        <div className="trust-item">
+          <span className="trust-icon">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 22V12h6v10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </span>
+          <div>
+            <strong>25 anos</strong>
+            <span>de vida útil dos painéis</span>
+          </div>
+        </div>
+        <div className="trust-item">
+          <span className="trust-icon">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </span>
+          <div>
+            <strong>Até 82%</strong>
+            <span>de economia na conta</span>
+          </div>
+        </div>
+        <div className="trust-item">
+          <span className="trust-icon">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          </span>
+          <div>
+            <strong>100%</strong>
+            <span>energia limpa e renovável</span>
+          </div>
+        </div>
+        <div className="trust-item">
+          <span className="trust-icon">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </span>
+          <div>
+            <strong>Garantia</strong>
+            <span>de fábrica e suporte técnico</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+export const SocialProof = () => (
+  <section className="social-proof" id="clientes">
+    <div className="container">
+      <div className="section-header sp-header">
+        <span className="section-label">CLIENTES REAIS</span>
+        <h2 className="section-title">Antes e depois da conta de energia</h2>
+        <p className="section-desc">Veja quanto nossos clientes <strong>estão economizando</strong> todos os meses.</p>
+      </div>
+      <div className="before-after-grid">
+        <article className="proof-card">
+          <h3>Família Santos - Imperatriz</h3>
+          <div className="proof-values">
+            <span>Antes: <strong>R$ 782</strong></span>
+            <span>Depois: <strong>R$ 143</strong></span>
+          </div>
+          <p className="proof-economy">Economia média: R$ 639/mês</p>
+        </article>
+        <article className="proof-card">
+          <h3>Mercado Central - Açailândia</h3>
+          <div className="proof-values">
+            <span>Antes: <strong>R$ 2.140</strong></span>
+            <span>Depois: <strong>R$ 488</strong></span>
+          </div>
+          <p className="proof-economy">Economia média: R$ 1.652/mês</p>
+        </article>
+        <article className="proof-card">
+          <h3>Clínica Vida - João Lisboa</h3>
+          <div className="proof-values">
+            <span>Antes: <strong>R$ 1.320</strong></span>
+            <span>Depois: <strong>R$ 276</strong></span>
+          </div>
+          <p className="proof-economy">Economia média: R$ 1.044/mês</p>
+        </article>
+      </div>
+      <div className="sp-cta">
+        <a className="btn-lp-green" href={makeWhatsAppLink('prova_social')} target="_blank" rel="noopener noreferrer">
+          <WhatsAppIcon />
+          Quero uma economia parecida
+        </a>
+      </div>
     </div>
   </section>
 );
@@ -35,38 +123,6 @@ export const OfferBanner = ({ onOpenSimulation }) => {
     </section>
   );
 };
-
-export const SocialProof = () => (
-  <section className="social-proof">
-    <div className="container">
-      <div className="section-header">
-        <span className="section-subtitle">Clientes Reais</span>
-        <h2 className="section-title">Antes e depois da conta de energia</h2>
-      </div>
-      <div className="before-after-grid">
-        <article className="proof-card">
-          <h3>Família Santos - Imperatriz</h3>
-          <p>Antes: R$ 782 | Depois: R$ 143</p>
-          <strong>Economia média: R$ 639/mês</strong>
-        </article>
-        <article className="proof-card">
-          <h3>Mercado Central - Açailândia</h3>
-          <p>Antes: R$ 2.140 | Depois: R$ 488</p>
-          <strong>Economia média: R$ 1.652/mês</strong>
-        </article>
-        <article className="proof-card">
-          <h3>Clínica Vida - João Lisboa</h3>
-          <p>Antes: R$ 1.320 | Depois: R$ 276</p>
-          <strong>Economia média: R$ 1.044/mês</strong>
-        </article>
-      </div>
-      <a className="btn btn-primary btn-whatsapp btn-whatsapp-primary" href={makeWhatsAppLink('prova_social')} target="_blank" rel="noopener noreferrer">
-        <WhatsAppIcon />
-        Quero resultado assim
-      </a>
-    </div>
-  </section>
-);
 
 export const ObjectionBreakers = ({ onOpenSimulation }) => (
   <section className="objections">
