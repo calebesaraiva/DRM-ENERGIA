@@ -408,6 +408,9 @@ const AdminDashboard = () => {
   const [leadOwnerFilter, setLeadOwnerFilter] = useState('todos');
   const [leadStatusFilter, setLeadStatusFilter] = useState('todos');
   const [orcamentoSearch, setOrcamentoSearch] = useState('');
+  const [orcClientSearch, setOrcClientSearch] = useState('');
+  const [orcClientPage, setOrcClientPage] = useState(1);
+  const [selectedOrcClient, setSelectedOrcClient] = useState(null);
   const [contratoStatusFilter, setContratoStatusFilter] = useState('todos');
   const [osStatusFilter, setOsStatusFilter] = useState('todos');
   const [userSearch, setUserSearch] = useState('');
@@ -640,6 +643,28 @@ const AdminDashboard = () => {
     ].some(value => String(value || '').toLowerCase().includes(search)));
   }, [orcamentoSearch, orcamentos]);
 
+  const ORC_CLIENTS_PER_PAGE = 10;
+
+  const filteredOrcClientes = useMemo(() => {
+    const q = orcClientSearch.trim().toLowerCase();
+    if (!q) return clientes;
+    return clientes.filter(c =>
+      [c.nome, c.whatsapp, c.cpfCnpj, c.email].some(v => String(v || '').toLowerCase().includes(q))
+    );
+  }, [orcClientSearch, clientes]);
+
+  const paginatedOrcClientes = useMemo(() => {
+    const start = (orcClientPage - 1) * ORC_CLIENTS_PER_PAGE;
+    return filteredOrcClientes.slice(start, start + ORC_CLIENTS_PER_PAGE);
+  }, [filteredOrcClientes, orcClientPage]);
+
+  const orcClientTotalPages = Math.max(1, Math.ceil(filteredOrcClientes.length / ORC_CLIENTS_PER_PAGE));
+
+  const clientOrcamentos = useMemo(
+    () => selectedOrcClient ? orcamentos.filter(o => String(o.clienteId) === String(selectedOrcClient.id)) : [],
+    [selectedOrcClient, orcamentos]
+  );
+
   const budgetClient = useMemo(
     () => clientes.find(cliente => String(cliente.id) === String(budgetForm.clienteId)) || null,
     [budgetForm.clienteId, clientes]
@@ -830,6 +855,7 @@ const AdminDashboard = () => {
   }, [request]);
 
   useEffect(() => { setLeadsPage(1); }, [leadSearch, leadStatusFilter, leadOwnerFilter]);
+  useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
 
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
@@ -2360,232 +2386,271 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'orcamentos' && (
-            <div className="orcamentos-view-grid">
-              {isBudgetFormOpen && (
-                <form className="admin-card budget-builder-card" onSubmit={createManualBudget}>
-                  <div className="card-header-flex">
-                    <div>
-                      <span className="section-kicker">Fazer orçamento</span>
-                      <h3>Proposta modelo Solaris</h3>
-                      <p className="muted-text">Escolha placa, inversor, quantidade, geração e condições comerciais antes de gerar contrato.</p>
-                    </div>
-                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setIsBudgetFormOpen(false)}>Fechar</button>
-                  </div>
+            <div className="orc-layout">
 
-                  <div className="budget-form-grid">
-                    <label className="span-2">
-                      Cliente cadastrado
-                      <select value={budgetForm.clienteId} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteId: event.target.value }))} required>
-                        <option value="">Selecione o cliente</option>
-                        {clientes.map(cliente => (
-                          <option key={cliente.id} value={cliente.id}>{cliente.nome} • {cliente.cidade || 'sem cidade'}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Kit/catálogo base
-                      <select value={budgetForm.equipamentoId} onChange={(event) => applyEquipmentToBudget(event.target.value)}>
-                        <option value="">Preencher manualmente</option>
-                        {equipamentos.filter(item => item.active).map(item => (
-                          <option key={item.id} value={item.id}>{item.nome}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Potência da placa
-                      <select value={budgetForm.potenciaPlacaW} onChange={(event) => setBudgetForm(prev => ({ ...prev, potenciaPlacaW: event.target.value }))}>
-                        {[550, 560, 570, 580, 590, 600, 605, 610, 615, 620, 630, 650, 700].map(value => <option key={value} value={value}>{value} W</option>)}
-                      </select>
-                    </label>
-                    <label>
-                      Modelo da placa
-                      <input value={budgetForm.placaModelo} onChange={(event) => setBudgetForm(prev => ({ ...prev, placaModelo: event.target.value }))} placeholder="Ex: JA Solar 610 W" required />
-                    </label>
-                    <label>
-                      Quantidade de placas
-                      <input type="number" min="1" value={budgetForm.numeroPaineis} onChange={(event) => setBudgetForm(prev => ({ ...prev, numeroPaineis: event.target.value }))} required />
-                    </label>
-                    <label>
-                      Potência do inversor
-                      <input type="number" min="0" step="0.01" value={budgetForm.potenciaInversorKw} onChange={(event) => setBudgetForm(prev => ({ ...prev, potenciaInversorKw: event.target.value }))} placeholder="Ex: 8" required />
-                    </label>
-                    <label>
-                      Modelo do inversor
-                      <input value={budgetForm.inversorModelo} onChange={(event) => setBudgetForm(prev => ({ ...prev, inversorModelo: event.target.value }))} placeholder="Ex: Growatt 8 kW" required />
-                    </label>
-                    <label>
-                      Quantidade de inversores
-                      <input type="number" min="1" value={budgetForm.quantidadeInversores} onChange={(event) => setBudgetForm(prev => ({ ...prev, quantidadeInversores: event.target.value }))} />
-                    </label>
-                    <label>
-                      Cabo CC
-                      <input value={budgetForm.quantidadeCaboCc} onChange={(event) => setBudgetForm(prev => ({ ...prev, quantidadeCaboCc: event.target.value }))} placeholder="Ex: 60 m cabo solar 6 mm preto/vermelho" />
-                    </label>
-                    <label>
-                      Área por placa
-                      <input type="number" min="0" step="0.01" value={budgetForm.areaPorPainelM2} onChange={(event) => setBudgetForm(prev => ({ ...prev, areaPorPainelM2: event.target.value }))} />
-                    </label>
-                    <label>
-                      Geração
-                      <select value={budgetForm.generationMode} onChange={(event) => setBudgetForm(prev => ({ ...prev, generationMode: event.target.value }))}>
-                        <option value="manual">Informar manualmente</option>
-                        <option value="auto">Calcular por irradiação</option>
-                      </select>
-                    </label>
-                    {budgetForm.generationMode === 'auto' ? (
-                      <>
-                        <label>
-                          Irradiação solar
-                          <input type="number" step="0.01" value={budgetForm.irradiacaoSolar} onChange={(event) => setBudgetForm(prev => ({ ...prev, irradiacaoSolar: event.target.value }))} placeholder="Ex: 5.2" required />
-                        </label>
-                        <label>
-                          Perda média
-                          <select value={budgetForm.perdaPercentual} onChange={(event) => setBudgetForm(prev => ({ ...prev, perdaPercentual: event.target.value }))}>
-                            <option value="15">15%</option>
-                            <option value="20">20%</option>
-                            <option value="25">25%</option>
-                          </select>
-                        </label>
-                      </>
-                    ) : (
-                      <label className="span-2">
-                        Geração mensal kWh
-                        <input type="number" min="0" step="0.01" value={budgetForm.geracaoKwh} onChange={(event) => setBudgetForm(prev => ({ ...prev, geracaoKwh: event.target.value }))} required />
-                      </label>
-                    )}
-                    <label>
-                      Valor do sistema
-                      <input type="number" min="0" step="0.01" value={budgetForm.valorSistema} onChange={(event) => setBudgetForm(prev => ({ ...prev, valorSistema: event.target.value }))} required />
-                    </label>
-                    <label>
-                      Forma de pagamento
-                      <select value={budgetForm.formaPagamentoTipo} onChange={(event) => setBudgetForm(prev => ({ ...prev, formaPagamentoTipo: event.target.value }))}>
-                        {pagamentoTypeOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-                      </select>
-                    </label>
-                    <label className="span-2">
-                      Condições
-                      <textarea value={budgetForm.condicoesPagamento} onChange={(event) => setBudgetForm(prev => ({ ...prev, condicoesPagamento: event.target.value }))} placeholder="Ex: entrada + saldo financiado, validade da proposta, parcelas..." required />
-                    </label>
-                    <label className="span-2">
-                      Observações
-                      <textarea value={budgetForm.observacoes} onChange={(event) => setBudgetForm(prev => ({ ...prev, observacoes: event.target.value }))} placeholder="Detalhes técnicos, observações comerciais ou premissas da proposta." />
-                    </label>
-                  </div>
+              {/* ── LEFT: Client selector ── */}
+              <div className="admin-card orc-client-panel">
+                <h4 className="orc-panel-title">1. Selecionar Cliente</h4>
+                <p className="orc-panel-sub">Busque e selecione um cliente para visualizar os orçamentos realizados.</p>
 
-                  <div className="budget-result-strip">
-                    <div><span>Cliente</span><strong>{budgetClient?.nome || 'A selecionar'}</strong></div>
-                    <div><span>Potência</span><strong>{budgetCalculations.potenciaKwp} kWp</strong></div>
-                    <div><span>Área ocupada</span><strong>{budgetCalculations.areaOcupadaM2} m²</strong></div>
-                    <div><span>Geração</span><strong>{budgetCalculations.geracaoKwh} kWh/mês</strong></div>
-                    <div><span>Valor</span><strong>{money(budgetForm.valorSistema)}</strong></div>
-                  </div>
-
-                  <div className="actions-footer">
-                    <button type="button" className="btn btn-outline" onClick={() => setBudgetForm(emptyBudgetForm)}>Limpar</button>
-                    <button type="submit" className="btn btn-primary">Salvar orçamento</button>
-                  </div>
-                  {budgetStatus && <p className="muted-text">{budgetStatus}</p>}
-                </form>
-              )}
-
-              <div className="admin-card list-orcamentos">
-                <div className="card-header-flex compact">
-                  <div>
-                    <h3>Simulações</h3>
-                    <p className="muted-text">{filteredOrcamentos.length} de {orcamentos.length} orçamento{orcamentos.length === 1 ? '' : 's'} na lista.</p>
-                  </div>
-                  <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openBudgetFormForClient()}>Novo orçamento</button>
+                <div className="orc-search-wrap">
+                  <svg className="orc-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12A6 6 0 0 1 10 4Z" /></svg>
+                  <input
+                    className="orc-search-input"
+                    placeholder="Buscar por nome, contato ou CPF..."
+                    value={orcClientSearch}
+                    onChange={(e) => setOrcClientSearch(e.target.value)}
+                  />
                 </div>
-                <div className="ops-toolbar single">
-                  <div className="lead-search-box">
-                    <input
-                      placeholder="Buscar por cliente, telefone, cidade ou responsável"
-                      value={orcamentoSearch}
-                      onChange={(event) => setOrcamentoSearch(event.target.value)}
-                    />
-                  </div>
+
+                <div className="orc-client-list-header">
+                  <p className="orc-client-list-title">Lista de Clientes</p>
+                  <p className="orc-client-list-sub">Selecione um cliente para ver seus orçamentos.</p>
                 </div>
-                <div className="orcamentos-scroll">
-                  {filteredOrcamentos.map(orc => (
-                    <div
-                      key={orc.id}
-                      className={`orcamento-item ${selectedOrcamento?.id === orc.id ? 'active' : ''}`}
-                      onClick={() => setSelectedOrcamento(orc)}
+
+                <div className="orc-client-table">
+                  <div className="orc-client-thead">NOME COMPLETO</div>
+                  {paginatedOrcClientes.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`orc-client-row ${selectedOrcClient?.id === c.id ? 'active' : ''}`}
+                      onClick={() => { setSelectedOrcClient(c); setIsBudgetFormOpen(false); setSelectedOrcamento(null); }}
                     >
-                      <div className="orc-info">
-                        <strong>{orc.clienteNome}</strong>
-                        <span className="kwp-tag">{orc.dimensionamento?.potencia_real_instalada_kwp || 0} kWp • {getResponsibleName(orc.assignedUserName)}</span>
-                      </div>
-                      <span className="orc-date">{orc.data}</span>
-                    </div>
+                      <span>{c.nome}</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
                   ))}
-                  {filteredOrcamentos.length === 0 && (
-                    <div className="empty-inline">
-                      <strong>Nenhuma simulação encontrada</strong>
-                      <span>Limpe a busca para voltar a ver todos os orçamentos.</span>
-                    </div>
+                  {paginatedOrcClientes.length === 0 && (
+                    <div className="orc-client-empty">Nenhum cliente encontrado.</div>
                   )}
                 </div>
+
+                {filteredOrcClientes.length > ORC_CLIENTS_PER_PAGE && (
+                  <div className="orc-client-pagination">
+                    <p>Exibindo {Math.min((orcClientPage - 1) * ORC_CLIENTS_PER_PAGE + 1, filteredOrcClientes.length)} a {Math.min(orcClientPage * ORC_CLIENTS_PER_PAGE, filteredOrcClientes.length)} de {filteredOrcClientes.length} clientes</p>
+                    <div className="orc-pagination-btns">
+                      {orcClientPage > 1 && <button type="button" className="orc-page-btn" onClick={() => setOrcClientPage(p => p - 1)}>‹</button>}
+                      {Array.from({ length: orcClientTotalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === orcClientTotalPages || Math.abs(p - orcClientPage) <= 1)
+                        .reduce((acc, p, idx, arr) => {
+                          if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                          acc.push(p);
+                          return acc;
+                        }, [])
+                        .map((item, idx) => item === '...'
+                          ? <span key={`dots-${idx}`} className="orc-page-dots">…</span>
+                          : <button key={item} type="button" className={`orc-page-btn ${item === orcClientPage ? 'active' : ''}`} onClick={() => setOrcClientPage(item)}>{item}</button>
+                        )}
+                      {orcClientPage < orcClientTotalPages && <button type="button" className="orc-page-btn" onClick={() => setOrcClientPage(p => p + 1)}>›</button>}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="admin-card orcamento-detalhes">
-                {selectedOrcamento ? (
-                  <>
-                    <h3>Detalhes da Simulação #{selectedOrcamento.id}</h3>
-                    <div className="lead-contact-summary">
-                      <div><span>Nome</span><strong>{selectedOrcamento.clienteNome}</strong></div>
-                      <div><span>Telefone</span><strong>{selectedOrcamento.clienteTelefone || 'Não informado'}</strong></div>
-                      <div><span>E-mail</span><strong>{selectedOrcamento.clienteEmail || 'Não informado'}</strong></div>
-                      <div><span>Cidade</span><strong>{selectedOrcamento.clienteCidade || 'Não informado'}</strong></div>
+              {/* ── RIGHT: Client budgets ── */}
+              <div className="orc-right-panel">
+                {!selectedOrcClient ? (
+                  <div className="admin-card orc-empty-state">
+                    <div className="orc-empty-icon">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 1.5L18.5 9H13V3.5ZM8 17h8v1.5H8V17Zm0-3.5h8v1.5H8v-1.5Zm0-3.5h5v1.5H8V10Z" /></svg>
                     </div>
-                    <div className="detalhes-grid">
-                      <div className="detalhe-item highlight">
-                        <span className="detalhe-titulo">Preço Final Cliente</span>
-                        <span className="detalhe-valor">{money(selectedOrcamento.financeiro?.preco_final_cliente_rs)}</span>
-                      </div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Potência Instalada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Nº de Painéis</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.numero_paineis_necessarios || 0}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Área ocupada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.area_ocupada_m2 || 0} m²</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Geração Estimada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.geracao_estimada_kwh || 0} kWh</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Conta Informada</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.valor_conta_reais ? money(selectedOrcamento.dimensionamento.valor_conta_reais) : 'Manual'}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Responsável</span><span className="detalhe-valor">{getResponsibleName(selectedOrcamento.assignedUserName)}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Placa</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.placa_modelo || 'Não informado'}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Inversor</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.inversor_modelo || 'Não informado'}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Cabo CC</span><span className="detalhe-valor">{selectedOrcamento.dimensionamento?.quantidade_cabo_cc || 'Não informado'}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Pagamento</span><span className="detalhe-valor">{selectedOrcamento.financeiro?.condicoes_pagamento || selectedOrcamento.financeiro?.forma_pagamento || 'Não informado'}</span></div>
-                    </div>
-                    {hasPermission('contratos') && (
-                      <div className="contract-generation-panel">
-                        <div>
-                          <span className="section-kicker">Equipamento do contrato</span>
-                          <h4>Selecione placa e inversor</h4>
-                          <p>O modelo selecionado será preenchido automaticamente no contrato.</p>
-                        </div>
-                        <select
-                          value={selectedEquipamentos[selectedOrcamento.id] || ''}
-                          onChange={(event) => setSelectedEquipamentos(prev => ({ ...prev, [selectedOrcamento.id]: event.target.value }))}
-                        >
-                          <option value="">Usar equipamento padrão</option>
-                          {equipamentos.filter(item => item.active).map(item => (
-                            <option key={item.id} value={item.id}>{item.nome} • {item.placaModelo} • {item.inversorModelo}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="actions-footer">
-                      <a className="btn btn-outline" href={getOrcamentoDownloadUrl(selectedOrcamento.id)} target="_blank" rel="noopener noreferrer">Baixar orçamento</a>
-                      {hasPermission('contratos') && (
-                        <button className="btn btn-outline" onClick={() => openContractModal(selectedOrcamento)}>Gerar contrato</button>
-                      )}
-                      <a href={`https://wa.me/55${String(selectedOrcamento.clienteTelefone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Contato</a>
-                    </div>
-                  </>
+                    <h4>Orçamentos do cliente</h4>
+                    <p>Selecione um cliente ao lado para visualizar os orçamentos realizados.</p>
+                  </div>
                 ) : (
-                  <div className="empty-state-orcamento">
-                    <span className="icon">OR</span>
-                    <h4>Selecione uma simulação</h4>
-                    <p>Clique em um item da lista para ver os detalhes.</p>
+                  <div className="orc-client-view">
+                    {/* Client header */}
+                    <div className="admin-card orc-client-header-card">
+                      <div className="orc-client-header-info">
+                        <div className="orc-client-avatar">{selectedOrcClient.nome.charAt(0).toUpperCase()}</div>
+                        <div>
+                          <h4>{selectedOrcClient.nome}</h4>
+                          <p>{[selectedOrcClient.whatsapp, selectedOrcClient.cidade, selectedOrcClient.estado].filter(Boolean).join(' · ') || 'Sem informações adicionais'}</p>
+                        </div>
+                      </div>
+                      <div className="orc-client-header-actions">
+                        <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setSelectedOrcClient(null); setIsBudgetFormOpen(false); }}>← Trocar cliente</button>
+                        {hasPermission('orcamentos') && (
+                          <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => { openBudgetFormForClient(selectedOrcClient); }}>+ Novo orçamento</button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Budget form */}
+                    {isBudgetFormOpen && (
+                      <form className="admin-card orc-budget-form" onSubmit={createManualBudget}>
+                        <div className="card-header-flex">
+                          <div>
+                            <span className="section-kicker">Novo orçamento</span>
+                            <h4>Proposta para {selectedOrcClient.nome}</h4>
+                          </div>
+                          <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setIsBudgetFormOpen(false)}>Fechar</button>
+                        </div>
+                        <div className="budget-form-grid">
+                          <label>
+                            Kit/catálogo base
+                            <select value={budgetForm.equipamentoId} onChange={(event) => applyEquipmentToBudget(event.target.value)}>
+                              <option value="">Preencher manualmente</option>
+                              {equipamentos.filter(item => item.active).map(item => (
+                                <option key={item.id} value={item.id}>{item.nome}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            Potência da placa
+                            <select value={budgetForm.potenciaPlacaW} onChange={(event) => setBudgetForm(prev => ({ ...prev, potenciaPlacaW: event.target.value }))}>
+                              {[550, 560, 570, 580, 590, 600, 605, 610, 615, 620, 630, 650, 700].map(value => <option key={value} value={value}>{value} W</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            Modelo da placa
+                            <input value={budgetForm.placaModelo} onChange={(event) => setBudgetForm(prev => ({ ...prev, placaModelo: event.target.value }))} placeholder="Ex: JA Solar 610 W" required />
+                          </label>
+                          <label>
+                            Quantidade de placas
+                            <input type="number" min="1" value={budgetForm.numeroPaineis} onChange={(event) => setBudgetForm(prev => ({ ...prev, numeroPaineis: event.target.value }))} required />
+                          </label>
+                          <label>
+                            Potência do inversor
+                            <input type="number" min="0" step="0.01" value={budgetForm.potenciaInversorKw} onChange={(event) => setBudgetForm(prev => ({ ...prev, potenciaInversorKw: event.target.value }))} placeholder="Ex: 8" required />
+                          </label>
+                          <label>
+                            Modelo do inversor
+                            <input value={budgetForm.inversorModelo} onChange={(event) => setBudgetForm(prev => ({ ...prev, inversorModelo: event.target.value }))} placeholder="Ex: Growatt 8 kW" required />
+                          </label>
+                          <label>
+                            Quantidade de inversores
+                            <input type="number" min="1" value={budgetForm.quantidadeInversores} onChange={(event) => setBudgetForm(prev => ({ ...prev, quantidadeInversores: event.target.value }))} />
+                          </label>
+                          <label>
+                            Cabo CC
+                            <input value={budgetForm.quantidadeCaboCc} onChange={(event) => setBudgetForm(prev => ({ ...prev, quantidadeCaboCc: event.target.value }))} placeholder="Ex: 60 m cabo solar 6 mm" />
+                          </label>
+                          <label>
+                            Área por placa
+                            <input type="number" min="0" step="0.01" value={budgetForm.areaPorPainelM2} onChange={(event) => setBudgetForm(prev => ({ ...prev, areaPorPainelM2: event.target.value }))} />
+                          </label>
+                          <label>
+                            Geração
+                            <select value={budgetForm.generationMode} onChange={(event) => setBudgetForm(prev => ({ ...prev, generationMode: event.target.value }))}>
+                              <option value="manual">Informar manualmente</option>
+                              <option value="auto">Calcular por irradiação</option>
+                            </select>
+                          </label>
+                          {budgetForm.generationMode === 'auto' ? (
+                            <>
+                              <label>
+                                Irradiação solar
+                                <input type="number" step="0.01" value={budgetForm.irradiacaoSolar} onChange={(event) => setBudgetForm(prev => ({ ...prev, irradiacaoSolar: event.target.value }))} placeholder="Ex: 5.2" required />
+                              </label>
+                              <label>
+                                Perda média
+                                <select value={budgetForm.perdaPercentual} onChange={(event) => setBudgetForm(prev => ({ ...prev, perdaPercentual: event.target.value }))}>
+                                  <option value="15">15%</option>
+                                  <option value="20">20%</option>
+                                  <option value="25">25%</option>
+                                </select>
+                              </label>
+                            </>
+                          ) : (
+                            <label className="span-2">
+                              Geração mensal kWh
+                              <input type="number" min="0" step="0.01" value={budgetForm.geracaoKwh} onChange={(event) => setBudgetForm(prev => ({ ...prev, geracaoKwh: event.target.value }))} required />
+                            </label>
+                          )}
+                          <label>
+                            Valor do sistema
+                            <input type="number" min="0" step="0.01" value={budgetForm.valorSistema} onChange={(event) => setBudgetForm(prev => ({ ...prev, valorSistema: event.target.value }))} required />
+                          </label>
+                          <label>
+                            Forma de pagamento
+                            <select value={budgetForm.formaPagamentoTipo} onChange={(event) => setBudgetForm(prev => ({ ...prev, formaPagamentoTipo: event.target.value }))}>
+                              {pagamentoTypeOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                            </select>
+                          </label>
+                          <label className="span-2">
+                            Condições
+                            <textarea value={budgetForm.condicoesPagamento} onChange={(event) => setBudgetForm(prev => ({ ...prev, condicoesPagamento: event.target.value }))} placeholder="Ex: entrada + saldo financiado, validade da proposta, parcelas..." required />
+                          </label>
+                          <label className="span-2">
+                            Observações
+                            <textarea value={budgetForm.observacoes} onChange={(event) => setBudgetForm(prev => ({ ...prev, observacoes: event.target.value }))} placeholder="Detalhes técnicos, observações comerciais ou premissas da proposta." />
+                          </label>
+                        </div>
+                        <div className="budget-result-strip">
+                          <div><span>Potência</span><strong>{budgetCalculations.potenciaKwp} kWp</strong></div>
+                          <div><span>Área</span><strong>{budgetCalculations.areaOcupadaM2} m²</strong></div>
+                          <div><span>Geração</span><strong>{budgetCalculations.geracaoKwh} kWh/mês</strong></div>
+                          <div><span>Valor</span><strong>{money(budgetForm.valorSistema)}</strong></div>
+                        </div>
+                        <div className="actions-footer">
+                          <button type="button" className="btn btn-outline" onClick={() => setBudgetForm(emptyBudgetForm)}>Limpar</button>
+                          <button type="submit" className="btn btn-primary">Salvar orçamento</button>
+                        </div>
+                        {budgetStatus && <p className="muted-text">{budgetStatus}</p>}
+                      </form>
+                    )}
+
+                    {/* Budget list */}
+                    <div className="admin-card orc-list-card">
+                      <div className="orc-list-header">
+                        <h4>Orçamentos <span className="orc-count">({clientOrcamentos.length})</span></h4>
+                      </div>
+
+                      {clientOrcamentos.length === 0 ? (
+                        <div className="orc-list-empty">
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 1.5L18.5 9H13V3.5ZM8 17h8v1.5H8V17Zm0-3.5h8v1.5H8v-1.5Zm0-3.5h5v1.5H8V10Z" /></svg>
+                          <p>Nenhum orçamento para este cliente ainda.</p>
+                          {hasPermission('orcamentos') && <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openBudgetFormForClient(selectedOrcClient)}>Criar primeiro orçamento</button>}
+                        </div>
+                      ) : (
+                        <div className="orc-cards-list">
+                          {clientOrcamentos.map(orc => (
+                            <div key={orc.id} className="orc-card-item">
+                              <div className="orc-card-main">
+                                <div className="orc-card-info">
+                                  <strong>Orçamento #{orc.id}</strong>
+                                  <span>{orc.dimensionamento?.potencia_real_instalada_kwp || 0} kWp · {orc.dimensionamento?.numero_paineis_necessarios || 0} placas · {money(orc.financeiro?.preco_final_cliente_rs)}</span>
+                                  <em>{orc.data} · {getResponsibleName(orc.assignedUserName)}</em>
+                                </div>
+                                <div className="orc-card-actions">
+                                  <a className="btn btn-outline btn-sm-admin" href={getOrcamentoDownloadUrl(orc.id)} target="_blank" rel="noopener noreferrer">
+                                    <svg viewBox="0 0 24 24" width="14" height="14"><path d="M5 20h14v-2H5v2Zm7-18v12l-5-5-1.4 1.4L12 17l6.4-6.6L17 9l-5 5V2h-2Z" fill="currentColor"/></svg>
+                                    Baixar PDF
+                                  </a>
+                                  {hasPermission('contratos') && (
+                                    <>
+                                      <div className="orc-equip-select">
+                                        <select
+                                          value={selectedEquipamentos[orc.id] || ''}
+                                          onChange={(event) => setSelectedEquipamentos(prev => ({ ...prev, [orc.id]: event.target.value }))}
+                                        >
+                                          <option value="">Equipamento padrão</option>
+                                          {equipamentos.filter(item => item.active).map(item => (
+                                            <option key={item.id} value={item.id}>{item.nome}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => openContractModal(orc)}>Emitir Contrato</button>
+                                    </>
+                                  )}
+                                  <a
+                                    className="leads-wa-btn"
+                                    href={`https://wa.me/55${String(selectedOrcClient.whatsapp || '').replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label="Enviar via WhatsApp"
+                                  >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" /></svg>
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
