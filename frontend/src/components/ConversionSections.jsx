@@ -8,7 +8,7 @@ export const TrustBar = () => (
       <div className="trust-grid">
         <div className="trust-item">
           <span className="trust-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M9 22V12h6v10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -20,7 +20,7 @@ export const TrustBar = () => (
         </div>
         <div className="trust-item">
           <span className="trust-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
@@ -31,7 +31,7 @@ export const TrustBar = () => (
         </div>
         <div className="trust-item">
           <span className="trust-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M2 22c3.6-5.3 8.4-8 14-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
               <path d="M12 4c0 5-4 8-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
               <path d="M12 4c0 5 4 8 8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
@@ -44,7 +44,7 @@ export const TrustBar = () => (
         </div>
         <div className="trust-item">
           <span className="trust-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>

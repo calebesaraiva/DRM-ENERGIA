@@ -20,20 +20,25 @@
 }
 
 .trust-icon {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   background: #fff7ed;
   border-radius: 10px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   color: #f97316;
+  line-height: 0;
+  font-size: 0;
 }
 
 .trust-icon svg {
   width: 22px;
   height: 22px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .trust-item strong {

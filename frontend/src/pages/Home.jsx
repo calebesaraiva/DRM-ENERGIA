@@ -32,7 +32,7 @@ const Home = () => {
           }
         });
       },
-      { threshold: 0.1, rootMargin: '0px 0px -6% 0px' },
+      { threshold: 0.08, rootMargin: '0px 0px -4% 0px' },
     );
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
@@ -42,9 +42,8 @@ const Home = () => {
 
   return (
     <main>
-      <div className="reveal-section">
-        <Hero onOpenSimulation={openSimulation} />
-      </div>
+      {/* Hero sem reveal-section: visível imediatamente */}
+      <Hero onOpenSimulation={openSimulation} />
       <div className="reveal-section"><TrustBar /></div>
       <div className="reveal-section"><SocialProof /></div>
       <div className="reveal-section"><ProjectGallery /></div>
