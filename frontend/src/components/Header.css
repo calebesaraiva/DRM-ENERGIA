@@ -230,6 +230,11 @@
   margin-top: 0.1rem;
 }
 
+/* Mobile access section */
+.mobile-access-section {
+  display: none;
+}
+
 /* Hamburger */
 .hamburger {
   display: none;
@@ -277,22 +282,28 @@
     display: flex;
   }
 
+  /* Hide the desktop Entrar dropdown on mobile — we use the inline section below */
+  .header-access-wrap {
+    display: none;
+  }
+
   .main-nav {
     position: fixed;
     top: 0;
     right: -100%;
-    width: 78vw;
-    max-width: 300px;
+    width: 82vw;
+    max-width: 320px;
     height: 100dvh;
     background: #fff;
     z-index: 1001;
     flex-direction: column;
     justify-content: flex-start;
     align-items: flex-start;
-    padding: 5rem 1.5rem 2rem;
-    gap: 1.5rem;
+    padding: 5rem 1.5rem calc(2rem + env(safe-area-inset-bottom));
+    gap: 0;
     transition: right 0.3s ease;
-    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.12);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.14);
+    overflow-y: auto;
   }
 
   .main-nav.nav-open {
@@ -309,21 +320,76 @@
   .nav-links li { width: 100%; }
 
   .nav-links a {
-    display: block;
+    display: flex;
+    align-items: center;
     font-size: 1rem;
-    padding: 0.75rem 0.8rem;
+    font-weight: 500;
+    padding: 0.85rem 0.8rem;
+    border-radius: 10px;
+    color: #374151;
+    transition: background 0.15s;
+  }
+
+  .nav-links a:hover {
+    background: #f9fafb;
+  }
+
+  /* Mobile access section */
+  .mobile-access-section {
+    display: block;
+    width: 100%;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .mobile-access-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #9ca3af;
+    padding: 0 0.8rem 0.5rem;
+  }
+
+  .mobile-access-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 0.8rem;
+    color: #374151;
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-decoration: none;
+    border-radius: 10px;
+    transition: background 0.15s;
+  }
+
+  .mobile-access-link:hover {
+    background: #f9fafb;
+  }
+
+  .mobile-access-link svg {
+    width: 18px;
+    height: 18px;
+    color: #f97316;
+    flex-shrink: 0;
   }
 
   .header-right {
     width: 100%;
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid #f3f4f6;
   }
 
   .btn-header-whatsapp {
     width: 100%;
     justify-content: center;
-    font-size: 0.93rem;
-    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    padding: 0.85rem 1rem;
     border-radius: 12px;
+    min-height: 48px;
   }
 
   .logo-img {

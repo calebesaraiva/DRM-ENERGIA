@@ -60,6 +60,21 @@ const Header = () => {
             ))}
           </ul>
 
+          {/* Mobile-only: acesso direto sem dropdown */}
+          {!role && (
+            <div className="mobile-access-section">
+              <p className="mobile-access-label">Acessar sistema</p>
+              <Link to="/portal-cliente" className="mobile-access-link" onClick={() => setMenuOpen(false)}>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/></svg>
+                Portal do Cliente
+              </Link>
+              <Link to="/sistema-drm" className="mobile-access-link" onClick={() => setMenuOpen(false)}>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                Equipe DRM
+              </Link>
+            </div>
+          )}
+
           <div className="header-right">
             {role ? (
               <>
