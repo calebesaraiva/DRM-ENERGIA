@@ -4444,34 +4444,39 @@
 
 .section-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
   gap: 0.65rem;
-  min-width: 280px;
-  max-width: 440px;
+  flex-shrink: 0;
 }
 
 .section-stats div {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0.85rem;
+  padding: 0.85rem 1rem;
   border: 1px solid #e6eaf0;
   border-radius: 12px;
   background: #f8fafc;
+  overflow: hidden;
 }
 
 .section-stats strong {
   color: #111827;
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .section-stats span {
-  margin-top: 0.25rem;
+  margin-top: 0.3rem;
   color: #64748b;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
 }
 
 /* --- ESTILOS RESPONSIVOS --- */
