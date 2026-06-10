@@ -46,6 +46,20 @@ const roleLabels = {
   CONSULTOR: 'Consultor',
 };
 
+const siteEventLabels = {
+  initial_load:        'Acesso ao site (1ª abertura)',
+  route_change:        'Navegação entre páginas',
+  simulation_cta:      'Clique em "Simular"',
+  whatsapp_cta:        'Clique no botão WhatsApp',
+  modal_auto_whatsapp: 'Simulação concluída → WhatsApp aberto',
+  modal_success:       'Formulário de simulação preenchido',
+  page_view:           'Visualização de página',
+  whatsapp_click:      'Clique no WhatsApp',
+  simulation_click:    'Iniciou simulação',
+  simulation_completed:'Simulação finalizada',
+};
+const labelSiteEvent = (source) => siteEventLabels[source] || source.replace(/_/g, ' ');
+
 const defaultContractConfig = {
   empresa: { nome: '', cnpj: '', telefone: '', email: '', endereco: '' },
   visual: { logoPosition: 'center', logoWidth: 150, primaryColor: '#F97316' },
@@ -2007,7 +2021,7 @@ const AdminDashboard = () => {
                     ).map(item => (
                       <div className="pipeline-item" key={item.source || item.etapa}>
                         <div>
-                          <strong>{item.source || item.etapa}</strong>
+                          <strong>{item.source ? labelSiteEvent(item.source) : item.etapa}</strong>
                           <span>{item.total} {item.source ? 'evento' : 'projeto'}{item.total === 1 ? '' : 's'}</span>
                         </div>
                         <div className="pipeline-bar orange"><span style={{ width: `${Math.min((item.total / Math.max(resumo.siteAnalytics?.totalEventos30d || resumo.kpis?.projetosAtivos || 1, 1)) * 100, 100)}%` }}></span></div>
