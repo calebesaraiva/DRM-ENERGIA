@@ -795,8 +795,8 @@
 
 .modern-table td {
   color: var(--cor-texto);
-  font-size: 0.95rem;
-  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  white-space: nowrap;
   background: #fff;
 }
 
@@ -1338,6 +1338,80 @@
 .clients-table-card .table-container { margin: 0; }
 .clients-table-card .modern-table { border-radius: 0; box-shadow: none; }
 .clients-table-card .empty-state-orcamento { margin: 2rem; }
+
+/* Client table cells */
+.client-table-v2 { min-width: 860px; }
+.client-table-v2 .col-id   { color: #94a3b8; font-size: 0.8rem; padding-right: 0.5rem; }
+.client-table-v2 .col-nome .client-name { font-weight: 600; color: #0f172a; }
+.client-table-v2 .text-muted { color: #94a3b8; font-size: 0.83rem; }
+
+/* WhatsApp cell link */
+.wp-cell-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #1e293b;
+  text-decoration: none;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.wp-cell-link:hover { color: #16a34a; }
+
+/* Etapa cell */
+.etapa-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+.etapa-change-btns { display: inline-flex; gap: 0.2rem; }
+
+/* Client action buttons */
+.client-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+.ca-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.38rem 0.8rem;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+  line-height: 1;
+}
+.ca-primary {
+  background: #f97316;
+  color: #fff;
+  border-color: #f97316;
+}
+.ca-primary:hover { background: #ea6c0a; border-color: #ea6c0a; }
+.ca-outline {
+  background: #fff;
+  color: #374151;
+  border-color: #dce2ea;
+}
+.ca-outline:hover { border-color: #94a3b8; background: #f8fafc; }
+.ca-ghost {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #f1f5f9;
+  padding: 0.38rem 0.55rem;
+}
+.ca-ghost:hover { background: #e2e8f0; color: #374151; }
+
+/* Row hover */
+.client-row:hover td { background: #fafbff !important; }
 
 .client-empty-state {
   min-height: 220px;

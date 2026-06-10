@@ -2326,14 +2326,13 @@ const AdminDashboard = () => {
                       <table className="modern-table client-table-v2">
                         <thead>
                           <tr>
-                            <th>ID</th>
+                            <th style={{width:'42px'}}>#</th>
                             <th>Cliente</th>
                             <th>WhatsApp</th>
                             <th>Cidade / UF</th>
                             <th>Cadastro</th>
-                            <th>Status</th>
                             <th>Etapa</th>
-                            <th>Ações</th>
+                            <th style={{width:'1%'}}>Ações</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2341,40 +2340,44 @@ const AdminDashboard = () => {
                             const whatsappDigits = String(c.whatsapp || '').replace(/\D/g, '');
                             const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}?text=${whatsappClientMessage(c)}` : '';
                             const etapa = c.etapaComercial || 'Em negociação';
+                            const dataFormatada = c.dataCadastro ? c.dataCadastro.slice(0,10).split('-').reverse().join('/') : '—';
                             return (
-                              <tr key={c.id}>
-                                <td data-label="ID" className="col-id">{c.id}</td>
-                                <td data-label="Cliente" className="col-nome font-medium">{c.nome}</td>
-                                <td data-label="WhatsApp" className="col-wp">
-                                  <span>{c.whatsapp || '—'}</span>
-                                  {whatsappHref && <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="wp-icon-link" title="Abrir WhatsApp">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#25d366"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
-                                  </a>}
+                              <tr key={c.id} className="client-row">
+                                <td className="col-id text-muted">{c.id}</td>
+                                <td className="col-nome">
+                                  <span className="client-name">{c.nome}</span>
                                 </td>
-                                <td data-label="Cidade/UF">{[c.cidade, c.estado].filter(Boolean).join(' / ') || '—'}</td>
-                                <td data-label="Cadastro">{c.dataCadastro || '—'}</td>
-                                <td data-label="Status"><span className="status-badge success">Ativo</span></td>
-                                <td data-label="Etapa">
+                                <td className="col-wp">
+                                  {c.whatsapp ? (
+                                    <a href={whatsappHref || '#'} target="_blank" rel="noopener noreferrer" className="wp-cell-link" title="Abrir WhatsApp">
+                                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#25d366" flexShrink="0"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
+                                      {c.whatsapp}
+                                    </a>
+                                  ) : <span className="text-muted">—</span>}
+                                </td>
+                                <td>{[c.cidade, c.estado].filter(Boolean).join(' / ') || '—'}</td>
+                                <td className="text-muted">{dataFormatada}</td>
+                                <td>
                                   <div className="etapa-cell">
-                                    <span className={`etapa-chip ${etapa === 'Venda concluída' ? 'etapa-concluida' : etapa === 'Venda suspensa' ? 'etapa-suspensa' : 'etapa-negociacao'}`}>
-                                      <i className="etapa-dot"></i>{etapa}
-                                    </span>
+                                    <span className={`etapa-chip ${etapa === 'Venda concluída' ? 'etapa-concluida' : etapa === 'Venda suspensa' ? 'etapa-suspensa' : 'etapa-negociacao'}`}>{etapa}</span>
                                     <div className="etapa-change-btns">
-                                      {etapa !== 'Venda concluída' && <button type="button" className="etapa-micro-btn concluir" title="Marcar como Venda concluída" onClick={() => updateClienteEtapa(c.id, 'Venda concluída', {})}>✓</button>}
-                                      {etapa !== 'Em negociação' && <button type="button" className="etapa-micro-btn negociar" title="Mover para Em negociação" onClick={() => updateClienteEtapa(c.id, 'Em negociação', {})}>↺</button>}
+                                      {etapa !== 'Venda concluída' && <button type="button" className="etapa-micro-btn concluir" title="Venda concluída" onClick={() => updateClienteEtapa(c.id, 'Venda concluída', {})}>✓</button>}
+                                      {etapa !== 'Em negociação' && <button type="button" className="etapa-micro-btn negociar" title="Em negociação" onClick={() => updateClienteEtapa(c.id, 'Em negociação', {})}>↺</button>}
                                       {etapa !== 'Venda suspensa' && <button type="button" className="etapa-micro-btn suspender" title="Suspender venda" onClick={() => { setSuspensaoModal(c); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}>⏸</button>}
                                     </div>
                                   </div>
                                 </td>
-                                <td data-label="Ações">
-                                  <div className="table-actions table-actions-compact">
-                                    {whatsappHref && <a className="btn-action-wp" href={whatsappHref} target="_blank" rel="noopener noreferrer">
-                                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
-                                      WhatsApp
-                                    </a>}
-                                    {hasPermission('orcamentos') && <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openBudgetFormForClient(c)}>Fazer orçamento</button>}
-                                    {hasPermission('contratos') && <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => openClientContractModal(c)}>Contrato direto</button>}
-                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>Ver</button>
+                                <td>
+                                  <div className="client-actions">
+                                    {hasPermission('orcamentos') && (
+                                      <button type="button" className="ca-btn ca-primary" onClick={() => openBudgetFormForClient(c)}>Orçamento</button>
+                                    )}
+                                    {hasPermission('contratos') && (
+                                      <button type="button" className="ca-btn ca-outline" onClick={() => openClientContractModal(c)}>Contrato</button>
+                                    )}
+                                    <button type="button" className="ca-btn ca-ghost" title="Ver detalhes" onClick={() => { setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </button>
                                   </div>
                                 </td>
                               </tr>
