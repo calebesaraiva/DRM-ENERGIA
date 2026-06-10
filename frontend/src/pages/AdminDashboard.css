@@ -6610,6 +6610,7 @@
   letter-spacing: 0.06em;
   text-align: left;
   border-bottom: 1px solid #e8eef4;
+  white-space: nowrap;
 }
 
 .orc-table td {
@@ -6617,6 +6618,7 @@
   color: #334155;
   border-bottom: 1px solid #f8fafc;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .orc-table tbody tr:last-child td {
@@ -6998,6 +7000,7 @@
   color: #334155;
   border-bottom: 1px solid #f8fafc;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .ctr-table tbody tr:last-child td { border-bottom: none; }
