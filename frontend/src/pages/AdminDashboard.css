@@ -1404,11 +1404,12 @@
 .ca-outline:hover { border-color: #94a3b8; background: #f8fafc; }
 .ca-ghost {
   background: #f1f5f9;
-  color: #64748b;
-  border-color: #f1f5f9;
-  padding: 0.38rem 0.55rem;
+  color: #475569;
+  border-color: #e2e8f0;
+  padding: 0.38rem 0.7rem;
+  gap: 0.3rem;
 }
-.ca-ghost:hover { background: #e2e8f0; color: #374151; }
+.ca-ghost:hover { background: #e2e8f0; color: #1e293b; border-color: #cbd5e1; }
 
 /* Row hover */
 .client-row:hover td { background: #fafbff !important; }
@@ -5991,10 +5992,7 @@
   color: #ea580c;
 }
 
-.leads-filter-arrow {
-  font-size: 0.7rem;
-  opacity: 0.6;
-}
+.leads-filter-arrow { display: none; }
 
 /* ── Registrar contato ── */
 .leads-rc-card {}
