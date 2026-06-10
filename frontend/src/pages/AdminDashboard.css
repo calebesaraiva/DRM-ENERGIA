@@ -3204,8 +3204,9 @@
 
 .contract-admin-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.4fr);
   gap: 1rem;
+  align-items: start;
 }
 
 .products-catalog-layout {
@@ -3416,30 +3417,44 @@
 }
 
 .catalog-shortcut-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-self: flex-start;
+}
+
+.catalog-shortcut-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 1rem;
 }
 
-.catalog-shortcut-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem;
+.catalog-shortcut-info h3 { margin: 0 0 0.2rem; font-size: 1rem; }
+.catalog-shortcut-info p  { margin: 0; font-size: 0.8rem; }
+
+.catalog-shortcut-chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.catalog-shortcut-summary div {
-  padding: 0.85rem;
-  border-radius: 10px;
-  background: #f8fafc;
+.catalog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+  color: #475569;
+  white-space: nowrap;
 }
 
-.catalog-shortcut-summary strong,
-.catalog-shortcut-summary span {
-  display: block;
-}
-
-.catalog-shortcut-summary span {
-  color: #64748b;
-  font-size: 0.84rem;
+.catalog-chip strong {
+  color: #0f172a;
+  font-weight: 700;
 }
 
 .equipment-form {

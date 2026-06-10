@@ -3272,18 +3272,18 @@ const AdminDashboard = () => {
               {adminUser.role === 'ADM' && (
                 <div className="contract-admin-grid">
                   <div className="admin-card catalog-shortcut-card">
-                    <div className="card-header-flex">
-                      <div>
+                    <div className="catalog-shortcut-top">
+                      <div className="catalog-shortcut-info">
                         <h3>Produtos e pacotes</h3>
-                        <p className="muted-text">O cadastro completo agora fica em uma tela própria no menu lateral.</p>
+                        <p className="muted-text">Gerencie kits e equipamentos no menu lateral.</p>
                       </div>
-                      <span className="status-badge success">{equipamentos.length} itens</span>
+                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setActiveTab('produtosPacotes')}>Abrir catálogo →</button>
                     </div>
-                    <div className="catalog-shortcut-summary">
-                      <div><strong>{activeProdutosTotal}</strong><span>ativos</span></div>
-                      <div><strong>{equipamentos.filter(item => item.valorSistema).length}</strong><span>com valor</span></div>
+                    <div className="catalog-shortcut-chips">
+                      <span className="catalog-chip"><strong>{activeProdutosTotal}</strong> ativos</span>
+                      <span className="catalog-chip"><strong>{equipamentos.filter(item => item.valorSistema).length}</strong> com valor</span>
+                      <span className="catalog-chip"><strong>{equipamentos.length}</strong> total</span>
                     </div>
-                    <button type="button" className="btn btn-primary" onClick={() => setActiveTab('produtosPacotes')}>Abrir catálogo</button>
                   </div>
 
                   <form className="admin-card contract-template-editor" onSubmit={saveContractConfig}>
