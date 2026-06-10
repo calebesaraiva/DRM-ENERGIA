@@ -474,6 +474,14 @@ const AdminDashboard = () => {
   const [comunicacoes, setComunicacoes] = useState(null);
   const [tabelasPrecos, setTabelasPrecos] = useState([]);
   const [toasts, setToasts] = useState([]);
+  const [clientEtapaFilter, setClientEtapaFilter] = useState('todos');
+  const [suspensaoModal, setSuspensaoModal] = useState(null);
+  const [suspensaoForm, setSuspensaoForm] = useState({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' });
+  const [homoView, setHomoView] = useState('fila');
+  const [homoDetalheTab, setHomoDetalheTab] = useState('cliente');
+  const [homoStatusFilter, setHomoStatusFilter] = useState('todos');
+  const [homoDocUpload, setHomoDocUpload] = useState({ tipo: 'cliente', nome: '', descricao: '', arquivo: null });
+  const [homoDocUploadLoading, setHomoDocUploadLoading] = useState(false);
 
   const headers = useMemo(() => ({
     'Content-Type': 'application/json',
@@ -616,6 +624,8 @@ const AdminDashboard = () => {
   const clientSummary = useMemo(() => {
     const search = clientSearch.trim().toLowerCase();
     const filtered = clientes.filter(cliente => {
+      const etapa = cliente.etapaComercial || 'Em negociação';
+      if (clientEtapaFilter !== 'todos' && etapa !== clientEtapaFilter) return false;
       if (!search) return true;
       return [cliente.nome, cliente.whatsapp, cliente.cidade, cliente.email, cliente.cpfCnpj, cliente.unidadeConsumidora, cliente.distribuidora]
         .some(value => String(value || '').toLowerCase().includes(search));
@@ -623,9 +633,12 @@ const AdminDashboard = () => {
 
     const withWhatsApp = clientes.filter(cliente => String(cliente.whatsapp || '').replace(/\D/g, '').length >= 10).length;
     const withCity = clientes.filter(cliente => String(cliente.cidade || '').trim()).length;
+    const vendaSuspensa = clientes.filter(c => (c.etapaComercial || 'Em negociação') === 'Venda suspensa').length;
+    const emNegociacao = clientes.filter(c => (c.etapaComercial || 'Em negociação') === 'Em negociação').length;
+    const vendaConcluida = clientes.filter(c => c.etapaComercial === 'Venda concluída').length;
 
-    return { filtered, withWhatsApp, withCity };
-  }, [clientes, clientSearch]);
+    return { filtered, withWhatsApp, withCity, vendaSuspensa, emNegociacao, vendaConcluida };
+  }, [clientes, clientSearch, clientEtapaFilter]);
 
   const activeUsersTotal = useMemo(
     () => usuarios.filter(user => user.active).length,
@@ -781,9 +794,7 @@ const AdminDashboard = () => {
     };
   }, [projetos]);
 
-  const filteredHomologacaoProjetos = useMemo(() => (
-    filteredProjetos.filter(projeto => projeto.etapa !== 'Projeto concluído' || (projeto.enviosHomologacao || []).length || (projeto.pendenciasHomologacao || []).length)
-  ), [filteredProjetos]);
+  const filteredHomologacaoProjetos = useMemo(() => filteredProjetos, [filteredProjetos]);
 
   const osSummary = useMemo(() => ({
     total: ordensServico.length,
@@ -1413,6 +1424,82 @@ const AdminDashboard = () => {
     }
   };
 
+  const updateClienteEtapa = async (clienteId, etapa, form = {}) => {
+    if (etapa === 'Venda suspensa' && !form.motivo?.trim()) {
+      showToast('O motivo da suspensão é obrigatório.', 'error');
+      return;
+    }
+    try {
+      const updated = await request(`/api/admin/clientes/${clienteId}/etapa-comercial`, {
+        method: 'PUT',
+        body: JSON.stringify({ etapaComercial: etapa, motivoSuspensao: form.motivo, dataPrevisaoRetorno: form.dataPrevisaoRetorno, ultimoContatoComercial: form.ultimoContato, proximaAcaoComercial: form.proximaAcao }),
+      });
+      setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, ...updated } : c));
+      setSuspensaoModal(null);
+      setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' });
+      showToast(`Etapa atualizada: ${etapa}`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const uploadProjetoDocumento = async (projetoId, tipo, docData) => {
+    setHomoDocUploadLoading(true);
+    try {
+      const updated = await request(`/api/admin/projetos/${projetoId}/documentos`, {
+        method: 'POST',
+        body: JSON.stringify({ tipo, ...docData }),
+      });
+      setProjetos(prev => prev.map(p => p.id === projetoId ? updated : p));
+      setSelectedProjeto(updated);
+      setHomoDocUpload({ tipo: 'cliente', nome: '', descricao: '', arquivo: null });
+      showToast('Documento adicionado.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setHomoDocUploadLoading(false);
+    }
+  };
+
+  const updateProjetoDocumento = async (projetoId, docId, tipo, data) => {
+    try {
+      const updated = await request(`/api/admin/projetos/${projetoId}/documentos/${docId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ tipo, ...data }),
+      });
+      setProjetos(prev => prev.map(p => p.id === projetoId ? updated : p));
+      setSelectedProjeto(updated);
+      showToast('Documento atualizado.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const deleteProjetoDocumento = async (projetoId, docId, tipo) => {
+    try {
+      await request(`/api/admin/projetos/${projetoId}/documentos/${docId}?tipo=${tipo}`, { method: 'DELETE' });
+      const updated = await request(`/api/admin/projetos/${projetoId}`);
+      setProjetos(prev => prev.map(p => p.id === projetoId ? updated : p));
+      setSelectedProjeto(updated);
+      showToast('Documento removido.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const updateProjetoDetalhes = async (projetoId, data) => {
+    try {
+      const updated = await request(`/api/admin/projetos/${projetoId}/detalhes-homologacao`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      setProjetos(prev => prev.map(p => p.id === projetoId ? updated : p));
+      setSelectedProjeto(updated);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const openBudgetFormForClient = (cliente = null) => {
     setBudgetStatus('');
     setBudgetForm({
@@ -1988,6 +2075,57 @@ const AdminDashboard = () => {
 
           {activeTab === 'clientes' && (
             <div className="admin-section client-screen">
+              {/* Modal de Suspensão */}
+              {suspensaoModal && (
+                <div className="contract-modal-backdrop">
+                  <div className="suspensao-modal">
+                    <div className="suspensao-modal-header">
+                      <div>
+                        <h3>Suspender Venda</h3>
+                        <p>{suspensaoModal.nome}</p>
+                      </div>
+                      <button type="button" className="lead-modal-close" onClick={() => { setSuspensaoModal(null); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}>×</button>
+                    </div>
+                    <div className="suspensao-modal-body">
+                      <div className="cc-field">
+                        <label className="cc-label">Motivo da suspensão <span className="cc-required">*</span></label>
+                        <textarea
+                          className="cc-input cc-textarea"
+                          placeholder="Descreva o motivo: cliente pausou, não respondeu, pediu para aguardar..."
+                          value={suspensaoForm.motivo}
+                          onChange={e => setSuspensaoForm(prev => ({ ...prev, motivo: e.target.value }))}
+                          rows={3}
+                        />
+                      </div>
+                      <div className="suspensao-modal-row">
+                        <div className="cc-field">
+                          <label className="cc-label">Data prevista de retorno</label>
+                          <input type="date" className="cc-input" value={suspensaoForm.dataPrevisaoRetorno} onChange={e => setSuspensaoForm(prev => ({ ...prev, dataPrevisaoRetorno: e.target.value }))} />
+                        </div>
+                        <div className="cc-field">
+                          <label className="cc-label">Último contato</label>
+                          <input type="date" className="cc-input" value={suspensaoForm.ultimoContato} onChange={e => setSuspensaoForm(prev => ({ ...prev, ultimoContato: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div className="cc-field">
+                        <label className="cc-label">Próxima ação</label>
+                        <select className="cc-input" value={suspensaoForm.proximaAcao} onChange={e => setSuspensaoForm(prev => ({ ...prev, proximaAcao: e.target.value }))}>
+                          <option value="">Selecione a próxima ação</option>
+                          <option value="Ligar">Ligar</option>
+                          <option value="Mandar mensagem">Mandar mensagem</option>
+                          <option value="Enviar nova proposta">Enviar nova proposta</option>
+                          <option value="Aguardar cliente">Aguardar cliente</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="suspensao-modal-footer">
+                      <button type="button" className="cc-btn-cancel" onClick={() => { setSuspensaoModal(null); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}>Cancelar</button>
+                      <button type="button" className="btn btn-danger" onClick={() => updateClienteEtapa(suspensaoModal.id, 'Venda suspensa', suspensaoForm)} disabled={!suspensaoForm.motivo.trim()}>Confirmar Suspensão</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {clientView === 'new' ? (
                 <div className="cc-page">
                   <div className="cc-page-header">
@@ -2011,15 +2149,12 @@ const AdminDashboard = () => {
                           <label className="cc-label">Nome completo <span className="cc-required">*</span></label>
                           <input className="cc-input" placeholder="Digite o nome completo do cliente" value={novoCliente.nome} onChange={(e) => setNovoCliente(prev => ({ ...prev, nome: e.target.value }))} required />
                         </div>
-
                         <div className="cc-field">
                           <label className="cc-label">CPF <span className="cc-required">*</span></label>
                           <input className="cc-input" placeholder="000.000.000-00" value={novoCliente.cpfCnpj} onChange={(e) => setNovoCliente(prev => ({ ...prev, cpfCnpj: maskCpf(e.target.value) }))} />
                         </div>
-
                         <div className="cc-address-block">
                           <p className="cc-section-label">Endereço completo <span className="cc-required">*</span></p>
-
                           <div className="cc-row cc-row-rua">
                             <div className="cc-field">
                               <label className="cc-label">Rua <span className="cc-required">*</span></label>
@@ -2030,7 +2165,6 @@ const AdminDashboard = () => {
                               <input className="cc-input" placeholder="Digite o número" value={novoCliente.numero} onChange={(e) => setNovoCliente(prev => ({ ...prev, numero: e.target.value }))} />
                             </div>
                           </div>
-
                           <div className="cc-row cc-row-2">
                             <div className="cc-field">
                               <label className="cc-label">Bairro <span className="cc-required">*</span></label>
@@ -2041,7 +2175,6 @@ const AdminDashboard = () => {
                               <input className="cc-input" placeholder="Digite o complemento" value={novoCliente.complemento} onChange={(e) => setNovoCliente(prev => ({ ...prev, complemento: e.target.value }))} />
                             </div>
                           </div>
-
                           <div className="cc-row cc-row-3">
                             <div className="cc-field">
                               <label className="cc-label">CEP <span className="cc-required">*</span></label>
@@ -2060,23 +2193,19 @@ const AdminDashboard = () => {
                             </div>
                           </div>
                         </div>
-
                         <div className="cc-field">
                           <label className="cc-label">WhatsApp <span className="cc-required">*</span></label>
                           <input className="cc-input" placeholder="(00) 00000-0000" value={novoCliente.whatsapp} onChange={(e) => setNovoCliente(prev => ({ ...prev, whatsapp: maskWhatsapp(e.target.value) }))} required />
                         </div>
-
                         <div className="cc-field">
                           <label className="cc-label">E-mail</label>
                           <input className="cc-input" type="email" placeholder="exemplo@email.com" value={novoCliente.email} onChange={(e) => setNovoCliente(prev => ({ ...prev, email: e.target.value }))} />
                         </div>
-
                         <div className="cc-field">
                           <label className="cc-label">Observações</label>
                           <textarea className="cc-input cc-textarea" placeholder="Digite observações adicionais sobre o cliente (opcional)" value={novoCliente.observacoes} onChange={(e) => setNovoCliente(prev => ({ ...prev, observacoes: e.target.value }))} />
                         </div>
                       </div>
-
                       <div className="cc-footer">
                         <button type="button" className="cc-btn-cancel" onClick={() => { setClientView('list'); setNovoCliente(emptyClientForm); }}>
                           <span aria-hidden="true">✕</span> Cancelar
@@ -2095,47 +2224,100 @@ const AdminDashboard = () => {
                     <div>
                       <span className="section-kicker">Base comercial</span>
                       <h3>Clientes</h3>
-                      <p>Cadastre, encontre e fale com clientes sem sair da tela.</p>
+                      <p>Cadastre, encontre e gerencie etapas comerciais sem sair da tela.</p>
                     </div>
                     <div className="section-stats">
-                      <div><strong>{clientes.length}</strong><span>clientes</span></div>
-                      <div><strong>{clientSummary.withWhatsApp}</strong><span>com WhatsApp</span></div>
-                      <div><strong>{clientSummary.withCity}</strong><span>com cidade</span></div>
+                      <div><strong>{clientes.length}</strong><span>total</span></div>
+                      <div><strong style={{color:'#16a34a'}}>{clientSummary.vendaConcluida}</strong><span>concluídas</span></div>
+                      <div><strong style={{color:'#2563eb'}}>{clientSummary.emNegociacao}</strong><span>em negociação</span></div>
+                      <div><strong style={{color:'#dc2626'}}>{clientSummary.vendaSuspensa}</strong><span>suspensas</span></div>
                     </div>
                   </div>
 
-                  {hasPermission('gerenciarClientes') && (
-                    <div className="cc-list-actions">
-                      <button type="button" className="btn btn-primary cc-new-btn" onClick={() => { setNovoCliente(emptyClientForm); setClientView('new'); }}>
-                        + Cadastrar Cliente
-                      </button>
+                  {/* Vendas Suspensas info area */}
+                  {clientEtapaFilter === 'Venda suspensa' && clientSummary.vendaSuspensa > 0 && (
+                    <div className="admin-card vendas-suspensas-info">
+                      <div className="vendas-suspensas-header">
+                        <div>
+                          <h4>Vendas Suspensas</h4>
+                          <p className="muted-text">Clientes que pausaram, sumiram ou pediram para aguardar. Acompanhe e retome contato.</p>
+                        </div>
+                        <span className="etapa-chip etapa-suspensa">{clientSummary.vendaSuspensa} suspenso{clientSummary.vendaSuspensa !== 1 ? 's' : ''}</span>
+                      </div>
+                      {/* Group by consultant */}
+                      {(() => {
+                        const suspensas = clientes.filter(c => (c.etapaComercial || 'Em negociação') === 'Venda suspensa');
+                        const byConsultor = suspensas.reduce((acc, c) => {
+                          const key = c.consultorNome || 'Sem consultor';
+                          acc[key] = [...(acc[key] || []), c];
+                          return acc;
+                        }, {});
+                        return Object.entries(byConsultor).map(([consultor, clientesSusp]) => (
+                          <div key={consultor} className="vendas-suspensas-consultor">
+                            <strong className="consultor-label">{consultor}</strong>
+                            <div className="vendas-suspensas-list">
+                              {clientesSusp.map(cs => (
+                                <div key={cs.id} className="venda-suspensa-item">
+                                  <div className="venda-suspensa-info">
+                                    <strong>{cs.nome}</strong>
+                                    <span>{cs.whatsapp || 'Sem WhatsApp'} • {[cs.cidade, cs.estado].filter(Boolean).join('/')}</span>
+                                    <em className="motivo-suspensao">{cs.motivoSuspensao || 'Motivo não informado'}</em>
+                                    {cs.dataPrevisaoRetorno && <span className="retorno-date">Retorno: {dateBr(cs.dataPrevisaoRetorno)}</span>}
+                                    {cs.proximaAcaoComercial && <span className="proxima-acao">Próxima ação: {cs.proximaAcaoComercial}</span>}
+                                  </div>
+                                  <div className="venda-suspensa-acoes">
+                                    {cs.whatsapp && (
+                                      <a className="btn btn-primary btn-sm-admin" href={`https://wa.me/55${String(cs.whatsapp).replace(/\D/g,'').startsWith('55') ? String(cs.whatsapp).replace(/\D/g,'').slice(2) : String(cs.whatsapp).replace(/\D/g,'')}?text=${whatsappClientMessage(cs)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                                    )}
+                                    <button type="button" className="btn btn-outline btn-sm-admin" style={{color:'#16a34a',borderColor:'#16a34a'}} onClick={() => updateClienteEtapa(cs.id, 'Em negociação', {})}>Retomar</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ));
+                      })()}
                     </div>
                   )}
 
                   <div className="admin-card">
-                    <div className="card-header-flex">
+                    <div className="card-header-flex client-card-header">
                       <div>
                         <h3>Clientes cadastrados</h3>
-                        <p className="muted-text">{clientSummary.filtered.length} encontrado{clientSummary.filtered.length === 1 ? '' : 's'} na busca atual.</p>
+                        <p className="muted-text">{clientSummary.filtered.length} encontrado{clientSummary.filtered.length === 1 ? '' : 's'}</p>
                       </div>
-                      <div className="client-search-box">
-                        <input
-                          placeholder="Buscar por nome, WhatsApp, cidade ou e-mail"
-                          value={clientSearch}
-                          onChange={(event) => setClientSearch(event.target.value)}
-                        />
+                      <div className="client-controls-row">
+                        <div className="client-search-box">
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12A6 6 0 0 1 10 4Z"/></svg>
+                          <input
+                            placeholder="Buscar por nome, WhatsApp, cidade ou e-mail"
+                            value={clientSearch}
+                            onChange={(event) => setClientSearch(event.target.value)}
+                          />
+                        </div>
+                        <div className="etapa-filter-tabs">
+                          {[['todos','Todos'],['Em negociação','Em negociação'],['Venda concluída','Venda concluída'],['Venda suspensa','Suspensas']].map(([val, label]) => (
+                            <button key={val} type="button" className={`etapa-filter-btn ${clientEtapaFilter === val ? 'active' : ''} ${val === 'Venda suspensa' ? 'filter-suspensa' : val === 'Venda concluída' ? 'filter-concluida' : val === 'Em negociação' ? 'filter-negociacao' : ''}`} onClick={() => setClientEtapaFilter(val)}>{label}</button>
+                          ))}
+                        </div>
+                        {hasPermission('gerenciarClientes') && (
+                          <button type="button" className="btn btn-primary" onClick={() => { setNovoCliente(emptyClientForm); setClientView('new'); }}>
+                            + Cadastrar Cliente
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="table-container">
-                      <table className="modern-table client-table">
+                      <table className="modern-table client-table-v2">
                         <thead>
                           <tr>
                             <th>ID</th>
                             <th>Cliente</th>
-                            <th>Whatsapp</th>
-                            <th>Localização</th>
+                            <th>WhatsApp</th>
+                            <th>Cidade / UF</th>
                             <th>Cadastro</th>
                             <th>Status</th>
+                            <th>Etapa</th>
                             <th>Ações</th>
                           </tr>
                         </thead>
@@ -2143,20 +2325,41 @@ const AdminDashboard = () => {
                           {clientSummary.filtered.map(c => {
                             const whatsappDigits = String(c.whatsapp || '').replace(/\D/g, '');
                             const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}?text=${whatsappClientMessage(c)}` : '';
+                            const etapa = c.etapaComercial || 'Em negociação';
                             return (
                               <tr key={c.id}>
-                                <td data-label="ID">#{c.id}</td>
-                                <td data-label="Cliente" className="font-medium">{c.nome}</td>
-                                <td data-label="WhatsApp">{c.whatsapp || 'Não informado'}</td>
-                                <td data-label="Localização">{[c.cidade, c.estado].filter(Boolean).join(' / ') || 'Não informada'}</td>
-                                <td data-label="Cadastro">{c.dataCadastro || 'Sem data'}</td>
+                                <td data-label="ID" className="col-id">{c.id}</td>
+                                <td data-label="Cliente" className="col-nome font-medium">{c.nome}</td>
+                                <td data-label="WhatsApp" className="col-wp">
+                                  <span>{c.whatsapp || '—'}</span>
+                                  {whatsappHref && <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="wp-icon-link" title="Abrir WhatsApp">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#25d366"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
+                                  </a>}
+                                </td>
+                                <td data-label="Cidade/UF">{[c.cidade, c.estado].filter(Boolean).join(' / ') || '—'}</td>
+                                <td data-label="Cadastro">{c.dataCadastro || '—'}</td>
                                 <td data-label="Status"><span className="status-badge success">Ativo</span></td>
+                                <td data-label="Etapa">
+                                  <div className="etapa-cell">
+                                    <span className={`etapa-chip ${etapa === 'Venda concluída' ? 'etapa-concluida' : etapa === 'Venda suspensa' ? 'etapa-suspensa' : 'etapa-negociacao'}`}>
+                                      <i className="etapa-dot"></i>{etapa}
+                                    </span>
+                                    <div className="etapa-change-btns">
+                                      {etapa !== 'Venda concluída' && <button type="button" className="etapa-micro-btn concluir" title="Marcar como Venda concluída" onClick={() => updateClienteEtapa(c.id, 'Venda concluída', {})}>✓</button>}
+                                      {etapa !== 'Em negociação' && <button type="button" className="etapa-micro-btn negociar" title="Mover para Em negociação" onClick={() => updateClienteEtapa(c.id, 'Em negociação', {})}>↺</button>}
+                                      {etapa !== 'Venda suspensa' && <button type="button" className="etapa-micro-btn suspender" title="Suspender venda" onClick={() => { setSuspensaoModal(c); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}>⏸</button>}
+                                    </div>
+                                  </div>
+                                </td>
                                 <td data-label="Ações">
-                                  <div className="table-actions">
-                                    {whatsappHref && <a className="btn btn-primary btn-sm-admin" href={whatsappHref} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                                  <div className="table-actions table-actions-compact">
+                                    {whatsappHref && <a className="btn-action-wp" href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
+                                      WhatsApp
+                                    </a>}
                                     {hasPermission('orcamentos') && <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => openBudgetFormForClient(c)}>Fazer orçamento</button>}
                                     {hasPermission('contratos') && <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => openClientContractModal(c)}>Contrato direto</button>}
-                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>Usar dados</button>
+                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>Ver</button>
                                   </div>
                                 </td>
                               </tr>
@@ -2168,7 +2371,7 @@ const AdminDashboard = () => {
                         <div className="empty-state-orcamento client-empty-state">
                           <div className="icon">CL</div>
                           <h4>Nenhum cliente encontrado</h4>
-                          <p>Ajuste a busca ou cadastre um novo cliente acima.</p>
+                          <p>Ajuste a busca ou o filtro de etapa.</p>
                         </div>
                       )}
                     </div>
@@ -3108,224 +3311,558 @@ const AdminDashboard = () => {
                 <div>
                   <span className="section-kicker">Workflow operacional</span>
                   <h3>Homologação</h3>
-                  <p>Controle análise, ART/TRT, envios, pendências, parecer, obra, vistoria e conclusão em uma tela dedicada.</p>
+                  <p>Acompanhe e gerencie todo o processo de homologação junto à concessionária.</p>
                 </div>
-                <div className="section-stats">
-                  <div><strong>{homologacaoSummary.ativos}</strong><span>ativos</span></div>
-                  <div><strong>{homologacaoSummary.pendencias}</strong><span>pendências</span></div>
-                  <div><strong>{homologacaoSummary.enviados}</strong><span>enviados</span></div>
+                {selectedProjeto && homoView === 'detalhes' && (
+                  <button type="button" className="btn btn-outline" onClick={() => { setHomoView('fila'); setSelectedProjeto(null); }}>
+                    ← Voltar para fila
+                  </button>
+                )}
+              </div>
+
+              {/* KPI Row */}
+              <div className="homo-kpi-row">
+                <div className="homo-kpi-card">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  <div><strong>{homologacaoSummary.ativos}</strong><span>Ativos</span></div>
+                </div>
+                <div className="homo-kpi-card kpi-warning">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <div><strong>{homologacaoSummary.pendencias}</strong><span>Pendências</span></div>
+                </div>
+                <div className="homo-kpi-card kpi-blue">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  <div><strong>{homologacaoSummary.enviados}</strong><span>Enviados</span></div>
+                </div>
+                <div className="homo-kpi-card kpi-purple">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  <div><strong>{homologacaoSummary.parecer}</strong><span>Pareceres emitidos</span></div>
+                </div>
+                <div className="homo-kpi-card kpi-green">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <div><strong>{homologacaoSummary.concluidos}</strong><span>Ligações concluídas</span></div>
                 </div>
               </div>
 
-              <div className="homologation-quick-grid">
-                <button type="button" onClick={() => setSelectedProjeto(filteredHomologacaoProjetos.find(item => (item.pendenciasHomologacao || []).some(p => !['Corrigida', 'Concluída', 'Cancelada'].includes(p.status))) || filteredHomologacaoProjetos[0] || null)}>
-                  <span>Pendências abertas</span>
-                  <strong>{homologacaoSummary.pendencias}</strong>
-                  <p>Exigências da concessionária ou correções em andamento.</p>
-                </button>
-                <button type="button" onClick={() => setSelectedProjeto(filteredHomologacaoProjetos.find(item => item.etapa === 'Projeto para envio') || filteredHomologacaoProjetos[0] || null)}>
-                  <span>Prontos para envio</span>
-                  <strong>{projetos.filter(item => item.etapa === 'Projeto para envio').length}</strong>
-                  <p>Projetos técnicos aguardando protocolo.</p>
-                </button>
-                <button type="button" onClick={() => setSelectedProjeto(filteredHomologacaoProjetos.find(item => item.etapa === 'Aguardando parecer de acesso') || filteredHomologacaoProjetos[0] || null)}>
-                  <span>Parecer</span>
-                  <strong>{homologacaoSummary.parecer}</strong>
-                  <p>Projetos aguardando ou tratando parecer de acesso.</p>
-                </button>
-                <button type="button" onClick={() => setSelectedProjeto(filteredHomologacaoProjetos.find(item => String(item.etapa || '').includes('Vistoria')) || filteredHomologacaoProjetos[0] || null)}>
-                  <span>Vistoria</span>
-                  <strong>{homologacaoSummary.vistoria}</strong>
-                  <p>Solicitação, protocolo, prazo e resultado de vistoria.</p>
-                </button>
-              </div>
-
-              <div className="homologation-layout">
-                <section className="admin-card homologation-list-panel">
-                  <div className="card-header-flex compact">
-                    <div>
-                      <h3>Fila de homologação</h3>
-                      <p className="muted-text">{filteredHomologacaoProjetos.length} projeto{filteredHomologacaoProjetos.length === 1 ? '' : 's'} na visão atual.</p>
-                    </div>
-                    <input
-                      value={projectSearch}
-                      onChange={(event) => setProjectSearch(event.target.value)}
-                      placeholder="Buscar cliente, contrato, etapa..."
-                    />
-                  </div>
-                  <div className="homologation-project-list">
-                    {filteredHomologacaoProjetos.map(projeto => {
-                      const openPendencias = (projeto.pendenciasHomologacao || []).filter(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status)).length;
-                      return (
-                        <button
-                          type="button"
-                          key={projeto.id}
-                          className={`homologation-project-row ${selectedProjeto?.id === projeto.id ? 'active' : ''}`}
-                          onClick={() => setSelectedProjeto(projeto)}
-                        >
-                          <div>
-                            <strong>{projeto.clienteNome}</strong>
-                            <span>Contrato #{projeto.contratoId} • {getResponsibleName(projeto.responsavelNome)}</span>
-                          </div>
-                          <em>{projeto.etapa}</em>
-                          <small>{openPendencias} pend. • {(projeto.enviosHomologacao || []).length} envio{(projeto.enviosHomologacao || []).length === 1 ? '' : 's'}</small>
-                        </button>
-                      );
-                    })}
-                    {filteredHomologacaoProjetos.length === 0 && (
-                      <div className="empty-inline">
-                        <strong>Nenhum projeto encontrado</strong>
-                        <span>Limpe a busca para voltar a ver todos.</span>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="admin-card homologation-detail-panel">
-                  {selectedProjeto ? (
-                    <>
-                      <div className="contract-modal-header inline-header">
+              {/* FILA VIEW */}
+              {homoView === 'fila' && (
+                <div className="homo-fila-layout">
+                  <div className="homo-fila-main">
+                    <div className="admin-card">
+                      <div className="homo-fila-header">
                         <div>
-                          <span className="section-kicker">Contrato #{selectedProjeto.contratoId}</span>
-                          <h3>{selectedProjeto.clienteNome}</h3>
-                          <p>{selectedProjeto.clienteCidade || 'Cidade não informada'} • {selectedProjeto.etapa}</p>
+                          <h3>Fila de homologação</h3>
+                          <p className="muted-text">{filteredHomologacaoProjetos.length} processo{filteredHomologacaoProjetos.length !== 1 ? 's' : ''}</p>
                         </div>
-                        <span className="status-badge warning">{(selectedProjeto.pendenciasHomologacao || []).filter(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status)).length} pendências</span>
-                      </div>
-
-                      <div className="homologation-action-strip">
-                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Gerar ART', checklist: { ...(selectedProjeto.checklist || {}), documentacaoRecebida: true } })}>Gerar ART</button>
-                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto para envio', checklist: { ...(selectedProjeto.checklist || {}), artGerada: true, trtPaga: true, projetoTecnico: true } })}>Pronto envio</button>
-                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Aguardando parecer de acesso', checklist: { ...(selectedProjeto.checklist || {}), projetoEnviado: true } })}>Aguardar parecer</button>
-                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Solicitar vistoria', checklist: { ...(selectedProjeto.checklist || {}), parecerAcesso: true } })}>Solicitar vistoria</button>
-                        <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto concluído', checklist: { ...(selectedProjeto.checklist || {}), sistemaLigado: true } })}>Concluir</button>
-                      </div>
-
-                      <div className="project-modal-controls homologation-controls">
-                        <label>
-                          Etapa atual
-                          <select value={selectedProjeto.etapa} onChange={(event) => updateProjeto(selectedProjeto.id, { etapa: event.target.value })}>
-                            {projectStages.map(option => <option key={option}>{option}</option>)}
+                        <div className="homo-fila-controls">
+                          <div className="homo-search-wrap">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+                            <input value={projectSearch} onChange={e => setProjectSearch(e.target.value)} placeholder="Buscar cliente, protocolo ou cidade..." />
+                          </div>
+                          <select className="homo-filter-select" value={homoStatusFilter} onChange={e => setHomoStatusFilter(e.target.value)}>
+                            <option value="todos">Todos os status</option>
+                            <option value="ativo">Ativos</option>
+                            <option value="pendente">Com pendências</option>
+                            <option value="enviado">Enviados</option>
+                            <option value="concluido">Concluídos</option>
                           </select>
-                        </label>
-                        <label>
-                          Prazo previsto
-                          <input type="date" value={selectedProjeto.prazoPrevisto || ''} onChange={(event) => updateProjeto(selectedProjeto.id, { prazoPrevisto: event.target.value })} />
-                        </label>
-                        <label>
-                          Previsão concessionária
-                          <input type="date" value={selectedProjeto.previsaoLigacao || ''} onChange={(event) => updateProjeto(selectedProjeto.id, { previsaoLigacao: event.target.value })} />
-                        </label>
+                        </div>
                       </div>
 
-                      <div className="homologation-workflow-grid">
-                        <form className="project-modal-section homologation-form" onSubmit={registerHomologacaoEnvio}>
-                          <h4>Envio / reenvio</h4>
-                          <div className="homologation-form-grid">
-                            <label>
-                              Tipo
-                              <select value={envioHomologacaoForm.tipo} onChange={(event) => setEnvioHomologacaoForm(prev => ({ ...prev, tipo: event.target.value }))}>
-                                <option>Envio inicial</option>
-                                <option>Reenvio</option>
-                              </select>
-                            </label>
-                            <label>
-                              Protocolo
-                              <input value={envioHomologacaoForm.protocolo} onChange={(event) => setEnvioHomologacaoForm(prev => ({ ...prev, protocolo: event.target.value }))} placeholder="Número do protocolo" />
-                            </label>
-                            <label className="span-2">
-                              Resposta / observação
-                              <textarea value={envioHomologacaoForm.resposta} onChange={(event) => setEnvioHomologacaoForm(prev => ({ ...prev, resposta: event.target.value }))} placeholder="Retorno da concessionária ou observação interna" />
-                            </label>
+                      <div className="table-container">
+                        <table className="modern-table homo-fila-table">
+                          <thead>
+                            <tr>
+                              <th>Protocolo</th>
+                              <th>Cliente</th>
+                              <th>Cidade</th>
+                              <th>Responsável</th>
+                              <th>Status documental</th>
+                              <th>Etapa atual</th>
+                              <th>Última atualização</th>
+                              <th>Próxima ação</th>
+                              <th>Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredHomologacaoProjetos.filter(p => {
+                              if (homoStatusFilter === 'ativo') return p.etapa !== 'Projeto concluído';
+                              if (homoStatusFilter === 'pendente') return (p.pendenciasHomologacao || []).some(pd => !['Corrigida','Concluída','Cancelada'].includes(pd.status));
+                              if (homoStatusFilter === 'enviado') return (p.enviosHomologacao || []).length > 0;
+                              if (homoStatusFilter === 'concluido') return p.etapa === 'Projeto concluído';
+                              return true;
+                            }).map(projeto => {
+                              const openPend = (projeto.pendenciasHomologacao || []).filter(pd => !['Corrigida','Concluída','Cancelada'].includes(pd.status)).length;
+                              const statusDoc = projeto.statusDocumental || (openPend > 0 ? 'Pendente' : (projeto.enviosHomologacao || []).length > 0 ? 'Enviado' : 'Em análise');
+                              const statusDocClass = statusDoc === 'Completo' ? 'homo-badge-completo' : statusDoc === 'Pendente' ? 'homo-badge-pendente' : statusDoc === 'Enviado' ? 'homo-badge-enviado' : 'homo-badge-analise';
+                              const etapaClass = projeto.etapa === 'Projeto concluído' ? 'homo-etapa-concluido' : openPend > 0 ? 'homo-etapa-pendente' : 'homo-etapa-andamento';
+                              const nextAction = openPend > 0 ? 'Corrigir pendência' : projeto.etapa === 'Projeto para envio' ? 'Protocolar envio' : projeto.etapa === 'Aguardando parecer de acesso' ? 'Aguardar parecer' : projeto.etapa === 'Projeto concluído' ? 'Finalizado' : 'Ver detalhes';
+                              return (
+                                <tr key={projeto.id} className="homo-row-clickable" onClick={() => { setSelectedProjeto(projeto); setHomoView('detalhes'); setHomoDetalheTab('cliente'); }}>
+                                  <td className="homo-protocolo">SP-{String(projeto.contratoId || projeto.id).padStart(4,'0')}</td>
+                                  <td className="font-medium homo-nome">{projeto.clienteNome}</td>
+                                  <td>{projeto.clienteCidade || '—'}</td>
+                                  <td>{getResponsibleName(projeto.responsavelNome)}</td>
+                                  <td><span className={`homo-badge ${statusDocClass}`}>{statusDoc}</span></td>
+                                  <td><span className={`homo-etapa-badge ${etapaClass}`}>{projeto.etapa}</span></td>
+                                  <td className="homo-date">{projeto.updatedAt ? new Date(projeto.updatedAt).toLocaleDateString('pt-BR') : '—'}</td>
+                                  <td className="homo-next-action">{nextAction}</td>
+                                  <td>
+                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={e => { e.stopPropagation(); setSelectedProjeto(projeto); setHomoView('detalhes'); setHomoDetalheTab('cliente'); }}>
+                                      Ver processo
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        {filteredHomologacaoProjetos.length === 0 && (
+                          <div className="empty-state-orcamento">
+                            <span className="icon">HM</span>
+                            <h4>Nenhum processo encontrado</h4>
+                            <p>Ajuste a busca ou os filtros para ver projetos de homologação.</p>
                           </div>
-                          <button className="btn btn-primary" type="submit">Registrar envio</button>
-                          <div className="homologation-list">
-                            {(selectedProjeto.enviosHomologacao || []).slice(0, 4).map(envio => (
-                              <article key={envio.id}>
-                                <strong>#{envio.numero} • {envio.tipo}</strong>
-                                <span>{envio.protocolo || 'Sem protocolo'} • {envio.status}</span>
-                                <p>{envio.resposta || 'Sem resposta registrada.'}</p>
-                              </article>
-                            ))}
-                          </div>
-                        </form>
-
-                        <form className="project-modal-section homologation-form" onSubmit={registerHomologacaoPendencia}>
-                          <h4>Pendência</h4>
-                          <div className="homologation-form-grid">
-                            <label>
-                              Tipo
-                              <input value={pendenciaForm.tipo} onChange={(event) => setPendenciaForm(prev => ({ ...prev, tipo: event.target.value }))} />
-                            </label>
-                            <label>
-                              Prazo
-                              <input type="date" value={pendenciaForm.prazo} onChange={(event) => setPendenciaForm(prev => ({ ...prev, prazo: event.target.value }))} />
-                            </label>
-                            <label className="span-2">
-                              Descrição
-                              <textarea value={pendenciaForm.descricao} onChange={(event) => setPendenciaForm(prev => ({ ...prev, descricao: event.target.value }))} placeholder="Descreva a exigência ou reprovação." required />
-                            </label>
-                          </div>
-                          <button className="btn btn-primary" type="submit">Registrar pendência</button>
-                          <div className="homologation-list">
-                            {(selectedProjeto.pendenciasHomologacao || []).slice(0, 5).map(pendencia => (
-                              <article key={pendencia.id} className={['Corrigida', 'Concluída', 'Cancelada'].includes(pendencia.status) ? 'resolved' : ''}>
-                                <strong>{pendencia.tipo}</strong>
-                                <span>{pendencia.status} • prazo {dateBr(pendencia.prazo)}</span>
-                                <p>{pendencia.descricao}</p>
-                                {!['Corrigida', 'Concluída', 'Cancelada'].includes(pendencia.status) && (
-                                  <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateHomologacaoPendencia(pendencia.id, { status: 'Corrigida', observacoes: 'Correção registrada pela equipe.' })}>Marcar corrigida</button>
-                                )}
-                              </article>
-                            ))}
-                          </div>
-                        </form>
+                        )}
                       </div>
-
-                      <div className="homologation-bottom-grid">
-                        <section className="project-modal-section">
-                          <h4>Checklist de homologação</h4>
-                          <div className="project-checklist modal-checklist simple-checklist">
-                            {officeChecklistKeys.map(key => (
-                              <label key={key}>
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(selectedProjeto.checklist?.[key])}
-                                  onChange={(event) => updateProjeto(selectedProjeto.id, { checklist: { ...(selectedProjeto.checklist || {}), [key]: event.target.checked } })}
-                                />
-                                <span>{projectChecklistLabels[key]}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </section>
-
-                        <section className="project-modal-section homologation-timeline">
-                          <h4>Timeline</h4>
-                          <div className="homologation-timeline-list">
-                            {(selectedProjeto.timeline || []).slice(0, 10).map(item => (
-                              <article key={item.id}>
-                                <i></i>
-                                <div>
-                                  <strong>{item.titulo}</strong>
-                                  <p>{item.descricao}</p>
-                                  <span>{dateBr(item.data)} • {item.responsavel || 'Equipe DRM'}</span>
-                                </div>
-                              </article>
-                            ))}
-                            {(selectedProjeto.timeline || []).length === 0 && <p className="muted-text">Os movimentos importantes aparecerão aqui automaticamente.</p>}
-                          </div>
-                        </section>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="empty-state-orcamento">
-                      <span className="icon">HM</span>
-                      <h4>Selecione um projeto</h4>
-                      <p>Escolha um item da fila para registrar envios, pendências e movimentações.</p>
                     </div>
-                  )}
-                </section>
-              </div>
+                  </div>
+
+                  <div className="homo-fila-sidebar">
+                    <div className="admin-card homo-resumo-card">
+                      <h4>Resumo da fila</h4>
+                      <div className="homo-resumo-list">
+                        <div className="homo-resumo-item"><span className="homo-dot dot-green"></span><span>Ativos</span><strong>{homologacaoSummary.ativos}</strong></div>
+                        <div className="homo-resumo-item"><span className="homo-dot dot-orange"></span><span>Pendentes</span><strong>{homologacaoSummary.pendencias}</strong></div>
+                        <div className="homo-resumo-item"><span className="homo-dot dot-blue"></span><span>Enviados</span><strong>{homologacaoSummary.enviados}</strong></div>
+                        <div className="homo-resumo-item"><span className="homo-dot dot-purple"></span><span>Parecer emitido</span><strong>{homologacaoSummary.parecer}</strong></div>
+                        <div className="homo-resumo-item"><span className="homo-dot dot-success"></span><span>Ligação concluída</span><strong>{homologacaoSummary.concluidos}</strong></div>
+                        <div className="homo-resumo-divider"></div>
+                        <div className="homo-resumo-item homo-resumo-total"><span>Total de processos</span><strong>{projetos.length}</strong></div>
+                      </div>
+                    </div>
+                    <div className="admin-card homo-legenda-card">
+                      <h4>Legenda — Status documental</h4>
+                      <div className="homo-legenda-list">
+                        <div><span className="homo-badge homo-badge-completo">Completo</span><span>Documentação completa</span></div>
+                        <div><span className="homo-badge homo-badge-pendente">Pendente</span><span>Aguardando correção</span></div>
+                        <div><span className="homo-badge homo-badge-analise">Em análise</span><span>Faltam documentos</span></div>
+                        <div><span className="homo-badge homo-badge-enviado">Enviado</span><span>Enviado para análise</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* DETALHES VIEW */}
+              {homoView === 'detalhes' && selectedProjeto && (
+                <div className="homo-detalhes-screen">
+                  {/* Top strip */}
+                  <div className="admin-card homo-detalhes-strip">
+                    <div className="homo-strip-item"><span>Cliente</span><strong>{selectedProjeto.clienteNome}</strong></div>
+                    <div className="homo-strip-item"><span>Cidade</span><strong>{selectedProjeto.clienteCidade || '—'}</strong></div>
+                    <div className="homo-strip-item"><span>Protocolo</span><strong>SP-{String(selectedProjeto.contratoId || selectedProjeto.id).padStart(4,'0')}</strong></div>
+                    <div className="homo-strip-item">
+                      <span>Etapa atual</span>
+                      <span className={`homo-etapa-badge ${selectedProjeto.etapa === 'Projeto concluído' ? 'homo-etapa-concluido' : 'homo-etapa-andamento'}`}>{selectedProjeto.etapa}</span>
+                    </div>
+                    <div className="homo-strip-item"><span>Responsável técnico</span><strong>{selectedProjeto.responsavelTecnicoNome || selectedProjeto.responsavelNome || '—'}</strong></div>
+                    <div className="homo-strip-item"><span>Concessionária</span>
+                      <input className="homo-strip-input" defaultValue={selectedProjeto.concessionaria || ''} onBlur={e => e.target.value !== (selectedProjeto.concessionaria || '') && updateProjetoDetalhes(selectedProjeto.id, { concessionaria: e.target.value })} placeholder="Ex: CPFL, Equatorial..." />
+                    </div>
+                    <div className="homo-strip-item"><span>SLA atual</span>
+                      <input className="homo-strip-input" defaultValue={selectedProjeto.slaAtual || ''} onBlur={e => e.target.value !== (selectedProjeto.slaAtual || '') && updateProjetoDetalhes(selectedProjeto.id, { slaAtual: e.target.value })} placeholder="Ex: 5 dias úteis" />
+                    </div>
+                  </div>
+
+                  <div className="homo-detalhes-layout">
+                    {/* Left column */}
+                    <div className="homo-detalhes-left">
+                      {/* Dados do cliente + sistema */}
+                      <div className="admin-card homo-dados-card">
+                        <div className="homo-dados-sections">
+                          <div>
+                            <div className="homo-dados-header"><h4>Dados do cliente</h4></div>
+                            <div className="homo-dados-grid">
+                              <div><span>Nome</span><p>{selectedProjeto.clienteNome}</p></div>
+                              <div><span>Cidade</span><p>{selectedProjeto.clienteCidade || '—'}</p></div>
+                              <div><span>Telefone</span><p>{selectedProjeto.clienteTelefone || '—'}</p></div>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="homo-dados-header"><h4>Dados do sistema / obra</h4></div>
+                            <div className="homo-dados-grid">
+                              <div><span>Contrato</span><p>#{selectedProjeto.contratoId || '—'}</p></div>
+                              <div><span>Valor</span><p>{money(selectedProjeto.valorProjeto)}</p></div>
+                              <div><span>Prazo previsto</span><p>{dateBr(selectedProjeto.prazoPrevisto)}</p></div>
+                              <div><span>Previsão ligação</span><p>{dateBr(selectedProjeto.previsaoLigacao)}</p></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tabs */}
+                      <div className="admin-card homo-tabs-card">
+                        <div className="homo-tabs">
+                          {[['cliente','Documentos do cliente'],['projetista','Documentos do projetista'],['protocolos','Protocolos e concessionária'],['observacoes','Observações internas']].map(([tab, label]) => (
+                            <button key={tab} type="button" className={`homo-tab ${homoDetalheTab === tab ? 'active' : ''}`} onClick={() => setHomoDetalheTab(tab)}>{label}</button>
+                          ))}
+                        </div>
+
+                        {/* Documents tab content */}
+                        {(homoDetalheTab === 'cliente' || homoDetalheTab === 'projetista') && (() => {
+                          const tipo = homoDetalheTab === 'cliente' ? 'cliente' : 'projetista';
+                          const docs = tipo === 'cliente' ? (selectedProjeto.documentosCliente || []) : (selectedProjeto.documentosProjetista || []);
+                          return (
+                            <div className="homo-docs-panel">
+                              <div className="table-container">
+                                <table className="modern-table homo-docs-table">
+                                  <thead>
+                                    <tr><th>Documento</th><th>Arquivo</th><th>Responsável</th><th>Data</th><th>Status</th><th>Ações</th></tr>
+                                  </thead>
+                                  <tbody>
+                                    {docs.map(doc => (
+                                      <tr key={doc.id}>
+                                        <td>
+                                          <strong>{doc.nome}</strong>
+                                          {doc.descricao && <p className="muted-text" style={{fontSize:'0.75rem',margin:0}}>{doc.descricao}</p>}
+                                        </td>
+                                        <td className="homo-arquivo-cell">
+                                          {doc.dataUrl ? (
+                                            <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" className="homo-file-link">{doc.arquivo || 'Ver arquivo'}</a>
+                                          ) : <span className="muted-text">—</span>}
+                                        </td>
+                                        <td>{doc.responsavel || '—'}</td>
+                                        <td>{doc.data || '—'}</td>
+                                        <td>
+                                          <select className="homo-status-select" value={doc.status} onChange={e => updateProjetoDocumento(selectedProjeto.id, doc.id, tipo, { status: e.target.value })}>
+                                            <option>Pendente</option>
+                                            <option>Concluído</option>
+                                            <option>Não enviado</option>
+                                            <option>Incompleto</option>
+                                          </select>
+                                        </td>
+                                        <td>
+                                          <div className="table-actions">
+                                            <label className="btn btn-outline btn-sm-admin homo-upload-btn" title="Substituir arquivo">
+                                              Substituir
+                                              <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => {
+                                                const file = e.target.files[0];
+                                                if (!file) return;
+                                                const reader = new FileReader();
+                                                reader.onload = ev => updateProjetoDocumento(selectedProjeto.id, doc.id, tipo, { dataUrl: ev.target.result, arquivo: file.name, status: 'Concluído' });
+                                                reader.readAsDataURL(file);
+                                                e.target.value = '';
+                                              }} />
+                                            </label>
+                                            <button type="button" className="btn btn-outline btn-sm-admin" style={{color:'#dc2626'}} onClick={() => deleteProjetoDocumento(selectedProjeto.id, doc.id, tipo)}>Remover</button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                {docs.length === 0 && <p className="muted-text" style={{padding:'1rem'}}>Nenhum documento nesta categoria.</p>}
+                              </div>
+                              <div className="homo-add-doc-area">
+                                <h5>Adicionar documento</h5>
+                                <div className="homo-add-doc-form">
+                                  <input className="cc-input" placeholder="Nome do documento" value={homoDocUpload.nome} onChange={e => setHomoDocUpload(prev => ({ ...prev, nome: e.target.value }))} />
+                                  <input className="cc-input" placeholder="Descrição (opcional)" value={homoDocUpload.descricao} onChange={e => setHomoDocUpload(prev => ({ ...prev, descricao: e.target.value }))} />
+                                  <label className="homo-file-upload-btn">
+                                    {homoDocUpload.arquivo ? homoDocUpload.arquivo.name : 'Selecionar arquivo'}
+                                    <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => setHomoDocUpload(prev => ({ ...prev, arquivo: e.target.files[0] || null }))} />
+                                  </label>
+                                  <button type="button" className="btn btn-primary" disabled={!homoDocUpload.nome.trim() || homoDocUploadLoading}
+                                    onClick={() => {
+                                      if (!homoDocUpload.arquivo) {
+                                        uploadProjetoDocumento(selectedProjeto.id, tipo, { nome: homoDocUpload.nome, descricao: homoDocUpload.descricao });
+                                      } else {
+                                        const reader = new FileReader();
+                                        reader.onload = ev => uploadProjetoDocumento(selectedProjeto.id, tipo, { nome: homoDocUpload.nome, descricao: homoDocUpload.descricao, dataUrl: ev.target.result, arquivo: homoDocUpload.arquivo.name });
+                                        reader.readAsDataURL(homoDocUpload.arquivo);
+                                      }
+                                    }}>
+                                    {homoDocUploadLoading ? 'Enviando...' : 'Adicionar'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Protocolos e concessionária */}
+                        {homoDetalheTab === 'protocolos' && (
+                          <div className="homo-docs-panel">
+                            <div className="homo-protocol-section">
+                              <h5>Envios / Protocolos registrados</h5>
+                              <div className="homologation-list">
+                                {(selectedProjeto.enviosHomologacao || []).map(envio => (
+                                  <article key={envio.id}>
+                                    <strong>#{envio.numero} • {envio.tipo}</strong>
+                                    <span>{envio.protocolo || 'Sem protocolo'} • {envio.status}</span>
+                                    <p>{envio.resposta || 'Sem resposta registrada.'}</p>
+                                  </article>
+                                ))}
+                                {(selectedProjeto.enviosHomologacao || []).length === 0 && <p className="muted-text">Nenhum envio registrado.</p>}
+                              </div>
+                            </div>
+                            <div className="homo-protocol-section">
+                              <h5>Documentos da concessionária</h5>
+                              <div className="table-container">
+                                <table className="modern-table homo-docs-table">
+                                  <thead>
+                                    <tr><th>Documento</th><th>Arquivo</th><th>Responsável</th><th>Data</th><th>Status</th><th>Ações</th></tr>
+                                  </thead>
+                                  <tbody>
+                                    {(selectedProjeto.documentosConcessionaria || []).map(doc => (
+                                      <tr key={doc.id}>
+                                        <td><strong>{doc.nome}</strong></td>
+                                        <td>{doc.dataUrl ? <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" className="homo-file-link">{doc.arquivo || 'Ver'}</a> : '—'}</td>
+                                        <td>{doc.responsavel || '—'}</td>
+                                        <td>{doc.data || '—'}</td>
+                                        <td><span className={`homo-badge ${doc.status === 'Concluído' ? 'homo-badge-completo' : 'homo-badge-pendente'}`}>{doc.status}</span></td>
+                                        <td>
+                                          <label className="btn btn-outline btn-sm-admin">Subir
+                                            <input type="file" style={{display:'none'}} onChange={e => {
+                                              const file = e.target.files[0]; if (!file) return;
+                                              const reader = new FileReader();
+                                              reader.onload = ev => updateProjetoDocumento(selectedProjeto.id, doc.id, 'concessionaria', { dataUrl: ev.target.result, arquivo: file.name, status: 'Concluído' });
+                                              reader.readAsDataURL(file); e.target.value = '';
+                                            }} />
+                                          </label>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                {(selectedProjeto.documentosConcessionaria || []).length === 0 && <p className="muted-text" style={{padding:'1rem'}}>Nenhum documento da concessionária.</p>}
+                              </div>
+                              <div className="homo-add-doc-area">
+                                <h5>Adicionar documento da concessionária</h5>
+                                <div className="homo-add-doc-form">
+                                  <input className="cc-input" placeholder="Ex: Parecer de acesso, Protocolo..." value={homoDocUpload.tipo === 'concessionaria' ? homoDocUpload.nome : ''} onChange={e => setHomoDocUpload({ tipo: 'concessionaria', nome: e.target.value, descricao: '', arquivo: null })} />
+                                  <label className="homo-file-upload-btn">
+                                    {homoDocUpload.tipo === 'concessionaria' && homoDocUpload.arquivo ? homoDocUpload.arquivo.name : 'Selecionar arquivo'}
+                                    <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => setHomoDocUpload(prev => ({ ...prev, tipo: 'concessionaria', arquivo: e.target.files[0] || null }))} />
+                                  </label>
+                                  <button type="button" className="btn btn-primary" disabled={!(homoDocUpload.tipo === 'concessionaria' && homoDocUpload.nome.trim())}
+                                    onClick={() => {
+                                      if (!homoDocUpload.arquivo) {
+                                        uploadProjetoDocumento(selectedProjeto.id, 'concessionaria', { nome: homoDocUpload.nome });
+                                      } else {
+                                        const reader = new FileReader();
+                                        reader.onload = ev => uploadProjetoDocumento(selectedProjeto.id, 'concessionaria', { nome: homoDocUpload.nome, dataUrl: ev.target.result, arquivo: homoDocUpload.arquivo.name });
+                                        reader.readAsDataURL(homoDocUpload.arquivo);
+                                      }
+                                    }}>Adicionar</button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Observações internas */}
+                        {homoDetalheTab === 'observacoes' && (
+                          <div className="homo-docs-panel homo-obs-panel">
+                            <h5>Anotações internas</h5>
+                            <p className="muted-text">Adicione observações sobre o andamento, pendências ou orientações internas.</p>
+                            <textarea
+                              className="cc-input cc-textarea homo-obs-textarea"
+                              placeholder="Adicione observações sobre o andamento, pendências ou orientações..."
+                              defaultValue={selectedProjeto.observacoesInternas || ''}
+                              onBlur={e => { if (e.target.value !== (selectedProjeto.observacoesInternas || '')) updateProjetoDetalhes(selectedProjeto.id, { observacoesInternas: e.target.value }); }}
+                              rows={8}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Timeline */}
+                      <div className="admin-card homo-timeline-card">
+                        <h4>Linha do tempo do processo</h4>
+                        <div className="homo-timeline-steps">
+                          {[
+                            { key:'documentacaoRecebida', label:'Doc. recebida' },
+                            { key:'artGerada', label:'ART gerada' },
+                            { key:'trtPaga', label:'ART/TRT paga' },
+                            { key:'projetoTecnico', label:'Projeto elaborado' },
+                            { key:'projetoEnviado', label:'Projeto enviado' },
+                            { key:'parecerAcesso', label:'Parecer emitido' },
+                            { key:'homologacao', label:'Ped. de ligação' },
+                            { key:'sistemaLigado', label:'Ligação concluída' },
+                          ].map((step, i) => {
+                            const done = Boolean(selectedProjeto.checklist?.[step.key]);
+                            return (
+                              <div key={step.key} className={`homo-timeline-step ${done ? 'done' : ''}`}>
+                                <button type="button" className="homo-step-circle" onClick={() => updateProjeto(selectedProjeto.id, { checklist: { ...(selectedProjeto.checklist || {}), [step.key]: !done } })} title={done ? 'Marcar como pendente' : 'Marcar como concluído'}>
+                                  {done ? '✓' : String(i+1)}
+                                </button>
+                                <span>{step.label}</span>
+                                {done && <small>{dateBr(selectedProjeto.updatedAt)}</small>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="homologation-timeline-list" style={{marginTop:'1rem'}}>
+                          {(selectedProjeto.timeline || []).slice(0,8).map(item => (
+                            <article key={item.id}>
+                              <i></i>
+                              <div>
+                                <strong>{item.titulo}</strong>
+                                <p>{item.descricao}</p>
+                                <span>{dateBr(item.data)} • {item.responsavel || 'Equipe DRM'}</span>
+                              </div>
+                            </article>
+                          ))}
+                          {(selectedProjeto.timeline || []).length === 0 && <p className="muted-text">Os movimentos aparecerão aqui automaticamente.</p>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right column */}
+                    <div className="homo-detalhes-right">
+                      {/* Status geral */}
+                      <div className="admin-card homo-status-card">
+                        <h4>Status geral</h4>
+                        <div className="homo-status-list">
+                          <div className="homo-status-item">
+                            <span>Documentos do cliente</span>
+                            <span className={`homo-badge ${(selectedProjeto.documentosCliente || []).some(d => d.status !== 'Concluído') ? 'homo-badge-pendente' : (selectedProjeto.documentosCliente || []).length > 0 ? 'homo-badge-completo' : 'homo-badge-analise'}`}>
+                              {(selectedProjeto.documentosCliente || []).some(d => d.status !== 'Concluído') ? 'Pendente' : (selectedProjeto.documentosCliente || []).length > 0 ? 'Completo' : 'Vazio'}
+                            </span>
+                          </div>
+                          <div className="homo-status-item">
+                            <span>Documentos do projetista</span>
+                            <span className={`homo-badge ${(selectedProjeto.documentosProjetista || []).some(d => d.status !== 'Concluído') ? 'homo-badge-pendente' : (selectedProjeto.documentosProjetista || []).length > 0 ? 'homo-badge-completo' : 'homo-badge-analise'}`}>
+                              {(selectedProjeto.documentosProjetista || []).some(d => d.status !== 'Concluído') ? 'Pendente' : (selectedProjeto.documentosProjetista || []).length > 0 ? 'Completo' : 'Vazio'}
+                            </span>
+                          </div>
+                          <div className="homo-status-item">
+                            <span>Protocolos e concessionária</span>
+                            <span className={`homo-badge ${(selectedProjeto.enviosHomologacao || []).length > 0 ? 'homo-badge-enviado' : 'homo-badge-analise'}`}>
+                              {(selectedProjeto.enviosHomologacao || []).length > 0 ? 'Em andamento' : 'Aguardando'}
+                            </span>
+                          </div>
+                          <div className="homo-status-item">
+                            <span>Parecer e ligação</span>
+                            <span className={`homo-badge ${selectedProjeto.checklist?.sistemaLigado ? 'homo-badge-completo' : selectedProjeto.checklist?.parecerAcesso ? 'homo-badge-enviado' : 'homo-badge-pendente'}`}>
+                              {selectedProjeto.checklist?.sistemaLigado ? 'Ligação concluída' : selectedProjeto.checklist?.parecerAcesso ? 'Parecer emitido' : 'Pendente'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Fluxo de homologação */}
+                      <div className="admin-card homo-fluxo-card">
+                        <h4>Fluxo de homologação</h4>
+                        <div className="homo-fluxo-list">
+                          {officeChecklistKeys.map((key, i) => {
+                            const done = Boolean(selectedProjeto.checklist?.[key]);
+                            return (
+                              <label key={key} className={`homo-fluxo-item ${done ? 'done' : ''}`}>
+                                <input type="checkbox" checked={done} onChange={e => updateProjeto(selectedProjeto.id, { checklist: { ...(selectedProjeto.checklist || {}), [key]: e.target.checked } })} />
+                                <span className="homo-fluxo-num">{i+1}</span>
+                                <span>{projectChecklistLabels[key]}</span>
+                                <span className={`homo-fluxo-status ${done ? 'done' : ''}`}>{done ? 'Concluído' : 'Pendente'}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Ações rápidas */}
+                      <div className="admin-card homo-acoes-card">
+                        <h4>Ações rápidas</h4>
+                        <div className="homo-acoes-list">
+                          <button type="button" className="homo-acao-btn" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Gerar ART', checklist: { ...(selectedProjeto.checklist || {}), documentacaoRecebida: true } })}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Gerar ART / TRT
+                          </button>
+                          <button type="button" className="homo-acao-btn" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto para envio', checklist: { ...(selectedProjeto.checklist || {}), artGerada: true, trtPaga: true, projetoTecnico: true } })}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            Enviar projeto
+                          </button>
+                          <button type="button" className="homo-acao-btn" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Aguardando parecer de acesso', checklist: { ...(selectedProjeto.checklist || {}), projetoEnviado: true } })}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            Registrar protocolo
+                          </button>
+                          <button type="button" className="homo-acao-btn" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto concluído', checklist: { ...(selectedProjeto.checklist || {}), sistemaLigado: true } })}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            Concluir ligação
+                          </button>
+                        </div>
+                        <div className="homo-etapa-control">
+                          <label>
+                            <span>Alterar etapa</span>
+                            <select value={selectedProjeto.etapa} onChange={e => updateProjeto(selectedProjeto.id, { etapa: e.target.value })}>
+                              {projectStages.map(s => <option key={s}>{s}</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Prazo previsto</span>
+                            <input type="date" value={selectedProjeto.prazoPrevisto || ''} onChange={e => updateProjeto(selectedProjeto.id, { prazoPrevisto: e.target.value })} />
+                          </label>
+                          <label>
+                            <span>Previsão concessionária</span>
+                            <input type="date" value={selectedProjeto.previsaoLigacao || ''} onChange={e => updateProjeto(selectedProjeto.id, { previsaoLigacao: e.target.value })} />
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Pendências */}
+                      <div className="admin-card homo-pend-card">
+                        <h4>Pendências <span className="homo-pend-count">{(selectedProjeto.pendenciasHomologacao || []).filter(pd => !['Corrigida','Concluída','Cancelada'].includes(pd.status)).length}</span></h4>
+                        <form onSubmit={registerHomologacaoPendencia}>
+                          <div className="homo-pend-form">
+                            <input value={pendenciaForm.tipo} onChange={e => setPendenciaForm(prev => ({ ...prev, tipo: e.target.value }))} placeholder="Tipo de pendência" className="cc-input" />
+                            <input type="date" value={pendenciaForm.prazo} onChange={e => setPendenciaForm(prev => ({ ...prev, prazo: e.target.value }))} className="cc-input" />
+                            <textarea value={pendenciaForm.descricao} onChange={e => setPendenciaForm(prev => ({ ...prev, descricao: e.target.value }))} placeholder="Descreva a exigência..." className="cc-input" style={{gridColumn:'1/-1'}} required rows={2} />
+                            <button className="btn btn-primary" type="submit" style={{gridColumn:'1/-1'}}>Registrar pendência</button>
+                          </div>
+                        </form>
+                        <div className="homologation-list" style={{marginTop:'0.75rem'}}>
+                          {(selectedProjeto.pendenciasHomologacao || []).slice(0,5).map(pendencia => (
+                            <article key={pendencia.id} className={['Corrigida','Concluída','Cancelada'].includes(pendencia.status) ? 'resolved' : ''}>
+                              <strong>{pendencia.tipo}</strong>
+                              <span>{pendencia.status} • {dateBr(pendencia.prazo)}</span>
+                              <p>{pendencia.descricao}</p>
+                              {!['Corrigida','Concluída','Cancelada'].includes(pendencia.status) && (
+                                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateHomologacaoPendencia(pendencia.id, { status: 'Corrigida', observacoes: 'Correção registrada.' })}>Marcar corrigida</button>
+                              )}
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Envio/Protocolo */}
+                      <div className="admin-card homo-envio-card">
+                        <h4>Registro de envio / protocolo</h4>
+                        <form onSubmit={registerHomologacaoEnvio}>
+                          <div className="homo-pend-form">
+                            <select value={envioHomologacaoForm.tipo} onChange={e => setEnvioHomologacaoForm(prev => ({ ...prev, tipo: e.target.value }))} className="cc-input">
+                              <option>Envio inicial</option>
+                              <option>Reenvio</option>
+                            </select>
+                            <input value={envioHomologacaoForm.protocolo} onChange={e => setEnvioHomologacaoForm(prev => ({ ...prev, protocolo: e.target.value }))} placeholder="Nº do protocolo" className="cc-input" />
+                            <textarea value={envioHomologacaoForm.resposta} onChange={e => setEnvioHomologacaoForm(prev => ({ ...prev, resposta: e.target.value }))} placeholder="Retorno da concessionária ou observação..." className="cc-input" style={{gridColumn:'1/-1'}} rows={2} />
+                            <button className="btn btn-primary" type="submit" style={{gridColumn:'1/-1'}}>Registrar envio</button>
+                          </div>
+                        </form>
+                        <div className="homologation-list" style={{marginTop:'0.75rem'}}>
+                          {(selectedProjeto.enviosHomologacao || []).slice(0,3).map(envio => (
+                            <article key={envio.id}>
+                              <strong>#{envio.numero} • {envio.tipo}</strong>
+                              <span>{envio.protocolo || 'Sem protocolo'} • {envio.status}</span>
+                              <p>{envio.resposta || '—'}</p>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

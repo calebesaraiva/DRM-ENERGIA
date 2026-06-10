@@ -546,6 +546,15 @@ const CLIENT_EXTRA_FIELDS = [
   'cidadeInstalacao',
   'estadoInstalacao',
   'observacoes',
+  'etapaComercial',
+  'motivoSuspensao',
+  'dataSuspensao',
+  'dataPrevisaoRetorno',
+  'ultimoContatoComercial',
+  'proximaAcaoComercial',
+  'consultorId',
+  'consultorNome',
+  'historicoSuspensao',
 ];
 
 const normalizeClientPayload = (body = {}) => {
@@ -1004,6 +1013,9 @@ const parseProjeto = (projeto) => ({
   pendenciasHomologacao: parseJsonField(projeto.pendenciasHomologacao, []),
   enviosHomologacao: parseJsonField(projeto.enviosHomologacao, []),
   documentosHomologacao: parseJsonField(projeto.documentosHomologacao, []),
+  documentosCliente: parseJsonField(projeto.documentosCliente, []),
+  documentosProjetista: parseJsonField(projeto.documentosProjetista, []),
+  documentosConcessionaria: parseJsonField(projeto.documentosConcessionaria, []),
   timeline: parseJsonField(projeto.timeline, []),
 });
 
@@ -2192,6 +2204,15 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     ['enviosHomologacao', 'TEXT'],
     ['documentosHomologacao', 'TEXT'],
     ['timeline', 'TEXT'],
+    ['documentosCliente', 'TEXT'],
+    ['documentosProjetista', 'TEXT'],
+    ['documentosConcessionaria', 'TEXT'],
+    ['observacoesInternas', 'TEXT'],
+    ['concessionaria', 'TEXT'],
+    ['statusDocumental', 'TEXT'],
+    ['responsavelTecnicoNome', 'TEXT'],
+    ['responsavelTecnicoId', 'INTEGER'],
+    ['slaAtual', 'TEXT'],
   ]) {
     if (!existingProjetoColumns.includes(field)) {
       await db.exec(`ALTER TABLE projetos ADD COLUMN ${field} ${definition}`);
@@ -3234,6 +3255,112 @@ app.put('/api/admin/clientes/:id', authRequired, requirePermission('gerenciarCli
   );
   const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.params.id);
   res.json(cliente ? publicClient(cliente) : { message: 'Cliente atualizado.' });
+});
+
+app.put('/api/admin/clientes/:id/etapa-comercial', authRequired, requirePermission('clientes'), async (req, res) => {
+  const { etapaComercial, motivoSuspensao, dataPrevisaoRetorno, ultimoContatoComercial, proximaAcaoComercial } = req.body;
+  const etapasValidas = ['Em negociação', 'Venda concluída', 'Venda suspensa'];
+  if (!etapasValidas.includes(etapaComercial)) {
+    return res.status(400).json({ message: 'Etapa comercial inválida.' });
+  }
+  if (etapaComercial === 'Venda suspensa' && !String(motivoSuspensao || '').trim()) {
+    return res.status(400).json({ message: 'O motivo da suspensão é obrigatório.' });
+  }
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.params.id);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+
+  const historicoAtual = JSON.parse(cliente.historicoSuspensao || '[]');
+  const novoHistorico = etapaComercial === 'Venda suspensa'
+    ? [{ id: `${Date.now()}`, data: new Date().toISOString(), etapa: etapaComercial, motivo: motivoSuspensao, responsavel: req.user.nome || req.user.username }, ...historicoAtual.slice(0, 19)]
+    : etapaComercial !== cliente.etapaComercial
+      ? [{ id: `${Date.now()}`, data: new Date().toISOString(), etapa: etapaComercial, motivo: `Alterado de ${cliente.etapaComercial || 'Em negociação'} para ${etapaComercial}`, responsavel: req.user.nome || req.user.username }, ...historicoAtual.slice(0, 19)]
+      : historicoAtual;
+
+  await db.run(
+    `UPDATE clientes SET etapaComercial = ?, motivoSuspensao = ?, dataSuspensao = ?, dataPrevisaoRetorno = ?, ultimoContatoComercial = ?, proximaAcaoComercial = ?, consultorId = ?, consultorNome = ?, historicoSuspensao = ? WHERE id = ?`,
+    etapaComercial,
+    etapaComercial === 'Venda suspensa' ? (motivoSuspensao || null) : null,
+    etapaComercial === 'Venda suspensa' ? new Date().toISOString().split('T')[0] : null,
+    dataPrevisaoRetorno || null,
+    ultimoContatoComercial || null,
+    proximaAcaoComercial || null,
+    req.user.id,
+    req.user.nome || req.user.username,
+    JSON.stringify(novoHistorico),
+    req.params.id
+  );
+  const updated = publicClient(await db.get('SELECT * FROM clientes WHERE id = ?', req.params.id));
+  res.json(updated);
+});
+
+app.put('/api/admin/projetos/:id/detalhes-homologacao', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  const { concessionaria, statusDocumental, observacoesInternas, responsavelTecnicoNome, responsavelTecnicoId, slaAtual } = req.body;
+  const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
+  if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
+
+  await db.run(
+    `UPDATE projetos SET concessionaria = COALESCE(?, concessionaria), statusDocumental = COALESCE(?, statusDocumental), observacoesInternas = COALESCE(?, observacoesInternas), responsavelTecnicoNome = COALESCE(?, responsavelTecnicoNome), responsavelTecnicoId = COALESCE(?, responsavelTecnicoId), slaAtual = COALESCE(?, slaAtual), updatedAt = ? WHERE id = ?`,
+    concessionaria || null, statusDocumental || null, observacoesInternas || null,
+    responsavelTecnicoNome || null, responsavelTecnicoId || null, slaAtual || null,
+    new Date().toISOString(), req.params.id
+  );
+  res.json(parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id)));
+});
+
+app.post('/api/admin/projetos/:id/documentos', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
+  if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
+
+  const { tipo, nome, descricao, dataUrl, arquivo, categoria } = req.body;
+  const tiposValidos = ['cliente', 'projetista', 'concessionaria'];
+  if (!tiposValidos.includes(tipo)) return res.status(400).json({ message: 'Tipo de documento inválido.' });
+
+  const field = tipo === 'cliente' ? 'documentosCliente' : tipo === 'projetista' ? 'documentosProjetista' : 'documentosConcessionaria';
+  const docs = parseJsonField(projeto[field], []);
+  const novoDoc = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    nome: nome || 'Documento',
+    descricao: descricao || '',
+    arquivo: arquivo || '',
+    dataUrl: dataUrl || null,
+    categoria: categoria || tipo,
+    status: dataUrl ? 'Concluído' : 'Pendente',
+    responsavel: req.user.nome || req.user.username,
+    data: new Date().toISOString().split('T')[0],
+  };
+  docs.push(novoDoc);
+  const timeline = appendProjetoTimeline(projeto, timelineEvent({ tipo: 'documento', titulo: `Documento adicionado: ${novoDoc.nome}`, descricao: `Categoria: ${tipo}. Responsável: ${novoDoc.responsavel}`, responsavel: novoDoc.responsavel }));
+  await db.run(`UPDATE projetos SET ${field} = ?, timeline = ?, updatedAt = ? WHERE id = ?`, JSON.stringify(docs), JSON.stringify(timeline), new Date().toISOString(), req.params.id);
+  res.status(201).json(parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id)));
+});
+
+app.put('/api/admin/projetos/:id/documentos/:docId', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
+  if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
+
+  const { tipo, status, dataUrl, arquivo } = req.body;
+  const tiposValidos = ['cliente', 'projetista', 'concessionaria'];
+  if (!tiposValidos.includes(tipo)) return res.status(400).json({ message: 'Tipo de documento inválido.' });
+
+  const field = tipo === 'cliente' ? 'documentosCliente' : tipo === 'projetista' ? 'documentosProjetista' : 'documentosConcessionaria';
+  const docs = parseJsonField(projeto[field], []);
+  const idx = docs.findIndex(d => d.id === req.params.docId);
+  if (idx === -1) return res.status(404).json({ message: 'Documento não encontrado.' });
+
+  docs[idx] = { ...docs[idx], status: status || docs[idx].status, dataUrl: dataUrl !== undefined ? dataUrl : docs[idx].dataUrl, arquivo: arquivo || docs[idx].arquivo, responsavel: req.user.nome || req.user.username, data: new Date().toISOString().split('T')[0] };
+  await db.run(`UPDATE projetos SET ${field} = ?, updatedAt = ? WHERE id = ?`, JSON.stringify(docs), new Date().toISOString(), req.params.id);
+  res.json(parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id)));
+});
+
+app.delete('/api/admin/projetos/:id/documentos/:docId', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
+  if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
+
+  const tipo = req.query.tipo || 'cliente';
+  const field = tipo === 'cliente' ? 'documentosCliente' : tipo === 'projetista' ? 'documentosProjetista' : 'documentosConcessionaria';
+  const docs = parseJsonField(projeto[field], []).filter(d => d.id !== req.params.docId);
+  await db.run(`UPDATE projetos SET ${field} = ?, updatedAt = ? WHERE id = ?`, JSON.stringify(docs), new Date().toISOString(), req.params.id);
+  res.json({ message: 'Documento removido.' });
 });
 
 app.get('/api/admin/leads', authRequired, requirePermission('leads'), async (req, res) => {
