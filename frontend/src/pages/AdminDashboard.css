@@ -1213,6 +1213,132 @@
   min-width: 980px;
 }
 
+/* ============================================================
+   CLIENTES — redesign 2.0
+   ============================================================ */
+
+/* Page header */
+.clients-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.clients-header-left { flex: 1; min-width: 220px; }
+.clients-header-left .section-kicker { display: block; font-size: 0.72rem; font-weight: 700; color: #f97316; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.25rem; }
+.clients-header-left h3 { margin: 0 0 0.25rem; font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+.clients-header-left p  { margin: 0; font-size: 0.9rem; color: #64748b; }
+
+/* Stats row */
+.clients-stats-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.cst-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 90px;
+  padding: 0.85rem 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(15,23,42,0.05);
+}
+.cst-card strong { font-size: 1.6rem; font-weight: 700; line-height: 1; color: #0f172a; }
+.cst-card span   { font-size: 0.73rem; font-weight: 500; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
+.cst-card.cst-negociacao strong { color: #2563eb; }
+.cst-card.cst-concluida  strong { color: #16a34a; }
+.cst-card.cst-suspensa   strong { color: #dc2626; }
+
+/* Table card */
+.clients-table-card { padding: 0; overflow: hidden; }
+
+/* Toolbar */
+.clients-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+.clients-toolbar-left  { display: flex; align-items: center; gap: 0.75rem; flex: 1; flex-wrap: wrap; min-width: 0; }
+.clients-toolbar-right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+
+/* Search */
+.clients-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 220px;
+  max-width: 340px;
+  flex: 1;
+}
+.clients-search-wrap svg {
+  position: absolute;
+  left: 0.75rem;
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.clients-search-wrap input {
+  width: 100%;
+  padding: 0.55rem 0.85rem 0.55rem 2.25rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  background: #f8fafc;
+  color: #1e293b;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.clients-search-wrap input:focus {
+  outline: none;
+  border-color: #f97316;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.1);
+}
+
+/* Filter tabs */
+.clients-filter-tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.cft-btn {
+  padding: 0.38rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.cft-btn:hover             { border-color: #cbd5e1; color: #374151; }
+.cft-btn.active            { border-color: #f97316; color: #f97316; background: #fff7ed; font-weight: 600; }
+.cft-btn.cft-negociacao.active { border-color: #3b82f6; color: #2563eb; background: #eff6ff; }
+.cft-btn.cft-concluida.active  { border-color: #22c55e; color: #16a34a; background: #f0fdf4; }
+.cft-btn.cft-suspensa.active   { border-color: #ef4444; color: #dc2626; background: #fef2f2; }
+
+/* Count chip */
+.clients-count {
+  font-size: 0.82rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* Table inside card - no extra padding */
+.clients-table-card .table-container { margin: 0; }
+.clients-table-card .modern-table { border-radius: 0; box-shadow: none; }
+.clients-table-card .empty-state-orcamento { margin: 2rem; }
+
 .client-empty-state {
   min-height: 220px;
   padding: 1.5rem;
@@ -4243,9 +4369,10 @@
 
 .section-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
   gap: 0.65rem;
-  min-width: 330px;
+  min-width: 280px;
+  max-width: 440px;
 }
 
 .section-stats div {

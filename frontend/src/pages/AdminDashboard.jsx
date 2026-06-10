@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import io from 'socket.io-client';
+import io from 'socket.io-client'; // v2
 import './AdminDashboard.css';
 import { getApiBaseUrl, withApiBase } from '../utils/apiBase';
 import AdminCommunicationCenter from '../components/AdminCommunicationCenter';
@@ -2220,17 +2220,30 @@ const AdminDashboard = () => {
                 </div>
               ) : (
                 <>
-                  <div className="section-heading">
-                    <div>
+                  {/* ── Cabeçalho com stats ── */}
+                  <div className="clients-page-header">
+                    <div className="clients-header-left">
                       <span className="section-kicker">Base comercial</span>
                       <h3>Clientes</h3>
                       <p>Cadastre, encontre e gerencie etapas comerciais sem sair da tela.</p>
                     </div>
-                    <div className="section-stats">
-                      <div><strong>{clientes.length}</strong><span>total</span></div>
-                      <div><strong style={{color:'#16a34a'}}>{clientSummary.vendaConcluida}</strong><span>concluídas</span></div>
-                      <div><strong style={{color:'#2563eb'}}>{clientSummary.emNegociacao}</strong><span>em negociação</span></div>
-                      <div><strong style={{color:'#dc2626'}}>{clientSummary.vendaSuspensa}</strong><span>suspensas</span></div>
+                    <div className="clients-stats-row">
+                      <div className="cst-card">
+                        <strong>{clientes.length}</strong>
+                        <span>Total</span>
+                      </div>
+                      <div className="cst-card cst-negociacao">
+                        <strong>{clientSummary.emNegociacao}</strong>
+                        <span>Em negociação</span>
+                      </div>
+                      <div className="cst-card cst-concluida">
+                        <strong>{clientSummary.vendaConcluida}</strong>
+                        <span>Concluídas</span>
+                      </div>
+                      <div className="cst-card cst-suspensa">
+                        <strong>{clientSummary.vendaSuspensa}</strong>
+                        <span>Suspensas</span>
+                      </div>
                     </div>
                   </div>
 
@@ -2280,29 +2293,31 @@ const AdminDashboard = () => {
                     </div>
                   )}
 
-                  <div className="admin-card">
-                    <div className="card-header-flex client-card-header">
-                      <div>
-                        <h3>Clientes cadastrados</h3>
-                        <p className="muted-text">{clientSummary.filtered.length} encontrado{clientSummary.filtered.length === 1 ? '' : 's'}</p>
-                      </div>
-                      <div className="client-controls-row">
-                        <div className="client-search-box">
-                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12A6 6 0 0 1 10 4Z"/></svg>
+                  <div className="admin-card clients-table-card">
+                    <div className="clients-table-toolbar">
+                      <div className="clients-toolbar-left">
+                        <div className="clients-search-wrap">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
                           <input
-                            placeholder="Buscar por nome, WhatsApp, cidade ou e-mail"
+                            placeholder="Buscar por nome, WhatsApp, cidade ou e-mail..."
                             value={clientSearch}
                             onChange={(event) => setClientSearch(event.target.value)}
                           />
                         </div>
-                        <div className="etapa-filter-tabs">
-                          {[['todos','Todos'],['Em negociação','Em negociação'],['Venda concluída','Venda concluída'],['Venda suspensa','Suspensas']].map(([val, label]) => (
-                            <button key={val} type="button" className={`etapa-filter-btn ${clientEtapaFilter === val ? 'active' : ''} ${val === 'Venda suspensa' ? 'filter-suspensa' : val === 'Venda concluída' ? 'filter-concluida' : val === 'Em negociação' ? 'filter-negociacao' : ''}`} onClick={() => setClientEtapaFilter(val)}>{label}</button>
+                        <div className="clients-filter-tabs">
+                          {[['todos','Todos'],['Em negociação','Em negociação'],['Venda concluída','Concluídas'],['Venda suspensa','Suspensas']].map(([val, label]) => (
+                            <button key={val} type="button"
+                              className={`cft-btn ${clientEtapaFilter === val ? 'active' : ''} ${val === 'Venda suspensa' ? 'cft-suspensa' : val === 'Venda concluída' ? 'cft-concluida' : val === 'Em negociação' ? 'cft-negociacao' : ''}`}
+                              onClick={() => setClientEtapaFilter(val)}>{label}
+                            </button>
                           ))}
                         </div>
+                      </div>
+                      <div className="clients-toolbar-right">
+                        <span className="clients-count">{clientSummary.filtered.length} cliente{clientSummary.filtered.length !== 1 ? 's' : ''}</span>
                         {hasPermission('gerenciarClientes') && (
                           <button type="button" className="btn btn-primary" onClick={() => { setNovoCliente(emptyClientForm); setClientView('new'); }}>
-                            + Cadastrar Cliente
+                            + Cadastrar
                           </button>
                         )}
                       </div>
