@@ -2422,6 +2422,36 @@
   box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
 }
 
+.project-detail-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.project-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #e6eaf0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.project-detail-toolbar h3,
+.project-detail-toolbar p {
+  margin: 0;
+}
+
+.project-detail-inline {
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+  border: 1px solid #e6eaf0;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+}
+
 .project-detail-grid,
 .project-modal-controls {
   display: grid;

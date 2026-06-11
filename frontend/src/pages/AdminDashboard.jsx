@@ -4377,71 +4377,85 @@ const AdminDashboard = () => {
 
           {activeTab === 'projetos' && (
             <div className="admin-section">
-              <div className="section-heading">
-                <div>
-                  <span className="section-kicker">Operação</span>
-                  <h3>Instalações e campo</h3>
-                  <p>Pesquise o cliente, abra a instalação e registre agenda, fotos e observações em poucos toques.</p>
-                </div>
-                <div className="section-stats">
-                  <div><strong>{projetos.length}</strong><span>projetos</span></div>
-                  <div><strong>{projetos.filter(item => item.etapa !== 'Projeto concluído').length}</strong><span>ativos</span></div>
-                  <div><strong>{projetos.filter(item => item.etapa === 'Projeto concluído').length}</strong><span>concluídos</span></div>
-                </div>
-              </div>
-
-              <div className="project-search-panel">
-                <div>
-                  <h4>Pesquisar projeto</h4>
-                  <p>Digite nome do cliente, telefone ou número do contrato.</p>
-                </div>
-                <input
-                  value={projectSearch}
-                  onChange={(event) => setProjectSearch(event.target.value)}
-                  placeholder="Ex: nome do cliente, #12, 99991..."
-                />
-                <span>{filteredProjetos.length} resultado{filteredProjetos.length === 1 ? '' : 's'}</span>
-              </div>
-
-              <div className="project-board simple-project-board">
-                {projectOperationColumns.map(column => (
-                  <div className="project-column" key={column.id}>
-                    <div className="project-column-header">
-                      <strong>{column.label}</strong>
-                      <span>{filteredProjetos.filter(column.matches).length}</span>
+              {!selectedProjeto && (
+                <>
+                  <div className="section-heading">
+                    <div>
+                      <span className="section-kicker">Operação</span>
+                      <h3>Instalações e campo</h3>
+                      <p>Pesquise o cliente, abra a instalação e registre agenda, fotos e observações em poucos toques.</p>
                     </div>
-                    {filteredProjetos.filter(column.matches).map(projeto => (
-                      <button className="project-card" key={projeto.id} onClick={() => setSelectedProjeto(projeto)}>
-                        <div className="project-card-top">
-                          <strong>{projeto.clienteNome}</strong>
-                          <span>{projeto.prioridade || 'Normal'}</span>
-                        </div>
-                        <p>Contrato #{projeto.contratoId} • {getResponsibleName(projeto.responsavelNome)}</p>
-                        <p>Prazo {dateBr(projeto.prazoPrevisto)} • {projectPhotos[projeto.id]?.length || 0} foto{(projectPhotos[projeto.id]?.length || 0) === 1 ? '' : 's'}</p>
-                        <strong className="project-value">{money(projeto.valorProjeto)}</strong>
-                        <span className="project-open-hint">Abrir projeto</span>
-                      </button>
-                    ))}
-                    {filteredProjetos.filter(column.matches).length === 0 && (
-                      <div className="empty-inline">
-                        <strong>Nada nessa etapa</strong>
-                        <span>Nenhum projeto encontrado aqui.</span>
-                      </div>
-                    )}
+                    <div className="section-stats">
+                      <div><strong>{projetos.length}</strong><span>projetos</span></div>
+                      <div><strong>{projetos.filter(item => item.etapa !== 'Projeto concluído').length}</strong><span>ativos</span></div>
+                      <div><strong>{projetos.filter(item => item.etapa === 'Projeto concluído').length}</strong><span>concluídos</span></div>
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  <div className="project-search-panel">
+                    <div>
+                      <h4>Pesquisar projeto</h4>
+                      <p>Digite nome do cliente, telefone ou número do contrato.</p>
+                    </div>
+                    <input
+                      value={projectSearch}
+                      onChange={(event) => setProjectSearch(event.target.value)}
+                      placeholder="Ex: nome do cliente, #12, 99991..."
+                    />
+                    <span>{filteredProjetos.length} resultado{filteredProjetos.length === 1 ? '' : 's'}</span>
+                  </div>
+
+                  <div className="project-board simple-project-board">
+                    {projectOperationColumns.map(column => (
+                      <div className="project-column" key={column.id}>
+                        <div className="project-column-header">
+                          <strong>{column.label}</strong>
+                          <span>{filteredProjetos.filter(column.matches).length}</span>
+                        </div>
+                        {filteredProjetos.filter(column.matches).map(projeto => (
+                          <button className="project-card" key={projeto.id} onClick={() => setSelectedProjeto(projeto)}>
+                            <div className="project-card-top">
+                              <strong>{projeto.clienteNome}</strong>
+                              <span>{projeto.prioridade || 'Normal'}</span>
+                            </div>
+                            <p>Contrato #{projeto.contratoId} • {getResponsibleName(projeto.responsavelNome)}</p>
+                            <p>Prazo {dateBr(projeto.prazoPrevisto)} • {projectPhotos[projeto.id]?.length || 0} foto{(projectPhotos[projeto.id]?.length || 0) === 1 ? '' : 's'}</p>
+                            <strong className="project-value">{money(projeto.valorProjeto)}</strong>
+                            <span className="project-open-hint">Abrir projeto</span>
+                          </button>
+                        ))}
+                        {filteredProjetos.filter(column.matches).length === 0 && (
+                          <div className="empty-inline">
+                            <strong>Nada nessa etapa</strong>
+                            <span>Nenhum projeto encontrado aqui.</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
               {selectedProjeto && (
-                <div className="contract-modal-backdrop">
-                  <div className="project-detail-modal">
+                <div className="project-detail-page">
+                  <div className="project-detail-toolbar">
+                    <button type="button" className="btn btn-outline" onClick={() => setSelectedProjeto(null)}>
+                      Voltar para instalações
+                    </button>
+                    <div>
+                      <span className="section-kicker">Cadastro da instalação</span>
+                      <h3>{selectedProjeto.clienteNome}</h3>
+                      <p>Atualize agenda, etapa, checklist, fotos e observações do cliente.</p>
+                    </div>
+                  </div>
+
+                  <div className="project-detail-modal project-detail-inline">
                     <div className="contract-modal-header">
                       <div>
                         <span className="section-kicker">Contrato #{selectedProjeto.contratoId}</span>
                         <h3>{selectedProjeto.clienteNome}</h3>
                         <p>{selectedProjeto.clienteCidade || 'Cidade não informada'} • {getResponsibleName(selectedProjeto.responsavelNome)}</p>
                       </div>
-                      <button type="button" className="lead-modal-close" onClick={() => setSelectedProjeto(null)}>×</button>
                     </div>
 
                     <div className="project-detail-grid">
