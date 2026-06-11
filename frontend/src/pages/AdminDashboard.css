@@ -1402,12 +1402,6 @@
   border-color: #dce2ea;
 }
 .ca-outline:hover { border-color: #94a3b8; background: #f8fafc; }
-.ca-homologacao {
-  border-color: #fdba74;
-  background: #fff7ed;
-  color: #c2410c;
-}
-.ca-homologacao:hover { border-color: #f97316; background: #ffedd5; }
 .ca-ghost {
   background: #f1f5f9;
   color: #475569;
