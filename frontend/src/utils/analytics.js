@@ -50,7 +50,7 @@ export const initSiteAnalytics = () => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    const whatsappLink = target.closest('a[href*="wa.me"], a[href*="whatsapp"]');
+    const whatsappLink = target.closest('a[href*="wa.me"], a[href*="whatsapp"], a[href*="/rleads"]');
     if (whatsappLink) {
       trackSiteEvent('whatsapp_click', whatsappLink.dataset.analyticsSource || 'whatsapp_cta', {
         text: whatsappLink.textContent?.trim().slice(0, 80) || '',
