@@ -7146,7 +7146,45 @@
 .ctr-status-pendente { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 .ctr-status-recusado { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 
-.ctr-table-actions { display: flex; align-items: center; gap: 0.375rem; }
+.ctr-table-actions { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+.ctr-action-text {
+  min-height: 34px;
+  padding: 0 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.ctr-action-text:hover { transform: translateY(-1px); }
+.ctr-action-approve {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+.ctr-action-approve:hover { background: #bbf7d0; }
+.ctr-action-reject {
+  background: #fff;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+.ctr-action-reject:hover { background: #fef2f2; }
+.ctr-action-waiting {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  background: #f8fafc;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .ctr-empty { padding: 2rem; text-align: center; font-size: 0.875rem; color: #94a3b8; }
 
 .ctr-pagination {
