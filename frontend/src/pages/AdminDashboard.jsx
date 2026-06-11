@@ -1671,6 +1671,18 @@ const AdminDashboard = () => {
     setActiveTab('contratos');
   };
 
+  const closeContractReview = () => {
+    setSelectedContrato(null);
+    setReviewNote('');
+    setReviewError('');
+  };
+
+  const abrirRevisaoContrato = (contrato) => {
+    setSelectedContrato(contrato);
+    setReviewNote('');
+    setReviewError('');
+  };
+
   const revisarContrato = async (contratoId, status) => {
     const normalizedReviewNote = reviewNote.trim();
     if (status === 'Recusado' && !normalizedReviewNote) {
@@ -1684,17 +1696,9 @@ const AdminDashboard = () => {
       body: JSON.stringify({ status, observacaoAnalise: normalizedReviewNote }),
     });
     setContratos(prev => prev.map(item => item.id === contrato.id ? contrato : item));
-    setSelectedContrato(contrato);
+    setSelectedContrato(null);
     setReviewNote('');
     setReviewError('');
-  };
-
-  const abrirRecusaContrato = (contrato) => {
-    setSelectedContrato(contrato);
-    setReviewError('Informe o motivo da recusa e confirme no painel abaixo.');
-    setTimeout(() => {
-      document.getElementById('review-note')?.focus();
-    }, 50);
   };
 
   const getContratoDownloadUrl = (contratoId) => (
@@ -3174,12 +3178,10 @@ const AdminDashboard = () => {
                         const year = String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear();
                         const numContrato = `CT-${year}-${String(contrato.id).padStart(4, '0')}`;
                         const dataFormatada = dateBr(contrato.dataCriacao);
-                        const isSelected = selectedContrato?.id === contrato.id;
                         return (
                           <tr
                             key={contrato.id}
-                            className={isSelected ? 'ctr-row-selected' : ''}
-                            onClick={() => setSelectedContrato(isSelected ? null : contrato)}
+                            onClick={() => abrirRevisaoContrato(contrato)}
                           >
                             <td className="ctr-td-id">#{String((contratoPage - 1) * CONTRATOS_PER_PAGE + idx + 1).padStart(4, '0').replace(/^0+/, '') || 1}</td>
                             <td className="ctr-td-num">{numContrato}</td>
@@ -3195,22 +3197,13 @@ const AdminDashboard = () => {
                             <td>
                               <div className="ctr-table-actions" onClick={e => e.stopPropagation()}>
                                 {adminUser.role === 'ADM' && contrato.status === 'Pendente' && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="ctr-action-text ctr-action-approve"
-                                      onClick={() => revisarContrato(contrato.id, 'Aprovado')}
-                                    >
-                                      Aprovar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="ctr-action-text ctr-action-reject"
-                                      onClick={() => abrirRecusaContrato(contrato)}
-                                    >
-                                      Recusar
-                                    </button>
-                                  </>
+                                  <button
+                                    type="button"
+                                    className="ctr-action-text ctr-action-review"
+                                    onClick={() => abrirRevisaoContrato(contrato)}
+                                  >
+                                    Revisar
+                                  </button>
                                 )}
                                 {contrato.status === 'Pendente' && adminUser.role !== 'ADM' && (
                                   <span className="ctr-action-waiting">Aguardando aprovação</span>
@@ -3275,65 +3268,91 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              {/* ── Selected contract detail / ADM review ── */}
+              {/* ── Contract review modal ── */}
               {selectedContrato && (
-                <div className="admin-card ctr-detail-panel">
-                  <div className="ctr-detail-header">
-                    <div>
-                      <p className="ctr-detail-num">CT-{String(selectedContrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-{String(selectedContrato.id).padStart(4, '0')}</p>
-                      <h4>{selectedContrato.clienteNome}</h4>
-                      <p className="ctr-detail-meta">{[selectedContrato.clienteTelefone, selectedContrato.clienteEmail, selectedContrato.clienteCidade].filter(Boolean).join(' · ')}</p>
-                    </div>
-                    <div className="ctr-detail-header-right">
-                      <span className={`ctr-status-badge ${selectedContrato.status === 'Aprovado' ? 'ctr-status-aprovado' : selectedContrato.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente'}`}>
-                        {selectedContrato.status}
-                      </span>
-                      <button type="button" className="ctr-close-btn" onClick={() => setSelectedContrato(null)} aria-label="Fechar">✕</button>
-                    </div>
-                  </div>
-
-                  <div className="ctr-detail-grid">
-                    <div><span>Valor</span><strong>{money(selectedContrato.valorProjeto)}</strong></div>
-                    <div><span>Potência</span><strong>{selectedContrato.dados?.manual?.potenciaKwp || selectedContrato.dados?.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</strong></div>
-                    <div><span>Placa</span><strong>{selectedContrato.equipamentoDados?.placaModelo || '—'}</strong></div>
-                    <div><span>Inversor</span><strong>{selectedContrato.equipamentoDados?.inversorModelo || '—'}</strong></div>
-                    <div><span>Geração</span><strong>{selectedContrato.dados?.manual?.geracaoKwh || selectedContrato.dados?.dimensionamento?.geracao_estimada_kwh || 0} kWh/mês</strong></div>
-                    <div><span>Responsável</span><strong>{getResponsibleName(selectedContrato.assignedUserName)}</strong></div>
-                  </div>
-
-                  {selectedContrato.observacaoAnalise && (
-                    <div className="contract-note">
-                      <span>Observação da análise</span>
-                      <p>{selectedContrato.observacaoAnalise}</p>
-                    </div>
-                  )}
-
-                  {adminUser.role === 'ADM' && selectedContrato.status === 'Pendente' && (
-                    <div className="review-box">
-                      <label htmlFor="review-note">Observação para a equipe</label>
-                      <textarea
-                        id="review-note"
-                        placeholder="Ex: revisar condição de pagamento, documentação ok, valor aprovado..."
-                        value={reviewNote}
-                        onChange={(event) => { setReviewNote(event.target.value); if (reviewError) setReviewError(''); }}
-                      />
-                      {reviewError && <p className="review-error">{reviewError}</p>}
-                      <div className="actions-footer">
-                        <button className="btn btn-outline" onClick={() => revisarContrato(selectedContrato.id, 'Recusado')}>Recusar</button>
-                        <button className="btn btn-primary" onClick={() => revisarContrato(selectedContrato.id, 'Aprovado')}>Aprovar contrato</button>
+                <div className="contract-modal-backdrop">
+                  <div className="contract-modal ctr-review-modal" role="dialog" aria-modal="true" aria-labelledby="contract-review-title">
+                    <div className="contract-modal-header">
+                      <div>
+                        <span>Revisão do contrato</span>
+                        <h3 id="contract-review-title">CT-{String(selectedContrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-{String(selectedContrato.id).padStart(4, '0')}</h3>
+                        <p>{selectedContrato.clienteNome}</p>
+                      </div>
+                      <div className="ctr-detail-header-right">
+                        <span className={`ctr-status-badge ${selectedContrato.status === 'Aprovado' ? 'ctr-status-aprovado' : selectedContrato.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente'}`}>
+                          {selectedContrato.status}
+                        </span>
+                        <button type="button" className="lead-modal-close" onClick={closeContractReview} aria-label="Fechar">×</button>
                       </div>
                     </div>
-                  )}
 
-                  {selectedContrato.status === 'Aprovado' && (
-                    <div className="approved-actions">
-                      <div><strong>Contrato liberado</strong><span>O arquivo pode ser baixado e enviado para o cliente.</span></div>
-                      <div className="approved-actions-buttons">
-                        <a className="btn btn-outline" href={getContratoDownloadUrl(selectedContrato.id)} target="_blank" rel="noopener noreferrer">Baixar contrato</a>
-                        <a className="btn btn-primary" href={`https://wa.me/55${String(selectedContrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência e te orientar nos próximos passos da instalação.')}`} target="_blank" rel="noopener noreferrer">Enviar ao cliente</a>
-                      </div>
+                    <div className="ctr-review-sections">
+                      <section className="ctr-review-section">
+                        <h4>Cliente</h4>
+                        <div className="ctr-detail-grid">
+                          <div><span>Nome</span><strong>{selectedContrato.clienteNome || '—'}</strong></div>
+                          <div><span>Telefone</span><strong>{selectedContrato.clienteTelefone || '—'}</strong></div>
+                          <div><span>E-mail</span><strong>{selectedContrato.clienteEmail || '—'}</strong></div>
+                          <div><span>Cidade</span><strong>{selectedContrato.clienteCidade || '—'}</strong></div>
+                          <div><span>Responsável</span><strong>{getResponsibleName(selectedContrato.assignedUserName || selectedContrato.criadoPorNome)}</strong></div>
+                          <div><span>Data</span><strong>{dateBr(selectedContrato.dataCriacao)}</strong></div>
+                        </div>
+                      </section>
+
+                      <section className="ctr-review-section">
+                        <h4>Sistema e valores</h4>
+                        <div className="ctr-detail-grid">
+                          <div><span>Valor total</span><strong>{money(selectedContrato.valorProjeto)}</strong></div>
+                          <div><span>Entrada</span><strong>{money(selectedContrato.dados?.manual?.valorEntrada || selectedContrato.equipamentoDados?.valorEntrada)}</strong></div>
+                          <div><span>Saldo</span><strong>{money(selectedContrato.dados?.manual?.valorSaldo || selectedContrato.equipamentoDados?.valorSaldo)}</strong></div>
+                          <div><span>Potência</span><strong>{selectedContrato.dados?.manual?.potenciaKwp || selectedContrato.equipamentoDados?.potenciaKwp || selectedContrato.dados?.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</strong></div>
+                          <div><span>Geração mensal</span><strong>{selectedContrato.dados?.manual?.geracaoKwh || selectedContrato.equipamentoDados?.geracaoKwh || selectedContrato.dados?.dimensionamento?.geracao_estimada_kwh || 0} kWh</strong></div>
+                          <div><span>Geração anual</span><strong>{selectedContrato.dados?.manual?.geracaoAnualKwh || selectedContrato.equipamentoDados?.geracaoAnualKwh || '—'} kWh</strong></div>
+                          <div><span>Placas</span><strong>{selectedContrato.dados?.manual?.numeroPaineis || selectedContrato.equipamentoDados?.numeroPaineis || '—'}</strong></div>
+                          <div><span>Modelo placa</span><strong>{selectedContrato.equipamentoDados?.placaModelo || selectedContrato.dados?.manual?.painel || '—'}</strong></div>
+                          <div><span>Inversor</span><strong>{selectedContrato.equipamentoDados?.inversorModelo || selectedContrato.dados?.manual?.inversor || '—'}</strong></div>
+                          <div><span>Cabo</span><strong>{selectedContrato.dados?.manual?.quantidadeCabo || selectedContrato.equipamentoDados?.quantidadeCabo || '—'}</strong></div>
+                          <div><span>Prazo</span><strong>{selectedContrato.dados?.manual?.prazoExecucao || selectedContrato.equipamentoDados?.prazoExecucao || '—'} dias</strong></div>
+                          <div><span>Pagamento</span><strong>{selectedContrato.dados?.manual?.formaPagamento || selectedContrato.equipamentoDados?.formaPagamento || selectedContrato.dados?.manual?.formaPagamentoTipo || '—'}</strong></div>
+                        </div>
+                      </section>
+
+                      {selectedContrato.observacaoAnalise && (
+                        <div className="contract-note">
+                          <span>Observação da análise</span>
+                          <p>{selectedContrato.observacaoAnalise}</p>
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {adminUser.role === 'ADM' && selectedContrato.status === 'Pendente' && (
+                      <div className="review-box ctr-review-box">
+                        <label htmlFor="review-note">Observação da revisão</label>
+                        <textarea
+                          id="review-note"
+                          placeholder="Para aprovar, a observação é opcional. Para recusar, informe o motivo do ajuste."
+                          value={reviewNote}
+                          onChange={(event) => { setReviewNote(event.target.value); if (reviewError) setReviewError(''); }}
+                        />
+                        {reviewError && <p className="review-error">{reviewError}</p>}
+                        <div className="contract-modal-actions">
+                          <button type="button" className="btn btn-outline" onClick={closeContractReview}>Cancelar</button>
+                          <button type="button" className="btn btn-outline ctr-modal-reject" onClick={() => revisarContrato(selectedContrato.id, 'Recusado')}>Recusar</button>
+                          <button type="button" className="btn btn-primary" onClick={() => revisarContrato(selectedContrato.id, 'Aprovado')}>Aprovar contrato</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedContrato.status === 'Aprovado' && (
+                      <div className="approved-actions">
+                        <div><strong>Contrato liberado</strong><span>O arquivo pode ser baixado e enviado para o cliente.</span></div>
+                        <div className="approved-actions-buttons">
+                          <a className="btn btn-outline" href={getContratoDownloadUrl(selectedContrato.id)} target="_blank" rel="noopener noreferrer">Baixar contrato</a>
+                          <a className="btn btn-primary" href={`https://wa.me/55${String(selectedContrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência e te orientar nos próximos passos da instalação.')}`} target="_blank" rel="noopener noreferrer">Enviar ao cliente</a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

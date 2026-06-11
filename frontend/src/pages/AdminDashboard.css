@@ -7160,6 +7160,12 @@
   transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 .ctr-action-text:hover { transform: translateY(-1px); }
+.ctr-action-review {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
+}
+.ctr-action-review:hover { background: #ffedd5; }
 .ctr-action-approve {
   background: #dcfce7;
   border-color: #86efac;
@@ -7243,6 +7249,38 @@
 .ctr-detail-grid > div { display: flex; flex-direction: column; gap: 0.125rem; }
 .ctr-detail-grid span { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
 .ctr-detail-grid strong { font-size: 0.9375rem; font-weight: 600; color: #0f172a; }
+
+.ctr-review-modal {
+  max-width: 980px;
+  max-height: min(88vh, 860px);
+  overflow-y: auto;
+}
+
+.ctr-review-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem 0;
+}
+
+.ctr-review-section h4 {
+  margin: 0 0 0.65rem;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.ctr-review-box {
+  margin: 1.25rem 1.5rem 1.5rem;
+}
+
+.ctr-modal-reject {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.ctr-modal-reject:hover {
+  background: #fef2f2;
+}
 
 .ctr-legend {
   display: flex;
