@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import io from 'socket.io-client'; // v2
 import './AdminDashboard.css';
 import { getApiBaseUrl, withApiBase } from '../utils/apiBase';
@@ -415,7 +415,8 @@ const getInitialAdminUser = () => {
   }
 };
 
-const resolveInitialTab = (user) => {
+const resolveInitialTab = (user, pathname = '') => {
+  if (pathname === '/admin/leads') return 'leads';
   if (!user) return 'leads';
   const firstTab = ['dashboard', 'leads', 'orcamentos', 'contratos', 'equipeTecnica', 'ordensServico', 'precosSistemas', 'clientes', 'financeiro', 'usuarios']
     .find(permission => user.role === 'ADM' || user.permissions?.[permission]);
@@ -424,8 +425,9 @@ const resolveInitialTab = (user) => {
 
 const AdminDashboard = () => {
   const initialUser = getInitialAdminUser();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(() => resolveInitialTab(initialUser));
+  const [activeTab, setActiveTab] = useState(() => resolveInitialTab(initialUser, location.pathname));
   const [clientes, setClientes] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
   const [leads, setLeads] = useState([]);
@@ -1987,6 +1989,65 @@ const AdminDashboard = () => {
                     <div className="crm-kpi-card analytics-card"><span>Cliques no WhatsApp</span><strong>{resumo.kpis?.clicksWhatsApp30d || 0}</strong><p>{percent(resumo.siteAnalytics?.conversaoWhatsApp30d)} de conversão por visita.</p></div>
                     <div className="crm-kpi-card analytics-card"><span>Cliques em simular</span><strong>{resumo.kpis?.clicksSimular30d || 0}</strong><p>Pessoas que abriram intenção de calcular economia.</p></div>
                     <div className="crm-kpi-card analytics-card"><span>Simulações concluídas</span><strong>{resumo.kpis?.simulacoesConcluidas30d || 0}</strong><p>{percent(resumo.siteAnalytics?.conversaoSimulacao30d)} concluem após clicar em simular.</p></div>
+                  </div>
+
+                  <div className="rr-leads-panel">
+                    <div className="section-heading rr-leads-heading">
+                      <div>
+                        <span className="section-kicker">Meta Ads</span>
+                        <h3>Captura via /rleads</h3>
+                        <p>Rodízio automático no servidor para os anúncios que apontam direto para o WhatsApp.</p>
+                      </div>
+                      <div className="section-stats">
+                        <div><strong>{resumo.roundRobinLeads?.total || 0}</strong><span>leads totais</span></div>
+                        <div><strong>{resumo.roundRobinLeads?.last24h || 0}</strong><span>últimas 24h</span></div>
+                        <div><strong>{resumo.roundRobinLeads?.status?.ok ? 'OK' : 'Atenção'}</strong><span>distribuição</span></div>
+                      </div>
+                    </div>
+
+                    <div className="rr-status-card">
+                      <div>
+                        <strong>{resumo.roundRobinLeads?.status?.message || 'Aguardando primeiros acessos.'}</strong>
+                        <span>Próximo vendedor: {resumo.roundRobinLeads?.nextSeller?.phone || 'não definido'} • rota ativa em /rleads</span>
+                      </div>
+                      <span className={`status-badge ${resumo.roundRobinLeads?.status?.ok ? 'success' : 'warning'}`}>
+                        {resumo.roundRobinLeads?.enabled ? 'online' : 'offline'}
+                      </span>
+                    </div>
+
+                    <div className="rr-seller-grid">
+                      {(resumo.roundRobinLeads?.bySeller || []).map(seller => (
+                        <div className="rr-seller-card" key={seller.phone}>
+                          <div className="rr-seller-top">
+                            <span>Vendedor {seller.position}</span>
+                            <strong>{seller.total || 0}</strong>
+                          </div>
+                          <p>{seller.phone}</p>
+                          <div className="pipeline-bar orange"><span style={{ width: `${Math.min((seller.percent || 0) * 100, 100)}%` }}></span></div>
+                          <small>{percent(seller.percent || 0)} dos redirecionamentos</small>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="admin-card rr-recent-card">
+                      <div className="card-header-flex compact">
+                        <h3>Últimos acessos /rleads</h3>
+                        <span className="status-badge success">{resumo.roundRobinLeads?.recent?.length || 0}</span>
+                      </div>
+                      <div className="mobile-list">
+                        {(resumo.roundRobinLeads?.recent || []).slice(0, 8).map(item => (
+                          <div className="mobile-list-item rr-recent-item" key={item.id}>
+                            <div>
+                              <strong>Vendedor {item.sellerPosition} • {item.sellerPhone}</strong>
+                              <span>{item.ip || 'IP não identificado'} • {item.referer || 'Sem referer'}</span>
+                              {Object.keys(item.utmParams || {}).length > 0 && <small>{Object.entries(item.utmParams).map(([key, value]) => `${key}=${value}`).join(' • ')}</small>}
+                            </div>
+                            <em>{item.createdAt ? new Date(item.createdAt).toLocaleString('pt-BR') : 'Sem data'}</em>
+                          </div>
+                        ))}
+                        {(resumo.roundRobinLeads?.recent || []).length === 0 && <p className="muted-text">Os acessos da campanha aparecerão aqui em tempo real após usar /rleads.</p>}
+                      </div>
+                    </div>
                   </div>
                 </>
               ) : null}

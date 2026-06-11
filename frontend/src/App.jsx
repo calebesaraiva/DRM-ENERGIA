@@ -76,6 +76,7 @@ function AppShell() {
           <Route path="/orcamento" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/leads" element={<AdminDashboard />} />
         </Routes>
       </Suspense>
       {!isSystemRoute && <StickyCTA />}

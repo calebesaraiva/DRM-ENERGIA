@@ -16,6 +16,11 @@ const PDFDocument = require('pdfkit');
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const DEFAULT_WHATSAPP_PHONE = '559985127056';
+const ROUND_ROBIN_SELLERS = [
+  { position: 1, phone: '5599984632324', name: 'Vendedor 1' },
+  { position: 2, phone: '5599992276744', name: 'Vendedor 2' },
+  { position: 3, phone: '5599985127056', name: 'Vendedor 3' },
+];
 
 // Configuração do Servidor HTTP para suportar o Socket.io
 const server = http.createServer(app);
@@ -24,6 +29,7 @@ const io = new Server(server, {
 });
 
 // Middlewares
+app.set('trust proxy', true);
 const allowedOrigins = [
   'http://localhost:5173',
   'https://drmenergiasolar.com.br',
@@ -701,6 +707,87 @@ const setSetting = async (key, value) => {
     key,
     JSON.stringify(value)
   );
+};
+
+const pickQueryEntries = (query = {}, predicate = () => true) => {
+  const entries = {};
+  for (const [key, rawValue] of Object.entries(query)) {
+    if (!predicate(key)) continue;
+    entries[key] = Array.isArray(rawValue)
+      ? rawValue.map(value => String(value).slice(0, 500))
+      : String(rawValue ?? '').slice(0, 500);
+  }
+  return entries;
+};
+
+const buildWhatsAppRedirectUrl = (phone, query = {}) => {
+  const params = new URLSearchParams();
+  for (const [key, rawValue] of Object.entries(query)) {
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    values.forEach(value => {
+      if (typeof value !== 'undefined' && value !== null) {
+        params.append(key, String(value).slice(0, 500));
+      }
+    });
+  }
+  const queryString = params.toString();
+  return `https://wa.me/${phone}${queryString ? `?${queryString}` : ''}`;
+};
+
+const getRoundRobinLeadSummary = async () => {
+  const [state, totalRow, last24Row, rows, recent] = await Promise.all([
+    db.get('SELECT nextIndex, updatedAt FROM lead_round_robin_state WHERE id = 1'),
+    db.get('SELECT COUNT(*) as total FROM lead_redirect_logs'),
+    db.get(`SELECT COUNT(*) as total FROM lead_redirect_logs WHERE datetime(createdAt) >= datetime('now', '-24 hours')`),
+    db.all(
+      `SELECT sellerPhone, sellerPosition, sellerName, COUNT(*) as total
+       FROM lead_redirect_logs
+       GROUP BY sellerPhone, sellerPosition, sellerName
+       ORDER BY sellerPosition ASC`
+    ),
+    db.all(
+      `SELECT id, createdAt, ip, userAgent, sellerPhone, sellerPosition, sellerName, referer, requestUrl, redirectUrl, utmParams, queryParams
+       FROM lead_redirect_logs
+       ORDER BY id DESC
+       LIMIT 12`
+    ),
+  ]);
+
+  const total = Number(totalRow?.total || 0);
+  const bySeller = ROUND_ROBIN_SELLERS.map(seller => {
+    const row = rows.find(item => item.sellerPhone === seller.phone);
+    const sellerTotal = Number(row?.total || 0);
+    return {
+      ...seller,
+      total: sellerTotal,
+      percent: total ? sellerTotal / total : 0,
+    };
+  });
+  const totals = bySeller.map(item => item.total);
+  const spread = totals.length ? Math.max(...totals) - Math.min(...totals) : 0;
+
+  return {
+    enabled: true,
+    route: '/rleads',
+    targetBaseUrl: 'https://wa.me/',
+    total,
+    last24h: Number(last24Row?.total || 0),
+    nextSeller: ROUND_ROBIN_SELLERS[Number(state?.nextIndex || 0) % ROUND_ROBIN_SELLERS.length],
+    lastUpdatedAt: state?.updatedAt || null,
+    status: {
+      ok: spread <= 1,
+      spread,
+      message: spread <= 1
+        ? 'Rodizio equilibrado e operacional.'
+        : `Distribuicao com diferenca de ${spread} lead(s).`,
+    },
+    bySeller,
+    recent: recent.map(item => ({
+      ...item,
+      utmParams: item.utmParams ? JSON.parse(item.utmParams) : {},
+      queryParams: item.queryParams ? JSON.parse(item.queryParams) : {},
+    })),
+  };
 };
 
 const getNextLeadOwner = async () => {
@@ -1759,6 +1846,11 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   });
 
   await db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA busy_timeout = 5000;
+  `);
+
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS clientes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT NOT NULL,
@@ -1958,6 +2050,27 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       value TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS lead_round_robin_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      nextIndex INTEGER NOT NULL DEFAULT 0,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS lead_redirect_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      createdAt TEXT NOT NULL,
+      ip TEXT,
+      userAgent TEXT,
+      sellerPhone TEXT NOT NULL,
+      sellerPosition INTEGER NOT NULL,
+      sellerName TEXT,
+      referer TEXT,
+      requestUrl TEXT,
+      redirectUrl TEXT NOT NULL,
+      utmParams TEXT,
+      queryParams TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS site_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
@@ -2109,7 +2222,16 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       UNIQUE(campaignId, email),
       FOREIGN KEY (campaignId) REFERENCES email_campaigns(id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_lead_redirect_logs_createdAt ON lead_redirect_logs(createdAt);
+    CREATE INDEX IF NOT EXISTS idx_lead_redirect_logs_sellerPhone ON lead_redirect_logs(sellerPhone);
   `);
+
+  await db.run(
+    `INSERT OR IGNORE INTO lead_round_robin_state (id, nextIndex, updatedAt)
+     VALUES (1, 0, ?)`,
+    new Date().toISOString()
+  );
 
   const clienteColumns = await db.all('PRAGMA table_info(clientes)');
   const existingClienteColumns = clienteColumns.map(column => column.name);
@@ -2339,6 +2461,57 @@ const sendOrcamentoPdf = async (res, orcamento) => {
 
 app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'API da DRM Energia Solar está no ar!' });
+});
+
+app.get('/rleads', async (req, res) => {
+  let transactionStarted = false;
+  try {
+    await db.exec('BEGIN IMMEDIATE TRANSACTION');
+    transactionStarted = true;
+
+    const state = await db.get('SELECT nextIndex FROM lead_round_robin_state WHERE id = 1');
+    const currentIndex = Number(state?.nextIndex || 0);
+    const seller = ROUND_ROBIN_SELLERS[currentIndex % ROUND_ROBIN_SELLERS.length];
+    const nextIndex = (currentIndex + 1) % ROUND_ROBIN_SELLERS.length;
+    const redirectUrl = buildWhatsAppRedirectUrl(seller.phone, req.query);
+    const now = new Date().toISOString();
+    const queryParams = pickQueryEntries(req.query);
+    const utmParams = pickQueryEntries(req.query, key => key.toLowerCase().startsWith('utm_'));
+
+    await db.run(
+      'UPDATE lead_round_robin_state SET nextIndex = ?, updatedAt = ? WHERE id = 1',
+      nextIndex,
+      now
+    );
+    await db.run(
+      `INSERT INTO lead_redirect_logs
+        (createdAt, ip, userAgent, sellerPhone, sellerPosition, sellerName, referer, requestUrl, redirectUrl, utmParams, queryParams)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      now,
+      String(req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim().slice(0, 80),
+      String(req.headers['user-agent'] || '').slice(0, 500),
+      seller.phone,
+      seller.position,
+      seller.name,
+      String(req.headers.referer || req.headers.referrer || '').slice(0, 1000),
+      String(req.originalUrl || req.url || '/rleads').slice(0, 1000),
+      redirectUrl,
+      JSON.stringify(utmParams).slice(0, 2000),
+      JSON.stringify(queryParams).slice(0, 4000)
+    );
+
+    await db.exec('COMMIT');
+    transactionStarted = false;
+    return res.redirect(302, redirectUrl);
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        await db.exec('ROLLBACK');
+      } catch {}
+    }
+    console.error('ERRO NO RODIZIO DE LEADS:', error);
+    return res.status(503).send('Servico de distribuicao temporariamente indisponivel.');
+  }
 });
 
 app.get('/api/portfolio', async (req, res) => {
@@ -3368,6 +3541,10 @@ app.get('/api/admin/leads', authRequired, requirePermission('leads'), async (req
     ? await db.all('SELECT * FROM leads ORDER BY id DESC')
     : await db.all('SELECT * FROM leads WHERE assignedUserId = ? ORDER BY id DESC', req.user.id);
   res.json(leads);
+});
+
+app.get('/api/admin/round-robin-leads', authRequired, requirePermission('dashboard'), async (req, res) => {
+  res.json(await getRoundRobinLeadSummary());
 });
 
 app.get('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'), async (req, res) => {
@@ -4436,6 +4613,7 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
     canSeeAll ? db.all('SELECT id, nome, username, email, emailVerified, active, mustChangePassword FROM usuarios') : Promise.resolve([]),
     canSeeAll ? db.all('SELECT * FROM ordens_servico') : db.all('SELECT * FROM ordens_servico WHERE responsavelId = ? OR responsavelId IS NULL', req.user.id),
   ]);
+  const roundRobinLeads = canSeeAll ? await getRoundRobinLeadSummary() : null;
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
@@ -4546,6 +4724,7 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
       topSources,
       eventosRecentes: siteEvents.slice(0, 8),
     },
+    roundRobinLeads,
     leadsPorStatus,
     projetosPorEtapa,
     proximosRetornos: leads
