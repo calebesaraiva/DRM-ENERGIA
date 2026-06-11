@@ -1439,6 +1439,7 @@ const buildContratoHtml = async (contrato) => {
   <style>
     @page { size: A4; margin: 13mm 12mm 15mm; }
     * { box-sizing: border-box; }
+    html { overflow-wrap: anywhere; word-break: normal; hyphens: none; }
     body {
       margin: 0;
       background: #eef1f5;
@@ -1454,7 +1455,7 @@ const buildContratoHtml = async (contrato) => {
       padding: 10mm 12mm 12mm;
       background: #fff;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
       box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
     }
     .page::before,
@@ -1508,7 +1509,7 @@ const buildContratoHtml = async (contrato) => {
       font-weight: 900;
       text-transform: uppercase;
     }
-    p { margin: 0 0 6px; text-align: justify; }
+    p { margin: 0 0 6px; text-align: left; overflow-wrap: anywhere; }
     .intro {
       margin-top: 8px;
       padding: 8px 9px;
@@ -1518,13 +1519,14 @@ const buildContratoHtml = async (contrato) => {
     }
     .info-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 8px;
       margin: 8px 0 10px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
+      table-layout: fixed;
       page-break-inside: avoid;
     }
     th {
@@ -1540,6 +1542,8 @@ const buildContratoHtml = async (contrato) => {
       padding: 6px 7px;
       border: 1px solid #e5e7eb;
       vertical-align: top;
+      overflow-wrap: anywhere;
+      word-break: normal;
     }
     .info-table td:first-child {
       width: 34%;
@@ -1707,15 +1711,8 @@ const buildContratoPdf = async (contrato) => {
   const equipamento = parsed.equipamentoDados || {};
   const template = await getContractTemplate();
   const logoPath = path.join(__dirname, '../frontend/public/assets/logo.png');
-  const projectRows = [
-    ['Potência instalada', `${manual.potenciaKwp || dimensionamento.potencia_real_instalada_kwp || 0} kWp`],
-    ['Geração mensal estimada', `${manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0} kWh`],
-    ['Quantidade de painéis', manual.numeroPaineis || dimensionamento.numero_paineis_necessarios || 'Não informado'],
-    ['Painel', manual.painel || equipamento.placaModelo || 'Não informado'],
-    ['Inversor', manual.inversor || equipamento.inversorModelo || 'Não informado'],
-    ['Valor do sistema', formatCurrency(manual.valorSistema || parsed.valorProjeto)],
-    ['Forma de pagamento', manual.formaPagamento || 'Não informado'],
-  ];
+  const clientAddress = cliente.enderecoCompleto || buildClientAddress(cliente);
+  const installAddress = cliente.enderecoInstalacaoCompleto || buildInstallAddress(cliente);
   const contractVariables = {
     empresa: template.empresa,
     cliente: {
@@ -1724,69 +1721,218 @@ const buildContratoPdf = async (contrato) => {
       email: parsed.clienteEmail || 'Não informado',
       cidade: parsed.clienteCidade || 'Não informado',
       cpfCnpj: cliente.cpfCnpj || manual.cpfCnpj || 'Não informado',
-      endereco: cliente.enderecoCompleto || buildClientAddress(cliente),
-      enderecoInstalacao: cliente.enderecoInstalacaoCompleto || buildInstallAddress(cliente),
+      rgIe: cliente.rgIe || 'Não informado',
+      endereco: clientAddress,
+      enderecoInstalacao: installAddress,
+      unidadeConsumidora: cliente.unidadeConsumidora || 'Não informado',
+      distribuidora: cliente.distribuidora || 'Não informado',
     },
     projeto: {
       potencia: manual.potenciaKwp || dimensionamento.potencia_real_instalada_kwp || 0,
       geracao: manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0,
+      geracaoAnual: manual.geracaoAnualKwh || dimensionamento.geracao_anual_kwh || dimensionamento.geracao_anual_estimada_kwh || (Number(manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0) * 12),
+      paineis: manual.numeroPaineis || dimensionamento.numero_paineis_necessarios || 0,
+      quantidadeCabo: manual.quantidadeCabo || equipamento.quantidadeCabo || 'Não informado',
+    },
+    equipamento: {
+      nome: parsed.equipamentoNome || equipamento.nome || 'Não informado',
+      placaModelo: manual.painel || equipamento.placaModelo || 'Não informado',
+      inversorModelo: manual.inversor || equipamento.inversorModelo || 'Não informado',
+      potenciaPlacaW: equipamento.potenciaPlacaW || '',
+      potenciaInversorKw: equipamento.potenciaInversorKw || '',
     },
     contrato: {
+      id: parsed.id,
       valor: formatCurrency(manual.valorSistema || parsed.valorProjeto),
       formaPagamento: manual.formaPagamento || 'Não informado',
+      entrada: manual.valorEntrada ? formatCurrency(manual.valorEntrada) : 'Não informado',
+      saldo: manual.valorSaldo ? formatCurrency(manual.valorSaldo) : 'Não informado',
       prazoExecucao: manual.prazoExecucao || 40,
+      status: parsed.status,
+      aprovadoPor: parsed.analisadoPorNome || 'Administrador',
+      dataAprovacao: parsed.dataAnalise ? new Date(parsed.dataAnalise).toLocaleDateString('pt-BR') : '',
     },
   };
+  const projectRows = [
+    ['Potência instalada', `${contractVariables.projeto.potencia} kWp`],
+    ['Geração mensal estimada', `${contractVariables.projeto.geracao} kWh`],
+    ['Geração anual estimada', `${contractVariables.projeto.geracaoAnual} kWh`],
+    ['Quantidade de painéis', contractVariables.projeto.paineis || 'Não informado'],
+    ['Modelo dos painéis', contractVariables.equipamento.placaModelo],
+    ['Modelo do inversor', contractVariables.equipamento.inversorModelo],
+    ['Quantidade de cabo', contractVariables.projeto.quantidadeCabo],
+  ];
+  const commercialRows = [
+    ['Valor do sistema', contractVariables.contrato.valor],
+    ['Entrada', contractVariables.contrato.entrada],
+    ['Saldo', contractVariables.contrato.saldo],
+    ['Condição de pagamento', contractVariables.contrato.formaPagamento],
+    ['Prazo de execução', `${contractVariables.contrato.prazoExecucao} dias úteis`],
+    ['Aprovado por', contractVariables.contrato.aprovadoPor],
+    ['Data de aprovação', contractVariables.contrato.dataAprovacao || formatDateBr()],
+  ];
   const clauses = htmlToPlainText(renderTemplate(template.corpo || DEFAULT_CONTRACT_TEMPLATE.corpo, contractVariables));
 
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 44, info: { Title: `Contrato DRM Solar #${parsed.id}` } });
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 86, left: 44, right: 44, bottom: 58 },
+      info: { Title: `Contrato DRM Solar #${parsed.id}` },
+      bufferPages: true,
+    });
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const orange = '#F97316';
+    const orange = template.visual.primaryColor || '#F97316';
     const dark = '#111827';
     const muted = '#64748B';
+    const border = '#E5E7EB';
+    const soft = '#F8FAFC';
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const footerTop = doc.page.height - 42;
+    const sanitize = (value) => String(value ?? 'Não informado').replace(/\s+/g, ' ').trim() || 'Não informado';
+
+    const drawHeader = () => {
+      const topY = 26;
+      doc.save();
+      doc.rect(0, 0, doc.page.width, 8).fill(orange);
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, doc.page.margins.left, topY, { fit: [92, 48] });
+      }
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(orange).text('DRM ENERGIA SOLAR', doc.page.margins.left + 112, topY, { width: pageWidth - 112, align: 'right' });
+      doc.font('Helvetica').fontSize(7.4).fillColor(muted).text(sanitize(template.empresa.endereco), doc.page.margins.left + 112, topY + 13, { width: pageWidth - 112, align: 'right' });
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(dark).text(`Contrato #${parsed.id} - ${parsed.status}`, doc.page.margins.left + 112, topY + 32, { width: pageWidth - 112, align: 'right' });
+      doc.strokeColor(border).lineWidth(1).moveTo(doc.page.margins.left, 78).lineTo(doc.page.margins.left + pageWidth, 78).stroke();
+      doc.restore();
+    };
+
+    const drawFooter = (pageNumber, totalPages) => {
+      doc.save();
+      doc.strokeColor(border).lineWidth(1).moveTo(doc.page.margins.left, footerTop - 8).lineTo(doc.page.margins.left + pageWidth, footerTop - 8).stroke();
+      doc.font('Helvetica').fontSize(7.4).fillColor(muted)
+        .text(`${sanitize(template.empresa.telefone)}${template.empresa.email ? ` - ${sanitize(template.empresa.email)}` : ''}`, doc.page.margins.left, footerTop, { width: pageWidth * 0.72 });
+      doc.font('Helvetica-Bold').fontSize(7.4).fillColor(orange)
+        .text(`Página ${pageNumber} de ${totalPages}`, doc.page.margins.left + pageWidth * 0.72, footerTop, { width: pageWidth * 0.28, align: 'right' });
+      doc.restore();
+    };
+
     const ensureSpace = (height = 80) => {
-      if (doc.y + height > doc.page.height - doc.page.margins.bottom) doc.addPage();
+      if (doc.y + height > doc.page.height - doc.page.margins.bottom) {
+        doc.addPage();
+        drawHeader();
+        doc.y = 92;
+      }
     };
     const sectionTitle = (title) => {
-      ensureSpace(45);
-      doc.moveDown(0.7).font('Helvetica-Bold').fontSize(11).fillColor(orange).text(title.toUpperCase());
-      doc.moveDown(0.25).strokeColor('#E2E8F0').moveTo(doc.x, doc.y).lineTo(doc.x + pageWidth, doc.y).stroke();
-      doc.moveDown(0.55);
-    };
-    const infoRow = (label, value) => {
-      ensureSpace(34);
-      const startY = doc.y;
-      doc.font('Helvetica-Bold').fontSize(8).fillColor(muted).text(String(label).toUpperCase(), doc.page.margins.left, startY, { width: 155 });
-      doc.font('Helvetica').fontSize(9.5).fillColor(dark).text(String(value ?? 'Não informado'), doc.page.margins.left + 160, startY, { width: pageWidth - 160 });
-      doc.y = Math.max(doc.y, startY + 22);
-      doc.strokeColor('#EEF2F7').moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.margins.left + pageWidth, doc.y).stroke();
-      doc.moveDown(0.4);
+      ensureSpace(38);
+      const y = doc.y + 8;
+      doc.roundedRect(doc.page.margins.left, y, pageWidth, 22, 6).fill('#FFF7ED');
+      doc.rect(doc.page.margins.left, y, 4, 22).fill(orange);
+      doc.font('Helvetica-Bold').fontSize(9.2).fillColor(dark).text(title.toUpperCase(), doc.page.margins.left + 12, y + 6, { width: pageWidth - 18 });
+      doc.y = y + 30;
     };
 
-    if (fs.existsSync(logoPath)) doc.image(logoPath, doc.page.margins.left, 34, { fit: [105, 58] });
-    doc.font('Helvetica-Bold').fontSize(17).fillColor(dark).text(template.titulo || 'CONTRATO DE FORNECIMENTO E INSTALAÇÃO DE SISTEMA FOTOVOLTAICO', 175, 38, { width: pageWidth - 130, align: 'right' });
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(orange).text(`CONTRATO #${parsed.id} - ${parsed.status}`, 175, 82, { width: pageWidth - 130, align: 'right' });
-    doc.moveTo(doc.page.margins.left, 108).lineTo(doc.page.margins.left + pageWidth, 108).lineWidth(2).strokeColor(orange).stroke();
-    doc.y = 126;
+    const keyValueCard = (x, y, width, label, value) => {
+      const labelText = sanitize(label).toUpperCase();
+      const valueText = sanitize(value);
+      const labelHeight = doc.heightOfString(labelText, { width: width - 18 });
+      const valueHeight = doc.font('Helvetica').fontSize(8.7).heightOfString(valueText, { width: width - 18, lineGap: 1.8 });
+      const height = Math.max(52, labelHeight + valueHeight + 25);
+      doc.roundedRect(x, y, width, height, 7).fillAndStroke('#FFFFFF', border);
+      doc.font('Helvetica-Bold').fontSize(7.2).fillColor(muted).text(labelText, x + 9, y + 8, { width: width - 18 });
+      doc.font('Helvetica').fontSize(8.7).fillColor(dark).text(valueText, x + 9, y + 23, { width: width - 18, lineGap: 1.8 });
+      return height;
+    };
 
-    sectionTitle('Partes do contrato');
-    infoRow('Contratada', `${template.empresa.nome} - CNPJ ${template.empresa.cnpj || 'Não informado'}`);
-    infoRow('Contratante', `${parsed.clienteNome} - CPF/CNPJ ${contractVariables.cliente.cpfCnpj}`);
-    infoRow('Contato', `${contractVariables.cliente.telefone} - ${contractVariables.cliente.email}`);
-    infoRow('Endereço', contractVariables.cliente.endereco);
-    infoRow('Local da instalação', contractVariables.cliente.enderecoInstalacao);
+    const cardGrid = (rows, columns = 2) => {
+      const gap = 8;
+      const width = (pageWidth - gap * (columns - 1)) / columns;
+      let x = doc.page.margins.left;
+      let y = doc.y;
+      let rowHeight = 0;
+      rows.forEach(([label, value], index) => {
+        const col = index % columns;
+        if (col === 0 && index > 0) {
+          y += rowHeight + gap;
+          x = doc.page.margins.left;
+          rowHeight = 0;
+        }
+        const estimatedHeight = Math.max(
+          52,
+          doc.font('Helvetica').fontSize(8.7).heightOfString(sanitize(value), { width: width - 18, lineGap: 1.8 }) + 27
+        );
+        if (col === 0) ensureSpace(estimatedHeight + gap);
+        const height = keyValueCard(x, y, width, label, value);
+        rowHeight = Math.max(rowHeight, height);
+        x += width + gap;
+      });
+      doc.y = y + rowHeight + 4;
+    };
 
-    sectionTitle('Resumo do sistema contratado');
-    projectRows.forEach(([label, value]) => infoRow(label, value));
+    const paragraph = (text, options = {}) => {
+      const clean = sanitize(text);
+      ensureSpace(44);
+      doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(options.size || 8.8).fillColor(options.color || dark)
+        .text(clean, doc.page.margins.left, doc.y, {
+          width: pageWidth,
+          align: 'left',
+          lineGap: options.lineGap ?? 3,
+        });
+      doc.moveDown(0.6);
+    };
 
-    sectionTitle('Condições e cláusulas');
-    doc.font('Helvetica').fontSize(9).fillColor(dark).text(clauses, { align: 'justify', lineGap: 3 });
+    const renderClauses = () => {
+      clauses.split('\n').map(line => line.trim()).filter(Boolean).forEach(line => {
+        if (/^CL[ÁA]USULA|^D[ÉE]CIMA|^DAS |^DO |^DA /i.test(line) && line.length < 110) {
+          sectionTitle(line);
+        } else {
+          paragraph(line);
+        }
+      });
+    };
+
+    drawHeader();
+    doc.y = 96;
+    doc.font('Helvetica-Bold').fontSize(15).fillColor(dark)
+      .text(template.titulo || 'CONTRATO DE FORNECIMENTO E INSTALAÇÃO DE SISTEMA FOTOVOLTAICO', {
+        width: pageWidth,
+        align: 'center',
+        lineGap: 2,
+      });
+    doc.moveDown(0.6);
+    doc.roundedRect(doc.page.margins.left, doc.y, pageWidth, 72, 8).fillAndStroke('#FFFBF7', '#FED7AA');
+    const introY = doc.y + 11;
+    doc.font('Helvetica').fontSize(8.8).fillColor(dark)
+      .text(
+        `Pelo presente instrumento particular, ${sanitize(template.empresa.nome)}, inscrita no CNPJ ${sanitize(template.empresa.cnpj)}, e ${sanitize(parsed.clienteNome)}, CPF/CNPJ ${sanitize(contractVariables.cliente.cpfCnpj)}, firmam o presente contrato de prestação de serviços com fornecimento de materiais e instalação de sistema solar fotovoltaico.`,
+        doc.page.margins.left + 12,
+        introY,
+        { width: pageWidth - 24, lineGap: 2.5, align: 'left' }
+      );
+    doc.y = introY + 58;
+
+    sectionTitle('Dados do contratante');
+    cardGrid([
+      ['Nome', parsed.clienteNome],
+      ['CPF/CNPJ', contractVariables.cliente.cpfCnpj],
+      ['Telefone', contractVariables.cliente.telefone],
+      ['E-mail', contractVariables.cliente.email],
+      ['Cidade', contractVariables.cliente.cidade],
+      ['Distribuidora', contractVariables.cliente.distribuidora],
+      ['Endereço', contractVariables.cliente.endereco],
+      ['Local da instalação', contractVariables.cliente.enderecoInstalacao],
+    ], 2);
+
+    sectionTitle('Resumo técnico do sistema');
+    cardGrid(projectRows, 2);
+
+    sectionTitle('Condições comerciais');
+    cardGrid(commercialRows, 2);
+
+    sectionTitle('Cláusulas contratuais');
+    renderClauses();
 
     ensureSpace(145);
     sectionTitle('Assinaturas');
@@ -1799,6 +1945,12 @@ const buildContratoPdf = async (contrato) => {
     doc.text(parsed.clienteNome, doc.page.margins.left + pageWidth - 205, signatureY + 7, { width: 205, align: 'center' });
     doc.font('Helvetica').fontSize(8).fillColor(muted).text('CONTRATADA', doc.page.margins.left, signatureY + 20, { width: 205, align: 'center' });
     doc.text('CONTRATANTE', doc.page.margins.left + pageWidth - 205, signatureY + 20, { width: 205, align: 'center' });
+
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i += 1) {
+      doc.switchToPage(i);
+      drawFooter(i + 1, range.count);
+    }
 
     doc.end();
   });
