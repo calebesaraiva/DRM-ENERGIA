@@ -4283,6 +4283,16 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
   const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', clienteId);
   if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
 
+  const existing = await db.get(
+    `SELECT * FROM contratos
+     WHERE json_valid(dados) = 1
+       AND CAST(json_extract(dados, '$.cliente.id') AS INTEGER) = ?
+     ORDER BY id DESC
+     LIMIT 1`,
+    cliente.id
+  );
+  if (existing) return res.json(parseContrato(existing));
+
   const equipamento = equipamentoId
     ? await db.get('SELECT * FROM equipamentos WHERE id = ?', equipamentoId)
     : await db.get('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id DESC LIMIT 1');

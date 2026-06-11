@@ -1666,7 +1666,19 @@ const AdminDashboard = () => {
     });
   };
 
+  const getClientContract = (cliente) => contratos.find(contrato => (
+    Number(contrato.dados?.cliente?.id) === Number(cliente.id)
+  ));
+
   const openClientContractModal = (cliente) => {
+    const existingContract = getClientContract(cliente);
+    if (existingContract) {
+      setActiveTab('contratos');
+      abrirRevisaoContrato(existingContract);
+      showToast(`Abrindo contrato ${contractNumber(existingContract)} - ${existingContract.status}.`, 'info');
+      return;
+    }
+
     const equipamento = equipamentos.find(item => item.active);
     setQuickModal(null);
     setContractModal({
@@ -2588,6 +2600,7 @@ const AdminDashboard = () => {
                             const whatsappDigits = String(c.whatsapp || '').replace(/\D/g, '');
                             const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}?text=${whatsappClientMessage(c)}` : '';
                             const etapa = c.etapaComercial || 'Em negociação';
+                            const existingContract = getClientContract(c);
                             const dataFormatada = c.dataCadastro ? c.dataCadastro.slice(0,10).split('-').reverse().join('/') : '—';
                             return (
                               <tr key={c.id} className="client-row">
@@ -2621,7 +2634,14 @@ const AdminDashboard = () => {
                                       <button type="button" className="ca-btn ca-primary" onClick={() => openBudgetFormForClient(c)}>Orçamento</button>
                                     )}
                                     {hasPermission('contratos') && (
-                                      <button type="button" className="ca-btn ca-outline" onClick={() => openClientContractModal(c)}>Contrato</button>
+                                      <button
+                                        type="button"
+                                        className="ca-btn ca-outline"
+                                        title={existingContract ? `${contractNumber(existingContract)} - ${existingContract.status}` : 'Gerar contrato'}
+                                        onClick={() => openClientContractModal(c)}
+                                      >
+                                        {existingContract ? 'Ver contrato' : 'Contrato'}
+                                      </button>
                                     )}
                                     {hasPermission('contratos') && (
                                       <button type="button" className="ca-btn ca-outline" onClick={() => gerarProcuracao(c)}>Procuração</button>
