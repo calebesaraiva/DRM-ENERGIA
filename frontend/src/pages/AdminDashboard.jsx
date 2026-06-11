@@ -490,6 +490,7 @@ const AdminDashboard = () => {
   const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(false);
   const [budgetStatus, setBudgetStatus] = useState('');
   const [contratos, setContratos] = useState([]);
+  const [procuracoes, setProcuracoes] = useState([]);
   const [ordensServico, setOrdensServico] = useState([]);
   const [selectedContrato, setSelectedContrato] = useState(null);
   const [contractReviewForm, setContractReviewForm] = useState(contractToReviewForm());
@@ -557,6 +558,7 @@ const AdminDashboard = () => {
         { id: 'leads', label: 'Leads', permission: 'leads' },
         { id: 'orcamentos', label: 'Orçamentos', permission: 'orcamentos' },
         { id: 'contratos', label: 'Contratos', permission: 'contratos' },
+        { id: 'procuracoes', label: 'Procurações', permission: 'contratos' },
       ],
     },
     {
@@ -906,6 +908,7 @@ const AdminDashboard = () => {
     }
     if (user.role === 'ADM' || user.permissions?.contratos) {
       calls.push(request('/api/admin/contratos').then(setContratos));
+      calls.push(request('/api/admin/procuracoes').then(setProcuracoes));
       calls.push(request('/api/admin/equipamentos').then(setEquipamentos));
       calls.push(request('/api/admin/contrato-config').then(setContractConfig));
     }
@@ -1682,6 +1685,42 @@ const AdminDashboard = () => {
       manual: applyEquipamentoToManual({ ...emptyContractManual, formaPagamentoTipo: 'avista' }, equipamento),
     });
   };
+
+  const gerarProcuracao = async (cliente) => {
+    try {
+      const procuracao = await request('/api/admin/procuracoes', {
+        method: 'POST',
+        body: JSON.stringify({ clienteId: cliente.id }),
+      });
+      setProcuracoes(prev => prev.some(item => item.id === procuracao.id) ? prev.map(item => item.id === procuracao.id ? procuracao : item) : [procuracao, ...prev]);
+      setActiveTab('procuracoes');
+      showToast(`Procuração de ${cliente.nome} enviada para aprovação.`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const revisarProcuracao = async (procuracao, status) => {
+    const motivo = status === 'Recusado' ? window.prompt('Informe o motivo da recusa:') : '';
+    if (status === 'Recusado' && !motivo?.trim()) return;
+    try {
+      const updated = await request(`/api/admin/procuracoes/${procuracao.id}/revisao`, {
+        method: 'PUT',
+        body: JSON.stringify({ status, observacaoAnalise: motivo || '' }),
+      });
+      setProcuracoes(prev => prev.map(item => item.id === updated.id ? updated : item));
+      showToast(`Procuração #${updated.id} ${status === 'Aprovado' ? 'aprovada' : 'recusada'} com sucesso.`, status === 'Aprovado' ? 'success' : 'warning');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const getProcuracaoDownloadUrl = (id) => (
+    `${withApiBase(`/api/admin/procuracoes/${id}/download`)}?token=${localStorage.getItem('token')}`
+  );
+  const getProcuracaoPreviewUrl = (id) => (
+    `${withApiBase(`/api/admin/procuracoes/${id}/preview`)}?token=${localStorage.getItem('token')}`
+  );
 
   const updateContractManual = (field, value) => {
     setContractModal(prev => ({ ...prev, manual: { ...prev.manual, [field]: value } }));
@@ -2584,6 +2623,9 @@ const AdminDashboard = () => {
                                     {hasPermission('contratos') && (
                                       <button type="button" className="ca-btn ca-outline" onClick={() => openClientContractModal(c)}>Contrato</button>
                                     )}
+                                    {hasPermission('contratos') && (
+                                      <button type="button" className="ca-btn ca-outline" onClick={() => gerarProcuracao(c)}>Procuração</button>
+                                    )}
                                     {hasPermission('gerenciarClientes') && (
                                       <button type="button" className="ca-btn ca-ghost" title="Editar dados do cliente" onClick={() => { setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -3175,6 +3217,59 @@ const AdminDashboard = () => {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'procuracoes' && (
+            <div className="admin-section procuracoes-screen">
+              <div className="section-heading">
+                <div>
+                  <span className="section-kicker">Documentos</span>
+                  <h3>Procurações</h3>
+                  <p>Documentos gerados com os dados do cliente e liberados somente após aprovação.</p>
+                </div>
+                <div className="section-stats">
+                  <div><strong>{procuracoes.length}</strong><span>total</span></div>
+                  <div><strong>{procuracoes.filter(item => item.status === 'Pendente').length}</strong><span>pendentes</span></div>
+                  <div><strong>{procuracoes.filter(item => item.status === 'Aprovado').length}</strong><span>aprovadas</span></div>
+                </div>
+              </div>
+
+              <div className="admin-card ctr-table-card">
+                <div className="ctr-table-wrap">
+                  <table className="ctr-table">
+                    <thead><tr><th>Nº</th><th>CLIENTE</th><th>CPF/CNPJ</th><th>GERADA EM</th><th>VALIDADE</th><th>STATUS</th><th>AÇÕES</th></tr></thead>
+                    <tbody>
+                      {procuracoes.map(item => (
+                        <tr key={item.id}>
+                          <td className="ctr-td-num">PR-{String(item.id).padStart(4, '0')}</td>
+                          <td className="ctr-td-cliente">{item.clienteNome}</td>
+                          <td>{item.clienteCpfCnpj || 'Não informado'}</td>
+                          <td>{dateBr(item.dataCriacao)}</td>
+                          <td>{dateBr(item.validadeAte)}</td>
+                          <td><span className={`ctr-status-badge ${item.status === 'Aprovado' ? 'ctr-status-aprovado' : item.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente'}`}>{item.status}</span></td>
+                          <td>
+                            <div className="ctr-table-actions">
+                              {adminUser.role === 'ADM' && item.status === 'Pendente' && (
+                                <>
+                                  <a className="btn btn-outline btn-sm-admin" href={getProcuracaoPreviewUrl(item.id)} target="_blank" rel="noopener noreferrer">Revisar PDF</a>
+                                  <button type="button" className="ctr-action-text ctr-action-review" onClick={() => revisarProcuracao(item, 'Aprovado')}>Aprovar</button>
+                                  <button type="button" className="ctr-action-text" onClick={() => revisarProcuracao(item, 'Recusado')}>Recusar</button>
+                                </>
+                              )}
+                              {item.status === 'Aprovado' && (
+                                <a className="btn btn-outline btn-sm-admin" href={getProcuracaoDownloadUrl(item.id)} target="_blank" rel="noopener noreferrer">Baixar</a>
+                              )}
+                              {item.status === 'Recusado' && <span className="ctr-action-waiting">{item.observacaoAnalise || 'Recusada'}</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!procuracoes.length && <div className="ctr-empty"><p>Nenhuma procuração gerada. Use o botão Procuração na lista de clientes.</p></div>}
+                </div>
               </div>
             </div>
           )}

@@ -1001,6 +1001,11 @@ const parseContrato = (contrato) => ({
   equipamentoDados: parseJsonField(contrato.equipamentoDados),
 });
 
+const parseProcuracao = (procuracao) => ({
+  ...procuracao,
+  clienteDados: parseJsonField(procuracao.clienteDados),
+});
+
 const equipamentoExtraColumns = {
   tipo: 'TEXT',
   geracaoKwh: 'REAL',
@@ -2000,6 +2005,86 @@ const sendContratoPdf = async (res, contrato) => {
   res.send(pdf);
 };
 
+const buildProcuracaoPdf = async (procuracao) => {
+  const parsed = parseProcuracao(procuracao);
+  const cliente = parsed.clienteDados || {};
+  const template = await getContractTemplate();
+  const logoPath = path.join(__dirname, '../frontend/public/assets/logo.png');
+  const primary = template.visual.primaryColor || '#F97316';
+  const dark = '#111827';
+  const muted = '#64748B';
+  const address = cliente.enderecoCompleto || buildClientAddress(cliente);
+  const city = parsed.clienteCidade || cliente.cidade || 'Imperatriz';
+  const state = parsed.clienteEstado || cliente.estado || 'MA';
+  const distributor = cliente.distribuidora || 'ENERGISA, EQUATORIAL e a AGÊNCIA NACIONAL DE ENERGIA ELÉTRICA - ANEEL';
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 52, left: 56, right: 56, bottom: 48 }, info: { Title: `Procuração DRM #${parsed.id}` } });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const text = (value) => String(value || 'Não informado').replace(/\s+/g, ' ').trim();
+    const paragraph = (content, options = {}) => {
+      doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(options.size || 9.5).fillColor(options.color || dark)
+        .text(content, doc.page.margins.left, doc.y, { width, align: 'left', lineGap: options.lineGap ?? 3.5 });
+      doc.moveDown(options.gap ?? 0.8);
+    };
+    const section = (label) => {
+      const y = doc.y + 3;
+      doc.roundedRect(doc.page.margins.left, y, width, 22, 5).fill('#FFF7ED');
+      doc.rect(doc.page.margins.left, y, 4, 22).fill(primary);
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(dark).text(label, doc.page.margins.left + 12, y + 6, { width: width - 20 });
+      doc.y = y + 31;
+    };
+
+    doc.rect(0, 0, doc.page.width, 9).fill(primary);
+    if (fs.existsSync(logoPath)) doc.image(logoPath, doc.page.margins.left, 28, { fit: [92, 46] });
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(primary).text('DRM ENERGIA SOLAR', doc.page.margins.left + 110, 32, { width: width - 110, align: 'right' });
+    doc.font('Helvetica').fontSize(7.3).fillColor(muted).text(text(template.empresa.endereco), doc.page.margins.left + 110, 45, { width: width - 110, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(dark).text(`Procuração #${parsed.id} - ${parsed.status}`, doc.page.margins.left + 110, 61, { width: width - 110, align: 'right' });
+    doc.strokeColor('#E5E7EB').moveTo(doc.page.margins.left, 86).lineTo(doc.page.margins.left + width, 86).stroke();
+    doc.y = 108;
+    doc.font('Helvetica-Bold').fontSize(18).fillColor(dark).text('PROCURAÇÃO', doc.page.margins.left, doc.y, { width, align: 'center' });
+    doc.moveDown(1.1);
+
+    section('OUTORGANTE');
+    paragraph(`${text(parsed.clienteNome).toUpperCase()}, brasileiro(a), inscrito(a) no CPF/CNPJ sob o nº ${text(parsed.clienteCpfCnpj || cliente.cpfCnpj)}, residente e domiciliado(a) em ${text(address)}.`);
+
+    section('OUTORGADO');
+    paragraph(`DRM ENERGIA SOLAR LTDA, sociedade empresária limitada, inscrita no CNPJ sob o nº ${text(template.empresa.cnpj || '48.518.202/0001-56')}, com sede em ${text(template.empresa.endereco)}, neste ato representada por DEIVSON RODRIGUES MARTINS, inscrito no CPF sob o nº 048.708.953-74.`);
+    paragraph('FELIX ASSESSORIA & SERVIÇOS INTEGRADOS LTDA, inscrita no CNPJ sob o nº 30.030.152/0001-06, com sede na Rua Jaime Pinto, nº 1.220, casa B, Novo Horizonte, Marabá/PA, CEP 68.503-250, representada por Matheus Pinheiro da Silva Félix, CPF nº 036.465.112-14.');
+
+    section('PODERES CONFERIDOS');
+    paragraph(`O OUTORGANTE confere aos OUTORGADOS poderes para representá-lo perante ${text(distributor)}, especialmente para solicitar e acompanhar ajustes de demanda, aumento ou redução de carga, bloqueio e revisão de faturas, memória de massa, reclamações, mudança de grupo ou modalidade tarifária, protocolos, assinaturas e demais atos necessários ao fiel cumprimento deste mandato.`);
+    paragraph('Fica vedado o substabelecimento desta procuração a qualquer outra pessoa física ou jurídica.', { bold: true });
+    paragraph(`Esta procuração possui validade de 06 (seis) meses, até ${formatDateBr(parsed.validadeAte)}.`, { bold: true });
+
+    doc.moveDown(1.2);
+    paragraph(`${text(city).toUpperCase()} - ${text(state).toUpperCase()}, ${formatDateBr(parsed.dataCriacao)}.`, { size: 9, gap: 4 });
+    const signatureY = Math.max(doc.y + 42, 660);
+    doc.strokeColor(dark).moveTo(doc.page.margins.left + 70, signatureY).lineTo(doc.page.margins.left + width - 70, signatureY).stroke();
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(dark).text(text(parsed.clienteNome).toUpperCase(), doc.page.margins.left, signatureY + 9, { width, align: 'center' });
+    doc.font('Helvetica').fontSize(8).fillColor(muted).text(`CPF/CNPJ nº ${text(parsed.clienteCpfCnpj || cliente.cpfCnpj)} - OUTORGANTE`, doc.page.margins.left, signatureY + 23, { width, align: 'center' });
+
+    const footerY = doc.page.height - 28;
+    doc.page.margins.bottom = 0;
+    doc.strokeColor('#E5E7EB').moveTo(doc.page.margins.left, footerY - 7).lineTo(doc.page.margins.left + width, footerY - 7).stroke();
+    doc.font('Helvetica').fontSize(7.2).fillColor(muted).text(`${text(template.empresa.telefone)} - ${text(template.empresa.email)}`, doc.page.margins.left, footerY, { width, align: 'center', lineBreak: false });
+    doc.end();
+  });
+};
+
+const sendProcuracaoPdf = async (res, procuracao) => {
+  const pdf = await buildProcuracaoPdf(procuracao);
+  const safeName = String(procuracao.clienteNome || 'cliente').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w-]+/g, '-').toLowerCase();
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Length', pdf.length);
+  res.setHeader('Content-Disposition', `attachment; filename="procuracao-drm-${procuracao.id}-${safeName}.pdf"`);
+  res.send(pdf);
+};
+
 const buildOrcamentoPdf = async (orcamento) => {
   const dimensionamento = parseJsonField(orcamento.dimensionamento, {});
   const financeiro = parseJsonField(orcamento.financeiro, {});
@@ -2325,6 +2410,26 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS procuracoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clienteId INTEGER NOT NULL,
+      clienteNome TEXT NOT NULL,
+      clienteCpfCnpj TEXT,
+      clienteCidade TEXT,
+      clienteEstado TEXT,
+      clienteDados TEXT,
+      status TEXT DEFAULT 'Pendente',
+      criadoPorId INTEGER,
+      criadoPorNome TEXT,
+      analisadoPorId INTEGER,
+      analisadoPorNome TEXT,
+      observacaoAnalise TEXT,
+      dataCriacao TEXT,
+      dataAnalise TEXT,
+      validadeAte TEXT,
+      FOREIGN KEY (clienteId) REFERENCES clientes(id)
     );
 
     CREATE TABLE IF NOT EXISTS lead_round_robin_state (
@@ -4046,6 +4151,68 @@ app.get('/api/admin/contratos', authRequired, requirePermission('contratos'), as
     );
 
   res.json(contratos.map(parseContrato));
+});
+
+app.get('/api/admin/procuracoes', authRequired, requirePermission('contratos'), async (req, res) => {
+  const rows = await db.all('SELECT * FROM procuracoes ORDER BY id DESC');
+  res.json(rows.map(parseProcuracao));
+});
+
+app.post('/api/admin/procuracoes', authRequired, requirePermission('contratos'), async (req, res) => {
+  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.body.clienteId);
+  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+  if (!cliente.cpfCnpj || !cliente.endereco || !cliente.cidade || !cliente.estado) {
+    return res.status(400).json({ message: 'Preencha CPF/CNPJ, endereço, cidade e estado do cliente antes de gerar a procuração.' });
+  }
+  const existing = await db.get(`SELECT * FROM procuracoes WHERE clienteId = ? AND status = 'Pendente' ORDER BY id DESC LIMIT 1`, cliente.id);
+  if (existing) return res.json(parseProcuracao(existing));
+  const now = new Date();
+  const expires = new Date(now);
+  expires.setMonth(expires.getMonth() + 6);
+  const snapshot = { ...cliente, enderecoCompleto: buildClientAddress(cliente) };
+  delete snapshot.password;
+  const result = await db.run(
+    `INSERT INTO procuracoes
+      (clienteId, clienteNome, clienteCpfCnpj, clienteCidade, clienteEstado, clienteDados, status, criadoPorId, criadoPorNome, dataCriacao, validadeAte)
+     VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?)`,
+    cliente.id, cliente.nome, cliente.cpfCnpj, cliente.cidade, cliente.estado, JSON.stringify(snapshot),
+    req.user.id, req.user.nome, now.toISOString(), expires.toISOString()
+  );
+  const procuracao = parseProcuracao(await db.get('SELECT * FROM procuracoes WHERE id = ?', result.lastID));
+  io.emit('procuracao_atualizada', procuracao);
+  res.status(201).json(procuracao);
+});
+
+app.put('/api/admin/procuracoes/:id/revisao', authRequired, requirePermission('contratos'), async (req, res) => {
+  if (req.user.role !== 'ADM') return res.status(403).json({ message: 'Somente administrador pode aprovar ou recusar procurações.' });
+  const status = String(req.body.status || '');
+  const observation = String(req.body.observacaoAnalise || '').trim();
+  if (!['Aprovado', 'Recusado'].includes(status)) return res.status(400).json({ message: 'Informe se a procuração foi aprovada ou recusada.' });
+  if (status === 'Recusado' && !observation) return res.status(400).json({ message: 'Informe o motivo da recusa.' });
+  const current = await db.get('SELECT * FROM procuracoes WHERE id = ?', req.params.id);
+  if (!current) return res.status(404).json({ message: 'Procuração não encontrada.' });
+  if (current.status === 'Aprovado' && !isMasterAdmin(req.user)) return res.status(403).json({ message: 'Procuração aprovada só pode ser alterada pelo admin master.' });
+  await db.run(
+    `UPDATE procuracoes SET status = ?, analisadoPorId = ?, analisadoPorNome = ?, observacaoAnalise = ?, dataAnalise = ? WHERE id = ?`,
+    status, req.user.id, req.user.nome, observation || null, new Date().toISOString(), req.params.id
+  );
+  const updated = parseProcuracao(await db.get('SELECT * FROM procuracoes WHERE id = ?', req.params.id));
+  io.emit('procuracao_atualizada', updated);
+  res.json(updated);
+});
+
+app.get('/api/admin/procuracoes/:id/download', authRequired, requirePermission('contratos'), async (req, res) => {
+  const procuracao = await db.get('SELECT * FROM procuracoes WHERE id = ?', req.params.id);
+  if (!procuracao) return res.status(404).send('Procuração não encontrada.');
+  if (procuracao.status !== 'Aprovado') return res.status(403).send('A procuração só pode ser baixada após aprovação.');
+  await sendProcuracaoPdf(res, procuracao);
+});
+
+app.get('/api/admin/procuracoes/:id/preview', authRequired, requirePermission('contratos'), async (req, res) => {
+  if (req.user.role !== 'ADM') return res.status(403).send('Somente administrador pode revisar procurações pendentes.');
+  const procuracao = await db.get('SELECT * FROM procuracoes WHERE id = ?', req.params.id);
+  if (!procuracao) return res.status(404).send('Procuração não encontrada.');
+  await sendProcuracaoPdf(res, procuracao);
 });
 
 app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), async (req, res) => {
