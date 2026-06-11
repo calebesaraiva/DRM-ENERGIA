@@ -491,6 +491,14 @@ const AdminDashboard = () => {
   const [budgetStatus, setBudgetStatus] = useState('');
   const [contratos, setContratos] = useState([]);
   const [procuracoes, setProcuracoes] = useState([]);
+  const [homologacaoModal, setHomologacaoModal] = useState(null);
+  const [homologacaoForm, setHomologacaoForm] = useState({
+    titularMesmoContrato: true,
+    nome: '',
+    cpfCnpj: '',
+    endereco: '',
+  });
+  const [homologacaoLoading, setHomologacaoLoading] = useState(false);
   const [ordensServico, setOrdensServico] = useState([]);
   const [selectedContrato, setSelectedContrato] = useState(null);
   const [contractReviewForm, setContractReviewForm] = useState(contractToReviewForm());
@@ -1698,17 +1706,63 @@ const AdminDashboard = () => {
     });
   };
 
-  const gerarProcuracao = async (cliente) => {
+  const openHomologacaoModal = (cliente) => {
+    const contrato = getClientContract(cliente);
+    if (!contrato) {
+      showToast('Gere o contrato deste cliente antes de iniciar a homologação.', 'warning');
+      return;
+    }
+    const existing = procuracoes.find(item => Number(item.contratoId) === Number(contrato.id));
+    if (existing) {
+      setActiveTab('procuracoes');
+      showToast(`Este contrato já possui a procuração PR-${String(existing.id).padStart(4, '0')} (${existing.status}).`, 'info');
+      return;
+    }
+    setHomologacaoForm({
+      titularMesmoContrato: true,
+      nome: '',
+      cpfCnpj: '',
+      endereco: '',
+    });
+    setHomologacaoModal({
+      cliente,
+      contrato,
+      titularContrato: { ...cliente, ...(contrato.dados?.cliente || {}) },
+    });
+  };
+
+  const gerarProcuracao = async (event) => {
+    event.preventDefault();
+    if (!homologacaoModal) return;
+    const { cliente, contrato } = homologacaoModal;
+    setHomologacaoLoading(true);
     try {
       const procuracao = await request('/api/admin/procuracoes', {
         method: 'POST',
-        body: JSON.stringify({ clienteId: cliente.id }),
+        body: JSON.stringify({
+          clienteId: cliente.id,
+          contratoId: contrato.id,
+          titularMesmoContrato: homologacaoForm.titularMesmoContrato,
+          titular: homologacaoForm.titularMesmoContrato ? undefined : {
+            nome: homologacaoForm.nome,
+            cpfCnpj: homologacaoForm.cpfCnpj,
+            endereco: homologacaoForm.endereco,
+          },
+        }),
       });
       setProcuracoes(prev => prev.some(item => item.id === procuracao.id) ? prev.map(item => item.id === procuracao.id ? procuracao : item) : [procuracao, ...prev]);
+      setHomologacaoModal(null);
       setActiveTab('procuracoes');
-      showToast(`Procuração de ${cliente.nome} enviada para aprovação.`, 'success');
+      showToast(
+        procuracao.status === 'Pendente'
+          ? `Homologação iniciada. A procuração foi vinculada ao ${contractNumber(contrato)} e enviada para aprovação.`
+          : `A procuração vinculada ao ${contractNumber(contrato)} já está ${String(procuracao.status).toLowerCase()}.`,
+        procuracao.status === 'Pendente' ? 'success' : 'info'
+      );
     } catch (err) {
       showToast(err.message, 'error');
+    } finally {
+      setHomologacaoLoading(false);
     }
   };
 
@@ -2644,7 +2698,10 @@ const AdminDashboard = () => {
                                       </button>
                                     )}
                                     {hasPermission('contratos') && (
-                                      <button type="button" className="ca-btn ca-outline" onClick={() => gerarProcuracao(c)}>Procuração</button>
+                                      <button type="button" className="ca-btn ca-outline" onClick={() => openHomologacaoModal(c)}>Procuração</button>
+                                    )}
+                                    {hasPermission('contratos') && (
+                                      <button type="button" className="ca-btn ca-homologacao" onClick={() => openHomologacaoModal(c)}>Homologação</button>
                                     )}
                                     {hasPermission('gerenciarClientes') && (
                                       <button type="button" className="ca-btn ca-ghost" title="Editar dados do cliente" onClick={() => { setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>
@@ -3259,11 +3316,12 @@ const AdminDashboard = () => {
               <div className="admin-card ctr-table-card">
                 <div className="ctr-table-wrap">
                   <table className="ctr-table">
-                    <thead><tr><th>Nº</th><th>CLIENTE</th><th>CPF/CNPJ</th><th>GERADA EM</th><th>VALIDADE</th><th>STATUS</th><th>AÇÕES</th></tr></thead>
+                    <thead><tr><th>Nº</th><th>CONTRATO</th><th>TITULAR DA CONTA</th><th>CPF/CNPJ</th><th>GERADA EM</th><th>VALIDADE</th><th>STATUS</th><th>AÇÕES</th></tr></thead>
                     <tbody>
                       {procuracoes.map(item => (
                         <tr key={item.id}>
                           <td className="ctr-td-num">PR-{String(item.id).padStart(4, '0')}</td>
+                          <td className="ctr-td-num">{item.contratoId ? `CT-${String(item.contratoId).padStart(4, '0')}` : 'Legado'}</td>
                           <td className="ctr-td-cliente">{item.clienteNome}</td>
                           <td>{item.clienteCpfCnpj || 'Não informado'}</td>
                           <td>{dateBr(item.dataCriacao)}</td>
@@ -5117,6 +5175,102 @@ const AdminDashboard = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {homologacaoModal && (
+        <div className="contract-modal-backdrop">
+          <form className="contract-modal homologacao-modal" onSubmit={gerarProcuracao}>
+            <div className="contract-modal-header">
+              <div>
+                <span className="section-kicker">Homologação • {contractNumber(homologacaoModal.contrato)}</span>
+                <h3>Quem é o titular da conta de energia?</h3>
+                <p>A procuração ficará vinculada a este contrato e será enviada uma única vez para aprovação.</p>
+              </div>
+              <button type="button" className="lead-modal-close" aria-label="Fechar" onClick={() => setHomologacaoModal(null)}>×</button>
+            </div>
+
+            <div className="homologacao-contract-summary">
+              <div>
+                <span>Cliente do contrato</span>
+                <strong>{homologacaoModal.titularContrato.nome}</strong>
+              </div>
+              <div>
+                <span>Status do contrato</span>
+                <strong>{homologacaoModal.contrato.status}</strong>
+              </div>
+            </div>
+
+            <div className="homologacao-holder-options">
+              <button
+                type="button"
+                className={homologacaoForm.titularMesmoContrato ? 'active' : ''}
+                onClick={() => setHomologacaoForm(prev => ({ ...prev, titularMesmoContrato: true }))}
+              >
+                <strong>Sim, é o mesmo titular</strong>
+                <span>Reutilizar os dados completos do contrato.</span>
+              </button>
+              <button
+                type="button"
+                className={!homologacaoForm.titularMesmoContrato ? 'active' : ''}
+                onClick={() => setHomologacaoForm(prev => ({ ...prev, titularMesmoContrato: false }))}
+              >
+                <strong>Não, é outro titular</strong>
+                <span>Informar os dados que constam na concessionária.</span>
+              </button>
+            </div>
+
+            {homologacaoForm.titularMesmoContrato ? (
+              <div className="homologacao-data-preview">
+                <span>Dados que serão usados na procuração</span>
+                <strong>{homologacaoModal.titularContrato.nome}</strong>
+                <p>CPF/CNPJ: {homologacaoModal.titularContrato.cpfCnpj || 'não informado'}</p>
+                <p>Endereço: {[homologacaoModal.titularContrato.endereco, homologacaoModal.titularContrato.numero, homologacaoModal.titularContrato.bairro, homologacaoModal.titularContrato.cidade, homologacaoModal.titularContrato.estado].filter(Boolean).join(', ') || 'não informado'}</p>
+              </div>
+            ) : (
+              <div className="contract-modal-grid homologacao-fields">
+                <label className="span-2">
+                  Nome completo do titular
+                  <input
+                    value={homologacaoForm.nome}
+                    onChange={(event) => setHomologacaoForm(prev => ({ ...prev, nome: event.target.value }))}
+                    placeholder="Exatamente como consta na conta de energia"
+                    required
+                  />
+                </label>
+                <label className="span-2">
+                  CPF do titular
+                  <input
+                    value={homologacaoForm.cpfCnpj}
+                    onChange={(event) => setHomologacaoForm(prev => ({ ...prev, cpfCnpj: event.target.value }))}
+                    inputMode="numeric"
+                    placeholder="000.000.000-00"
+                    required
+                  />
+                </label>
+                <label className="span-2">
+                  Endereço conforme a concessionária
+                  <textarea
+                    value={homologacaoForm.endereco}
+                    onChange={(event) => setHomologacaoForm(prev => ({ ...prev, endereco: event.target.value }))}
+                    placeholder="Rua, número, bairro e demais informações exatamente como aparecem na conta"
+                    required
+                  />
+                </label>
+              </div>
+            )}
+
+            <div className="homologacao-notice">
+              A procuração ficará conectada ao {contractNumber(homologacaoModal.contrato)} e seguirá para aprovação do responsável.
+            </div>
+
+            <div className="contract-modal-actions">
+              <button type="button" className="btn btn-outline" onClick={() => setHomologacaoModal(null)}>Cancelar</button>
+              <button type="submit" className="btn btn-primary" disabled={homologacaoLoading}>
+                {homologacaoLoading ? 'Gerando...' : 'Confirmar e gerar procuração'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

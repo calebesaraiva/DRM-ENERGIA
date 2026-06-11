@@ -2043,7 +2043,12 @@ const buildProcuracaoPdf = async (procuracao) => {
     if (fs.existsSync(logoPath)) doc.image(logoPath, doc.page.margins.left, 28, { fit: [92, 46] });
     doc.font('Helvetica-Bold').fontSize(8).fillColor(primary).text('DRM ENERGIA SOLAR', doc.page.margins.left + 110, 32, { width: width - 110, align: 'right' });
     doc.font('Helvetica').fontSize(7.3).fillColor(muted).text(text(template.empresa.endereco), doc.page.margins.left + 110, 45, { width: width - 110, align: 'right' });
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(dark).text(`Procuração #${parsed.id} - ${parsed.status}`, doc.page.margins.left + 110, 61, { width: width - 110, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(dark).text(
+      `Procuração #${parsed.id}${parsed.contratoId ? ` - Contrato #${parsed.contratoId}` : ''} - ${parsed.status}`,
+      doc.page.margins.left + 110,
+      61,
+      { width: width - 110, align: 'right' }
+    );
     doc.strokeColor('#E5E7EB').moveTo(doc.page.margins.left, 86).lineTo(doc.page.margins.left + width, 86).stroke();
     doc.y = 108;
     doc.font('Helvetica-Bold').fontSize(18).fillColor(dark).text('PROCURAÇÃO', doc.page.margins.left, doc.y, { width, align: 'center' });
@@ -2415,6 +2420,8 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     CREATE TABLE IF NOT EXISTS procuracoes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       clienteId INTEGER NOT NULL,
+      contratoId INTEGER,
+      titularMesmoContrato INTEGER DEFAULT 1,
       clienteNome TEXT NOT NULL,
       clienteCpfCnpj TEXT,
       clienteCidade TEXT,
@@ -2429,7 +2436,8 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       dataCriacao TEXT,
       dataAnalise TEXT,
       validadeAte TEXT,
-      FOREIGN KEY (clienteId) REFERENCES clientes(id)
+      FOREIGN KEY (clienteId) REFERENCES clientes(id),
+      FOREIGN KEY (contratoId) REFERENCES contratos(id)
     );
 
     CREATE TABLE IF NOT EXISTS lead_round_robin_state (
@@ -2688,6 +2696,16 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingContratoColumns.includes('equipamentoDados')) {
     await db.exec('ALTER TABLE contratos ADD COLUMN equipamentoDados TEXT');
   }
+
+  const procuracaoColumns = await db.all('PRAGMA table_info(procuracoes)');
+  const existingProcuracaoColumns = procuracaoColumns.map(column => column.name);
+  if (!existingProcuracaoColumns.includes('contratoId')) {
+    await db.exec('ALTER TABLE procuracoes ADD COLUMN contratoId INTEGER');
+  }
+  if (!existingProcuracaoColumns.includes('titularMesmoContrato')) {
+    await db.exec('ALTER TABLE procuracoes ADD COLUMN titularMesmoContrato INTEGER DEFAULT 1');
+  }
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_procuracoes_contrato_unique ON procuracoes(contratoId) WHERE contratoId IS NOT NULL');
 
   const equipamentoColumns = await db.all('PRAGMA table_info(equipamentos)');
   const existingEquipamentoColumns = equipamentoColumns.map(column => column.name);
@@ -4161,24 +4179,63 @@ app.get('/api/admin/procuracoes', authRequired, requirePermission('contratos'), 
 app.post('/api/admin/procuracoes', authRequired, requirePermission('contratos'), async (req, res) => {
   const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.body.clienteId);
   if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
-  if (!cliente.cpfCnpj || !cliente.endereco || !cliente.cidade || !cliente.estado) {
-    return res.status(400).json({ message: 'Preencha CPF/CNPJ, endereço, cidade e estado do cliente antes de gerar a procuração.' });
+
+  const contratoId = Number(req.body.contratoId);
+  if (!contratoId) return res.status(400).json({ message: 'Gere o contrato do cliente antes de iniciar a homologação.' });
+  const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', contratoId);
+  if (!contrato) return res.status(404).json({ message: 'Contrato vinculado não encontrado.' });
+  const parsedContrato = parseContrato(contrato);
+  if (Number(parsedContrato.dados?.cliente?.id) !== Number(cliente.id)) {
+    return res.status(400).json({ message: 'O contrato selecionado não pertence a este cliente.' });
   }
-  const existing = await db.get(`SELECT * FROM procuracoes WHERE clienteId = ? AND status = 'Pendente' ORDER BY id DESC LIMIT 1`, cliente.id);
+
+  const existing = await db.get('SELECT * FROM procuracoes WHERE contratoId = ? ORDER BY id DESC LIMIT 1', contratoId);
   if (existing) return res.json(parseProcuracao(existing));
+
+  const titularMesmoContrato = req.body.titularMesmoContrato !== false;
+  const titular = req.body.titular || {};
+  const source = titularMesmoContrato
+    ? { ...cliente, ...(parsedContrato.dados?.cliente || {}) }
+    : {
+      ...cliente,
+      nome: String(titular.nome || '').trim(),
+      cpfCnpj: String(titular.cpfCnpj || '').trim(),
+      endereco: String(titular.endereco || '').trim(),
+      numero: null,
+      bairro: null,
+      cep: null,
+      cidade: cliente.cidade || parsedContrato.clienteCidade || parsedContrato.dados?.cliente?.cidade || 'Imperatriz',
+      estado: cliente.estado || parsedContrato.dados?.cliente?.estado || 'MA',
+      titularContaEnergia: true,
+      clienteContratoNome: cliente.nome,
+    };
+  if (!source.nome || !source.cpfCnpj || !source.endereco || (titularMesmoContrato && (!source.cidade || !source.estado))) {
+    return res.status(400).json({
+      message: titularMesmoContrato
+        ? 'Preencha CPF/CNPJ, endereço, cidade e estado do cliente antes de iniciar a homologação.'
+        : 'Informe nome completo, CPF e endereço do titular exatamente como constam na concessionária.',
+    });
+  }
+
   const now = new Date();
   const expires = new Date(now);
   expires.setMonth(expires.getMonth() + 6);
-  const snapshot = { ...cliente, enderecoCompleto: buildClientAddress(cliente) };
+  const snapshot = {
+    ...source,
+    enderecoCompleto: titularMesmoContrato ? buildClientAddress(source) : source.endereco,
+    contratoId,
+    contratoNumero: contrato.id,
+    titularMesmoContrato,
+  };
   delete snapshot.password;
-  const result = await db.run(
-    `INSERT INTO procuracoes
-      (clienteId, clienteNome, clienteCpfCnpj, clienteCidade, clienteEstado, clienteDados, status, criadoPorId, criadoPorNome, dataCriacao, validadeAte)
-     VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?)`,
-    cliente.id, cliente.nome, cliente.cpfCnpj, cliente.cidade, cliente.estado, JSON.stringify(snapshot),
+  await db.run(
+    `INSERT OR IGNORE INTO procuracoes
+      (clienteId, contratoId, titularMesmoContrato, clienteNome, clienteCpfCnpj, clienteCidade, clienteEstado, clienteDados, status, criadoPorId, criadoPorNome, dataCriacao, validadeAte)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?)`,
+    cliente.id, contratoId, titularMesmoContrato ? 1 : 0, source.nome, source.cpfCnpj, source.cidade, source.estado, JSON.stringify(snapshot),
     req.user.id, req.user.nome, now.toISOString(), expires.toISOString()
   );
-  const procuracao = parseProcuracao(await db.get('SELECT * FROM procuracoes WHERE id = ?', result.lastID));
+  const procuracao = parseProcuracao(await db.get('SELECT * FROM procuracoes WHERE contratoId = ?', contratoId));
   io.emit('procuracao_atualizada', procuracao);
   res.status(201).json(procuracao);
 });

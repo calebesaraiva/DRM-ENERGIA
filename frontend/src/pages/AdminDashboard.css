@@ -1402,6 +1402,12 @@
   border-color: #dce2ea;
 }
 .ca-outline:hover { border-color: #94a3b8; background: #f8fafc; }
+.ca-homologacao {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: #c2410c;
+}
+.ca-homologacao:hover { border-color: #f97316; background: #ffedd5; }
 .ca-ghost {
   background: #f1f5f9;
   color: #475569;
@@ -3569,6 +3575,92 @@
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
 }
 
+.homologacao-modal {
+  width: min(720px, 100%);
+}
+
+.homologacao-contract-summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.homologacao-contract-summary div,
+.homologacao-data-preview {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.homologacao-contract-summary span,
+.homologacao-data-preview > span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.homologacao-holder-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.homologacao-holder-options button {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 92px;
+  padding: 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.homologacao-holder-options button.active {
+  border-color: #f97316;
+  background: #fff7ed;
+  box-shadow: 0 8px 22px rgba(249, 115, 22, 0.12);
+}
+
+.homologacao-holder-options span,
+.homologacao-data-preview p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.homologacao-data-preview {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-left: 4px solid #f97316;
+  border-radius: 0 10px 10px 0;
+  background: #f8fafc;
+}
+
+.homologacao-fields {
+  margin-bottom: 1rem;
+}
+
+.homologacao-notice {
+  margin-top: auto;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .quick-modal {
   display: flex;
   flex-direction: column;
@@ -5535,6 +5627,34 @@
     gap: 0.5rem;
     margin-top: auto;
     padding-top: 0.65rem;
+  }
+
+  .homologacao-modal {
+    height: min(94dvh, 760px);
+    max-height: 94dvh;
+  }
+
+  .homologacao-contract-summary,
+  .homologacao-holder-options {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .homologacao-contract-summary,
+  .homologacao-holder-options,
+  .homologacao-data-preview,
+  .homologacao-fields {
+    margin-bottom: 0.65rem;
+  }
+
+  .homologacao-holder-options button {
+    min-height: 70px;
+    padding: 0.75rem;
+  }
+
+  .homologacao-notice {
+    padding: 0.6rem 0.7rem;
+    font-size: 0.76rem;
   }
 
   .quick-metrics {
