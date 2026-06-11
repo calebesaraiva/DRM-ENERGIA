@@ -7269,6 +7269,76 @@
   font-size: 0.95rem;
 }
 
+.ctr-review-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.ctr-review-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ctr-review-field span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ctr-review-field strong {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.ctr-review-field input,
+.ctr-review-field select,
+.ctr-review-field textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.ctr-review-field textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.ctr-review-field input:focus,
+.ctr-review-field select:focus,
+.ctr-review-field textarea:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.ctr-review-span-2 {
+  grid-column: span 2;
+  min-width: 0;
+}
+
 .ctr-review-box {
   margin: 1.25rem 1.5rem 1.5rem;
 }
@@ -7312,11 +7382,44 @@
   .ctr-filter-search-wrap { min-width: 0; margin-top: 0; }
   .ctr-filter-dates { flex-direction: column; }
   .ctr-detail-grid { grid-template-columns: repeat(2, 1fr); }
+  .ctr-review-modal {
+    width: calc(100vw - 1.5rem);
+    max-height: calc(100vh - 1.5rem);
+  }
+  .ctr-review-sections {
+    padding: 1rem;
+  }
+  .ctr-review-edit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ctr-review-box {
+    margin: 1rem;
+  }
   .ctr-legend { flex-direction: column; gap: 0.875rem; }
 }
 
 @media (max-width: 480px) {
   .ctr-stats-grid { grid-template-columns: 1fr; }
+  .ctr-review-edit-grid {
+    grid-template-columns: 1fr;
+    padding: 0.85rem;
+  }
+  .ctr-review-span-2 {
+    grid-column: span 1;
+  }
+  .ctr-review-field strong,
+  .ctr-review-field input,
+  .ctr-review-field select,
+  .ctr-review-field textarea {
+    font-size: 0.85rem;
+  }
+  .ctr-review-box .contract-modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ctr-review-box .contract-modal-actions .btn {
+    width: 100%;
+  }
 }
 
 /* ============================================================

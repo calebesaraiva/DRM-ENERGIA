@@ -1054,6 +1054,103 @@ const mergeManualWithEquipamento = (manual = {}, equipamento = {}) => ({
   formaPagamento: manual.formaPagamento || equipamento?.formaPagamento || '',
 });
 
+const isMasterAdmin = (user = {}) => (
+  user.role === 'ADM' && String(user.username || '').toLowerCase() === String(process.env.MASTER_ADMIN_USERNAME || 'deivson').toLowerCase()
+);
+
+const numberOrNull = (value) => {
+  if (value === '' || typeof value === 'undefined' || value === null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const normalizeContractReviewPayload = (body = {}, existing = {}) => {
+  const parsed = parseContrato(existing);
+  const dados = parsed.dados || {};
+  const manual = dados.manual || {};
+  const financeiro = dados.financeiro || {};
+  const dimensionamento = dados.dimensionamento || {};
+  const equipamentoDados = parsed.equipamentoDados || {};
+
+  const nextManual = {
+    ...manual,
+    valorSistema: body.valorProjeto ?? manual.valorSistema ?? '',
+    valorEntrada: body.valorEntrada ?? manual.valorEntrada ?? '',
+    valorSaldo: body.valorSaldo ?? manual.valorSaldo ?? '',
+    potenciaKwp: body.potenciaKwp ?? manual.potenciaKwp ?? '',
+    geracaoKwh: body.geracaoKwh ?? manual.geracaoKwh ?? '',
+    geracaoAnualKwh: body.geracaoAnualKwh ?? manual.geracaoAnualKwh ?? '',
+    numeroPaineis: body.numeroPaineis ?? manual.numeroPaineis ?? '',
+    painel: body.placaModelo ?? manual.painel ?? '',
+    inversor: body.inversorModelo ?? manual.inversor ?? '',
+    quantidadeCabo: body.quantidadeCabo ?? manual.quantidadeCabo ?? '',
+    prazoExecucao: body.prazoExecucao ?? manual.prazoExecucao ?? '',
+    formaPagamento: body.formaPagamento ?? manual.formaPagamento ?? '',
+    formaPagamentoTipo: body.formaPagamentoTipo ?? manual.formaPagamentoTipo ?? '',
+  };
+
+  const nextFinanceiro = {
+    ...financeiro,
+    preco_final_cliente_rs: numberOrNull(body.valorProjeto) ?? financeiro.preco_final_cliente_rs ?? 0,
+    entrada_rs: numberOrNull(body.valorEntrada) ?? financeiro.entrada_rs ?? 0,
+    saldo_rs: numberOrNull(body.valorSaldo) ?? financeiro.saldo_rs ?? 0,
+    forma_pagamento: body.formaPagamento ?? financeiro.forma_pagamento ?? '',
+    forma_pagamento_tipo: body.formaPagamentoTipo ?? financeiro.forma_pagamento_tipo ?? '',
+  };
+
+  const nextDimensionamento = {
+    ...dimensionamento,
+    potencia_real_instalada_kwp: numberOrNull(body.potenciaKwp) ?? dimensionamento.potencia_real_instalada_kwp ?? 0,
+    geracao_estimada_kwh: numberOrNull(body.geracaoKwh) ?? dimensionamento.geracao_estimada_kwh ?? 0,
+    geracao_anual_kwh: numberOrNull(body.geracaoAnualKwh) ?? dimensionamento.geracao_anual_kwh ?? dimensionamento.geracao_anual_estimada_kwh ?? 0,
+    geracao_anual_estimada_kwh: numberOrNull(body.geracaoAnualKwh) ?? dimensionamento.geracao_anual_estimada_kwh ?? dimensionamento.geracao_anual_kwh ?? 0,
+    numero_paineis_necessarios: numberOrNull(body.numeroPaineis) ?? dimensionamento.numero_paineis_necessarios ?? 0,
+    placa_modelo: body.placaModelo ?? dimensionamento.placa_modelo ?? '',
+    inversor_modelo: body.inversorModelo ?? dimensionamento.inversor_modelo ?? '',
+    quantidade_cabo_cc: body.quantidadeCabo ?? dimensionamento.quantidade_cabo_cc ?? '',
+  };
+
+  const nextEquipamentoDados = {
+    ...equipamentoDados,
+    valorSistema: numberOrNull(body.valorProjeto) ?? equipamentoDados.valorSistema ?? null,
+    valorEntrada: numberOrNull(body.valorEntrada) ?? equipamentoDados.valorEntrada ?? null,
+    valorSaldo: numberOrNull(body.valorSaldo) ?? equipamentoDados.valorSaldo ?? null,
+    potenciaKwp: numberOrNull(body.potenciaKwp) ?? equipamentoDados.potenciaKwp ?? null,
+    geracaoKwh: numberOrNull(body.geracaoKwh) ?? equipamentoDados.geracaoKwh ?? null,
+    geracaoAnualKwh: numberOrNull(body.geracaoAnualKwh) ?? equipamentoDados.geracaoAnualKwh ?? null,
+    numeroPaineis: numberOrNull(body.numeroPaineis) ?? equipamentoDados.numeroPaineis ?? null,
+    placaModelo: String(body.placaModelo ?? equipamentoDados.placaModelo ?? '').trim(),
+    inversorModelo: String(body.inversorModelo ?? equipamentoDados.inversorModelo ?? '').trim(),
+    quantidadeCabo: String(body.quantidadeCabo ?? equipamentoDados.quantidadeCabo ?? '').trim(),
+    prazoExecucao: numberOrNull(body.prazoExecucao) ?? equipamentoDados.prazoExecucao ?? null,
+    formaPagamento: String(body.formaPagamento ?? equipamentoDados.formaPagamento ?? '').trim(),
+    formaPagamentoTipo: String(body.formaPagamentoTipo ?? equipamentoDados.formaPagamentoTipo ?? '').trim(),
+  };
+
+  const clienteNome = String(body.clienteNome ?? existing.clienteNome ?? '').trim();
+  if (!clienteNome) {
+    const error = new Error('Informe o nome do cliente.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    clienteNome,
+    clienteTelefone: String(body.clienteTelefone ?? existing.clienteTelefone ?? '').trim(),
+    clienteEmail: String(body.clienteEmail ?? existing.clienteEmail ?? '').trim(),
+    clienteCidade: String(body.clienteCidade ?? existing.clienteCidade ?? '').trim(),
+    valorProjeto: numberOrNull(body.valorProjeto) ?? Number(existing.valorProjeto || 0),
+    dados: {
+      ...dados,
+      dimensionamento: nextDimensionamento,
+      financeiro: nextFinanceiro,
+      manual: nextManual,
+      revisadoEm: new Date().toISOString(),
+    },
+    equipamentoDados: nextEquipamentoDados,
+  };
+};
+
 const PROJECT_STAGES = [
   'Novo projeto',
   'Análise inicial',
@@ -3910,6 +4007,62 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
   const parsedContrato = parseContrato(contrato);
   io.emit('contrato_atualizado', parsedContrato);
   res.status(201).json(parsedContrato);
+});
+
+app.put('/api/admin/contratos/:id', authRequired, requirePermission('contratos'), async (req, res) => {
+  const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id);
+  if (!contrato) return res.status(404).json({ message: 'Contrato não encontrado.' });
+
+  if (req.user.role !== 'ADM') {
+    return res.status(403).json({ message: 'Somente administrador pode revisar dados de contrato.' });
+  }
+
+  if (contrato.status === 'Aprovado' && !isMasterAdmin(req.user)) {
+    return res.status(403).json({ message: 'Contrato aprovado só pode ser alterado pelo admin master.' });
+  }
+
+  try {
+    const data = normalizeContractReviewPayload(req.body, contrato);
+    await db.run(
+      `UPDATE contratos
+       SET clienteNome = ?,
+           clienteTelefone = ?,
+           clienteEmail = ?,
+           clienteCidade = ?,
+           valorProjeto = ?,
+           dados = ?,
+           equipamentoDados = ?
+       WHERE id = ?`,
+      data.clienteNome,
+      data.clienteTelefone,
+      data.clienteEmail,
+      data.clienteCidade,
+      data.valorProjeto,
+      JSON.stringify(data.dados),
+      JSON.stringify(data.equipamentoDados),
+      req.params.id
+    );
+
+    if (contrato.status === 'Aprovado') {
+      await db.run(
+        `UPDATE projetos
+         SET clienteNome = ?, clienteTelefone = ?, clienteCidade = ?, valorProjeto = ?, updatedAt = ?
+         WHERE contratoId = ?`,
+        data.clienteNome,
+        data.clienteTelefone,
+        data.clienteCidade,
+        data.valorProjeto,
+        new Date().toISOString(),
+        req.params.id
+      );
+    }
+
+    const updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id));
+    io.emit('contrato_atualizado', updated);
+    res.json(updated);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Erro ao atualizar contrato.' });
+  }
 });
 
 app.put('/api/admin/contratos/:id/revisao', authRequired, requirePermission('contratos'), async (req, res) => {

@@ -200,6 +200,26 @@ const emptyContractManual = {
   formaPagamento: '',
 };
 
+const contractToReviewForm = (contrato = {}) => ({
+  clienteNome: contrato.clienteNome || '',
+  clienteTelefone: contrato.clienteTelefone || '',
+  clienteEmail: contrato.clienteEmail || '',
+  clienteCidade: contrato.clienteCidade || '',
+  valorProjeto: contrato.valorProjeto ?? contrato.dados?.manual?.valorSistema ?? '',
+  valorEntrada: contrato.dados?.manual?.valorEntrada ?? contrato.equipamentoDados?.valorEntrada ?? '',
+  valorSaldo: contrato.dados?.manual?.valorSaldo ?? contrato.equipamentoDados?.valorSaldo ?? '',
+  potenciaKwp: contrato.dados?.manual?.potenciaKwp ?? contrato.equipamentoDados?.potenciaKwp ?? contrato.dados?.dimensionamento?.potencia_real_instalada_kwp ?? '',
+  geracaoKwh: contrato.dados?.manual?.geracaoKwh ?? contrato.equipamentoDados?.geracaoKwh ?? contrato.dados?.dimensionamento?.geracao_estimada_kwh ?? '',
+  geracaoAnualKwh: contrato.dados?.manual?.geracaoAnualKwh ?? contrato.equipamentoDados?.geracaoAnualKwh ?? contrato.dados?.dimensionamento?.geracao_anual_kwh ?? contrato.dados?.dimensionamento?.geracao_anual_estimada_kwh ?? '',
+  numeroPaineis: contrato.dados?.manual?.numeroPaineis ?? contrato.equipamentoDados?.numeroPaineis ?? contrato.dados?.dimensionamento?.numero_paineis_necessarios ?? '',
+  placaModelo: contrato.equipamentoDados?.placaModelo || contrato.dados?.manual?.painel || '',
+  inversorModelo: contrato.equipamentoDados?.inversorModelo || contrato.dados?.manual?.inversor || '',
+  quantidadeCabo: contrato.dados?.manual?.quantidadeCabo || contrato.equipamentoDados?.quantidadeCabo || '',
+  prazoExecucao: contrato.dados?.manual?.prazoExecucao ?? contrato.equipamentoDados?.prazoExecucao ?? '',
+  formaPagamentoTipo: contrato.dados?.manual?.formaPagamentoTipo || contrato.equipamentoDados?.formaPagamentoTipo || '',
+  formaPagamento: contrato.dados?.manual?.formaPagamento || contrato.equipamentoDados?.formaPagamento || '',
+});
+
 const emptyEquipamentoForm = {
   nome: '',
   tipo: 'Kit solar',
@@ -467,6 +487,7 @@ const AdminDashboard = () => {
   const [contratos, setContratos] = useState([]);
   const [ordensServico, setOrdensServico] = useState([]);
   const [selectedContrato, setSelectedContrato] = useState(null);
+  const [contractReviewForm, setContractReviewForm] = useState(contractToReviewForm());
   const [reviewNote, setReviewNote] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [equipamentos, setEquipamentos] = useState([]);
@@ -507,6 +528,8 @@ const AdminDashboard = () => {
   const hasPermission = useCallback((permission) => (
     adminUser.role === 'ADM' || adminUser.permissions?.[permission]
   ), [adminUser.permissions, adminUser.role]);
+
+  const isMasterAdmin = adminUser.role === 'ADM' && String(adminUser.username || '').toLowerCase() === 'deivson';
 
   const showToast = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
@@ -1673,14 +1696,42 @@ const AdminDashboard = () => {
 
   const closeContractReview = () => {
     setSelectedContrato(null);
+    setContractReviewForm(contractToReviewForm());
     setReviewNote('');
     setReviewError('');
   };
 
   const abrirRevisaoContrato = (contrato) => {
     setSelectedContrato(contrato);
+    setContractReviewForm(contractToReviewForm(contrato));
     setReviewNote('');
     setReviewError('');
+  };
+
+  const updateContractReviewField = (field, value) => {
+    setContractReviewForm(prev => ({ ...prev, [field]: value }));
+    if (reviewError) setReviewError('');
+  };
+
+  const canEditReviewedContract = (contrato = selectedContrato) => (
+    adminUser.role === 'ADM' && contrato && (contrato.status !== 'Aprovado' || isMasterAdmin)
+  );
+
+  const saveContractReview = async (contrato = selectedContrato) => {
+    if (!contrato || !canEditReviewedContract(contrato)) return contrato;
+    if (!String(contractReviewForm.clienteNome || '').trim()) {
+      setReviewError('Informe o nome do cliente antes de salvar.');
+      return null;
+    }
+
+    const updated = await request(`/api/admin/contratos/${contrato.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(contractReviewForm),
+    });
+    setContratos(prev => prev.map(item => item.id === updated.id ? updated : item));
+    setSelectedContrato(updated);
+    setContractReviewForm(contractToReviewForm(updated));
+    return updated;
   };
 
   const revisarContrato = async (contratoId, status) => {
@@ -1691,6 +1742,9 @@ const AdminDashboard = () => {
     }
 
     setReviewError('');
+    const saved = await saveContractReview(selectedContrato);
+    if (!saved) return;
+
     const contrato = await request(`/api/admin/contratos/${contratoId}/revisao`, {
       method: 'PUT',
       body: JSON.stringify({ status, observacaoAnalise: normalizedReviewNote }),
@@ -1708,6 +1762,36 @@ const AdminDashboard = () => {
   const getOrcamentoDownloadUrl = (orcamentoId) => (
     `${withApiBase(`/api/admin/orcamentos/${orcamentoId}/download`)}?token=${localStorage.getItem('token')}`
   );
+
+  const renderContractReviewField = (label, field, options = {}) => {
+    const value = contractReviewForm[field] ?? '';
+    const editable = canEditReviewedContract();
+    return (
+      <label className="ctr-review-field">
+        <span>{label}</span>
+        {editable ? (
+          options.type === 'textarea' ? (
+            <textarea value={value} onChange={(event) => updateContractReviewField(field, event.target.value)} />
+          ) : options.type === 'select' ? (
+            <select value={value} onChange={(event) => updateContractReviewField(field, event.target.value)}>
+              {(options.options || []).map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type={options.type || 'text'}
+              inputMode={options.inputMode}
+              value={value}
+              onChange={(event) => updateContractReviewField(field, event.target.value)}
+            />
+          )
+        ) : (
+          <strong>{options.format ? options.format(value) : (value || '—')}</strong>
+        )}
+      </label>
+    );
+  };
 
   const startNewEquipamento = () => {
     setEditingEquipamentoId(null);
@@ -3289,31 +3373,43 @@ const AdminDashboard = () => {
                     <div className="ctr-review-sections">
                       <section className="ctr-review-section">
                         <h4>Cliente</h4>
-                        <div className="ctr-detail-grid">
-                          <div><span>Nome</span><strong>{selectedContrato.clienteNome || '—'}</strong></div>
-                          <div><span>Telefone</span><strong>{selectedContrato.clienteTelefone || '—'}</strong></div>
-                          <div><span>E-mail</span><strong>{selectedContrato.clienteEmail || '—'}</strong></div>
-                          <div><span>Cidade</span><strong>{selectedContrato.clienteCidade || '—'}</strong></div>
-                          <div><span>Responsável</span><strong>{getResponsibleName(selectedContrato.assignedUserName || selectedContrato.criadoPorNome)}</strong></div>
-                          <div><span>Data</span><strong>{dateBr(selectedContrato.dataCriacao)}</strong></div>
+                        <div className="ctr-review-edit-grid">
+                          {renderContractReviewField('Nome', 'clienteNome')}
+                          {renderContractReviewField('Telefone', 'clienteTelefone', { inputMode: 'tel' })}
+                          {renderContractReviewField('E-mail', 'clienteEmail', { type: 'email' })}
+                          {renderContractReviewField('Cidade', 'clienteCidade')}
+                          <label className="ctr-review-field"><span>Responsável</span><strong>{getResponsibleName(selectedContrato.assignedUserName || selectedContrato.criadoPorNome)}</strong></label>
+                          <label className="ctr-review-field"><span>Data</span><strong>{dateBr(selectedContrato.dataCriacao)}</strong></label>
                         </div>
                       </section>
 
                       <section className="ctr-review-section">
                         <h4>Sistema e valores</h4>
-                        <div className="ctr-detail-grid">
-                          <div><span>Valor total</span><strong>{money(selectedContrato.valorProjeto)}</strong></div>
-                          <div><span>Entrada</span><strong>{money(selectedContrato.dados?.manual?.valorEntrada || selectedContrato.equipamentoDados?.valorEntrada)}</strong></div>
-                          <div><span>Saldo</span><strong>{money(selectedContrato.dados?.manual?.valorSaldo || selectedContrato.equipamentoDados?.valorSaldo)}</strong></div>
-                          <div><span>Potência</span><strong>{selectedContrato.dados?.manual?.potenciaKwp || selectedContrato.equipamentoDados?.potenciaKwp || selectedContrato.dados?.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</strong></div>
-                          <div><span>Geração mensal</span><strong>{selectedContrato.dados?.manual?.geracaoKwh || selectedContrato.equipamentoDados?.geracaoKwh || selectedContrato.dados?.dimensionamento?.geracao_estimada_kwh || 0} kWh</strong></div>
-                          <div><span>Geração anual</span><strong>{selectedContrato.dados?.manual?.geracaoAnualKwh || selectedContrato.equipamentoDados?.geracaoAnualKwh || '—'} kWh</strong></div>
-                          <div><span>Placas</span><strong>{selectedContrato.dados?.manual?.numeroPaineis || selectedContrato.equipamentoDados?.numeroPaineis || '—'}</strong></div>
-                          <div><span>Modelo placa</span><strong>{selectedContrato.equipamentoDados?.placaModelo || selectedContrato.dados?.manual?.painel || '—'}</strong></div>
-                          <div><span>Inversor</span><strong>{selectedContrato.equipamentoDados?.inversorModelo || selectedContrato.dados?.manual?.inversor || '—'}</strong></div>
-                          <div><span>Cabo</span><strong>{selectedContrato.dados?.manual?.quantidadeCabo || selectedContrato.equipamentoDados?.quantidadeCabo || '—'}</strong></div>
-                          <div><span>Prazo</span><strong>{selectedContrato.dados?.manual?.prazoExecucao || selectedContrato.equipamentoDados?.prazoExecucao || '—'} dias</strong></div>
-                          <div><span>Pagamento</span><strong>{selectedContrato.dados?.manual?.formaPagamento || selectedContrato.equipamentoDados?.formaPagamento || selectedContrato.dados?.manual?.formaPagamentoTipo || '—'}</strong></div>
+                        <div className="ctr-review-edit-grid">
+                          {renderContractReviewField('Valor total', 'valorProjeto', { type: 'number', inputMode: 'decimal', format: money })}
+                          {renderContractReviewField('Entrada', 'valorEntrada', { type: 'number', inputMode: 'decimal', format: money })}
+                          {renderContractReviewField('Saldo', 'valorSaldo', { type: 'number', inputMode: 'decimal', format: money })}
+                          {renderContractReviewField('Potência kWp', 'potenciaKwp', { type: 'number', inputMode: 'decimal' })}
+                          {renderContractReviewField('Geração mensal kWh', 'geracaoKwh', { type: 'number', inputMode: 'decimal' })}
+                          {renderContractReviewField('Geração anual kWh', 'geracaoAnualKwh', { type: 'number', inputMode: 'decimal' })}
+                          {renderContractReviewField('Placas', 'numeroPaineis', { type: 'number', inputMode: 'numeric' })}
+                          {renderContractReviewField('Modelo placa', 'placaModelo')}
+                          {renderContractReviewField('Inversor', 'inversorModelo')}
+                          {renderContractReviewField('Cabo', 'quantidadeCabo')}
+                          {renderContractReviewField('Prazo dias', 'prazoExecucao', { type: 'number', inputMode: 'numeric' })}
+                          {renderContractReviewField('Tipo pagamento', 'formaPagamentoTipo', {
+                            type: 'select',
+                            options: [
+                              { value: '', label: 'Não informado' },
+                              { value: 'avista', label: 'À vista' },
+                              { value: 'financiado', label: 'Financiado' },
+                              { value: 'cartao', label: 'Cartão' },
+                              { value: 'misto', label: 'Misto' },
+                            ],
+                          })}
+                          <div className="ctr-review-span-2">
+                            {renderContractReviewField('Condição de pagamento', 'formaPagamento', { type: 'textarea' })}
+                          </div>
                         </div>
                       </section>
 
@@ -3337,6 +3433,7 @@ const AdminDashboard = () => {
                         {reviewError && <p className="review-error">{reviewError}</p>}
                         <div className="contract-modal-actions">
                           <button type="button" className="btn btn-outline" onClick={closeContractReview}>Cancelar</button>
+                          <button type="button" className="btn btn-outline" onClick={() => saveContractReview(selectedContrato)}>Salvar alterações</button>
                           <button type="button" className="btn btn-outline ctr-modal-reject" onClick={() => revisarContrato(selectedContrato.id, 'Recusado')}>Recusar</button>
                           <button type="button" className="btn btn-primary" onClick={() => revisarContrato(selectedContrato.id, 'Aprovado')}>Aprovar contrato</button>
                         </div>
@@ -3345,8 +3442,9 @@ const AdminDashboard = () => {
 
                     {selectedContrato.status === 'Aprovado' && (
                       <div className="approved-actions">
-                        <div><strong>Contrato liberado</strong><span>O arquivo pode ser baixado e enviado para o cliente.</span></div>
+                        <div><strong>Contrato liberado</strong><span>{isMasterAdmin ? 'Admin master pode salvar ajustes finais.' : 'O arquivo pode ser baixado e enviado para o cliente.'}</span></div>
                         <div className="approved-actions-buttons">
+                          {canEditReviewedContract(selectedContrato) && <button type="button" className="btn btn-outline" onClick={() => saveContractReview(selectedContrato)}>Salvar alterações</button>}
                           <a className="btn btn-outline" href={getContratoDownloadUrl(selectedContrato.id)} target="_blank" rel="noopener noreferrer">Baixar contrato</a>
                           <a className="btn btn-primary" href={`https://wa.me/55${String(selectedContrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência e te orientar nos próximos passos da instalação.')}`} target="_blank" rel="noopener noreferrer">Enviar ao cliente</a>
                         </div>
