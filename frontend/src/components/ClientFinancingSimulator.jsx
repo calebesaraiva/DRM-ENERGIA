@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import CurrencyInput from './CurrencyInput';
 
 const money = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -19,7 +20,7 @@ function ClientFinancingSimulator({ systemValue = 0 }) {
       <div className="portal-card-head"><div><span>Planejamento</span><h2>Simule seu financiamento</h2></div></div>
       <p>Faça uma estimativa de parcelas para planejar seu investimento. As condições oficiais dependem da análise da instituição financeira.</p>
       <div className="client-financing-inputs">
-        <label>Entrada<input type="number" step="0.01" value={entry} onChange={event => setEntry(event.target.value)} /></label>
+        <label>Entrada<CurrencyInput value={entry} onValueChange={setEntry} /></label>
         <label>Taxa mensal estimada (%)<input type="number" step="0.01" value={rate} onChange={event => setRate(event.target.value)} /></label>
         <label>Quantidade de parcelas<input type="number" min="1" value={months} onChange={event => setMonths(event.target.value)} /></label>
       </div>

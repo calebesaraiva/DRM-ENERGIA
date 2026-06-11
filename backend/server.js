@@ -1028,9 +1028,9 @@ const normalizeEquipamentoPayload = (body = {}) => ({
   potenciaKwp: body.potenciaKwp === '' || typeof body.potenciaKwp === 'undefined' ? null : Number(body.potenciaKwp),
   numeroPaineis: body.numeroPaineis === '' || typeof body.numeroPaineis === 'undefined' ? null : Number(body.numeroPaineis),
   quantidadeCabo: String(body.quantidadeCabo || '').trim() || null,
-  valorSistema: body.valorSistema === '' || typeof body.valorSistema === 'undefined' ? null : Number(body.valorSistema),
-  valorEntrada: body.valorEntrada === '' || typeof body.valorEntrada === 'undefined' ? null : Number(body.valorEntrada),
-  valorSaldo: body.valorSaldo === '' || typeof body.valorSaldo === 'undefined' ? null : Number(body.valorSaldo),
+  valorSistema: moneyNumberOrNull(body.valorSistema),
+  valorEntrada: moneyNumberOrNull(body.valorEntrada),
+  valorSaldo: moneyNumberOrNull(body.valorSaldo),
   prazoExecucao: body.prazoExecucao === '' || typeof body.prazoExecucao === 'undefined' ? null : Number(body.prazoExecucao),
   formaPagamentoTipo: String(body.formaPagamentoTipo || '').trim() || null,
   formaPagamento: String(body.formaPagamento || '').trim() || null,
@@ -1064,6 +1064,13 @@ const numberOrNull = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
+const moneyNumberOrNull = (value) => {
+  if (value === '' || typeof value === 'undefined' || value === null) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : null;
+  const digits = String(value).replace(/\D/g, '');
+  return digits ? Number(digits) : null;
+};
+
 const normalizeContractReviewPayload = (body = {}, existing = {}) => {
   const parsed = parseContrato(existing);
   const dados = parsed.dados || {};
@@ -1091,9 +1098,9 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
 
   const nextFinanceiro = {
     ...financeiro,
-    preco_final_cliente_rs: numberOrNull(body.valorProjeto) ?? financeiro.preco_final_cliente_rs ?? 0,
-    entrada_rs: numberOrNull(body.valorEntrada) ?? financeiro.entrada_rs ?? 0,
-    saldo_rs: numberOrNull(body.valorSaldo) ?? financeiro.saldo_rs ?? 0,
+    preco_final_cliente_rs: moneyNumberOrNull(body.valorProjeto) ?? financeiro.preco_final_cliente_rs ?? 0,
+    entrada_rs: moneyNumberOrNull(body.valorEntrada) ?? financeiro.entrada_rs ?? 0,
+    saldo_rs: moneyNumberOrNull(body.valorSaldo) ?? financeiro.saldo_rs ?? 0,
     forma_pagamento: body.formaPagamento ?? financeiro.forma_pagamento ?? '',
     forma_pagamento_tipo: body.formaPagamentoTipo ?? financeiro.forma_pagamento_tipo ?? '',
   };
@@ -1112,9 +1119,9 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
 
   const nextEquipamentoDados = {
     ...equipamentoDados,
-    valorSistema: numberOrNull(body.valorProjeto) ?? equipamentoDados.valorSistema ?? null,
-    valorEntrada: numberOrNull(body.valorEntrada) ?? equipamentoDados.valorEntrada ?? null,
-    valorSaldo: numberOrNull(body.valorSaldo) ?? equipamentoDados.valorSaldo ?? null,
+    valorSistema: moneyNumberOrNull(body.valorProjeto) ?? equipamentoDados.valorSistema ?? null,
+    valorEntrada: moneyNumberOrNull(body.valorEntrada) ?? equipamentoDados.valorEntrada ?? null,
+    valorSaldo: moneyNumberOrNull(body.valorSaldo) ?? equipamentoDados.valorSaldo ?? null,
     potenciaKwp: numberOrNull(body.potenciaKwp) ?? equipamentoDados.potenciaKwp ?? null,
     geracaoKwh: numberOrNull(body.geracaoKwh) ?? equipamentoDados.geracaoKwh ?? null,
     geracaoAnualKwh: numberOrNull(body.geracaoAnualKwh) ?? equipamentoDados.geracaoAnualKwh ?? null,
@@ -1139,7 +1146,7 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
     clienteTelefone: String(body.clienteTelefone ?? existing.clienteTelefone ?? '').trim(),
     clienteEmail: String(body.clienteEmail ?? existing.clienteEmail ?? '').trim(),
     clienteCidade: String(body.clienteCidade ?? existing.clienteCidade ?? '').trim(),
-    valorProjeto: numberOrNull(body.valorProjeto) ?? Number(existing.valorProjeto || 0),
+    valorProjeto: moneyNumberOrNull(body.valorProjeto) ?? Number(existing.valorProjeto || 0),
     dados: {
       ...dados,
       dimensionamento: nextDimensionamento,
@@ -3846,7 +3853,7 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
   };
   const normalizedFinanceiro = {
     ...financeiro,
-    preco_final_cliente_rs: Number(financeiro.preco_final_cliente_rs || financeiro.valorSistema || 0),
+    preco_final_cliente_rs: moneyNumberOrNull(financeiro.preco_final_cliente_rs || financeiro.valorSistema) || 0,
     forma_pagamento: financeiro.forma_pagamento || financeiro.formaPagamento || '',
     condicoes_pagamento: financeiro.condicoes_pagamento || financeiro.condicoesPagamento || '',
   };
@@ -4059,7 +4066,7 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     orcamento.clienteTelefone,
     orcamento.clienteEmail,
     orcamento.clienteCidade,
-    Number(manualFinal.valorSistema || financeiro.preco_final_cliente_rs) || 0,
+    moneyNumberOrNull(manualFinal.valorSistema || financeiro.preco_final_cliente_rs) || 0,
     JSON.stringify(dados),
     req.user.id,
     req.user.nome,
@@ -4099,7 +4106,7 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
     potenciaKwp && potenciaPlacaW ? Math.ceil(potenciaKwp / (potenciaPlacaW / 1000)) : 0
   );
   const geracaoMensal = Number(manualFinal.geracaoKwh || 0);
-  const valorSistema = Number(manualFinal.valorSistema || 0);
+  const valorSistema = moneyNumberOrNull(manualFinal.valorSistema) || 0;
   const now = new Date().toISOString();
   const clienteSnapshot = {
     ...cliente,
@@ -4121,8 +4128,8 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
       preco_final_cliente_rs: valorSistema,
       forma_pagamento_tipo: manualFinal.formaPagamentoTipo || '',
       forma_pagamento: manualFinal.formaPagamento || '',
-      entrada_rs: Number(manualFinal.valorEntrada || 0),
-      saldo_rs: Number(manualFinal.valorSaldo || 0),
+      entrada_rs: moneyNumberOrNull(manualFinal.valorEntrada) || 0,
+      saldo_rs: moneyNumberOrNull(manualFinal.valorSaldo) || 0,
     },
     manual: manualFinal,
     cliente: clienteSnapshot,
@@ -5132,7 +5139,7 @@ app.post('/api/admin/despesas-fixas', authRequired, requirePermission('financeir
   const result = await db.run(
     'INSERT INTO despesas_fixas (nome, valor, categoria, active, createdAt) VALUES (?, ?, ?, 1, ?)',
     nome,
-    Number(valor),
+    moneyNumberOrNull(valor),
     categoria || 'Geral',
     new Date().toISOString()
   );
@@ -5147,7 +5154,7 @@ app.put('/api/admin/despesas-fixas/:id', authRequired, requirePermission('financ
      SET nome = COALESCE(?, nome), valor = COALESCE(?, valor), categoria = COALESCE(?, categoria), active = ?
      WHERE id = ?`,
     nome || null,
-    typeof valor === 'undefined' ? null : Number(valor),
+    typeof valor === 'undefined' ? null : moneyNumberOrNull(valor),
     categoria || null,
     active === false ? 0 : 1,
     req.params.id

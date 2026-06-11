@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import './SimulationForm.css';
 import { withApiBase } from '../utils/apiBase';
+import CurrencyInput from './CurrencyInput';
 
 function SimulationForm({ onResults }) {
   const [formData, setFormData] = useState({
@@ -8,14 +9,6 @@ function SimulationForm({ onResults }) {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,12 +40,11 @@ function SimulationForm({ onResults }) {
     <form onSubmit={handleSubmit} className="simulation-form">
       <div className="form-group">
         <label htmlFor="contaEnergia" className="form-label">Quanto você paga atualmente na conta de energia em reais (R$)?</label>
-        <input
-          type="number"
+        <CurrencyInput
           id="contaEnergia"
           name="contaEnergia"
           value={formData.contaEnergia}
-          onChange={handleChange}
+          onValueChange={(value) => setFormData(prev => ({ ...prev, contaEnergia: value }))}
           placeholder="Ex: R$ 400"
           required
           className="form-input"

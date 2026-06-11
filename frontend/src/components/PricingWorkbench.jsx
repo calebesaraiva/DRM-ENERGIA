@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import CurrencyInput from './CurrencyInput';
 
 const money = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const number = value => Number(String(value || 0).replace(',', '.')) || 0;
@@ -82,7 +83,7 @@ function PricingWorkbench({ items, request, onItemsChange }) {
             {[
               ['valorKitSolar', 'Valor do kit solar'], ['custoInstalacao', 'Custo de instalação'], ['materialCA', 'Material CA'],
               ['deslocamento', 'Deslocamento'], ['custoAdicional', 'Custo adicional'], ['margemEmpresa', 'Margem da empresa'],
-            ].map(([key, label]) => <label key={key}>{label}<input type="number" step="0.01" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} /></label>)}
+            ].map(([key, label]) => <label key={key}>{label}<CurrencyInput value={form[key]} onValueChange={value => setForm(p => ({ ...p, [key]: value }))} /></label>)}
             <label>Comissão (%)<input type="number" min="0" max="99.99" step="0.01" value={form.comissaoPercentual} onChange={e => setForm(p => ({ ...p, comissaoPercentual: e.target.value }))} /></label>
             <label className="span-2">Observações<input value={form.observacoes} onChange={e => setForm(p => ({ ...p, observacoes: e.target.value }))} /></label>
           </div>
@@ -108,8 +109,8 @@ function PricingWorkbench({ items, request, onItemsChange }) {
       <section className="admin-card financing-simulator">
         <div className="card-header-flex"><div><span className="section-kicker">Simulação ao cliente</span><h3>Parcelas do financiamento</h3><p className="muted-text">Estimativa pela Tabela Price. A condição final depende da instituição financeira.</p></div></div>
         <div className="financing-grid">
-          <label>Valor do sistema<input type="number" step="0.01" value={finance.valorSistema || (result ? result.precoFinal.toFixed(2) : '')} onChange={e => setFinance(p => ({ ...p, valorSistema: e.target.value }))} /></label>
-          <label>Entrada<input type="number" value={finance.entrada} onChange={e => setFinance(p => ({ ...p, entrada: e.target.value }))} /></label>
+          <label>Valor do sistema<CurrencyInput value={finance.valorSistema || (result ? Math.round(result.precoFinal) : '')} onValueChange={value => setFinance(p => ({ ...p, valorSistema: value }))} /></label>
+          <label>Entrada<CurrencyInput value={finance.entrada} onValueChange={value => setFinance(p => ({ ...p, entrada: value }))} /></label>
           <label>Taxa mensal (%)<input type="number" step="0.01" value={finance.taxaMensal} onChange={e => setFinance(p => ({ ...p, taxaMensal: e.target.value }))} /></label>
           <label>Quantidade de parcelas<input type="number" min="1" value={finance.parcelas} onChange={e => setFinance(p => ({ ...p, parcelas: e.target.value }))} /></label>
         </div>

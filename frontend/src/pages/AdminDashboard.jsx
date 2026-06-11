@@ -6,6 +6,8 @@ import './AdminDashboard.css';
 import { getApiBaseUrl, withApiBase } from '../utils/apiBase';
 import AdminCommunicationCenter from '../components/AdminCommunicationCenter';
 import PricingWorkbench from '../components/PricingWorkbench';
+import CurrencyInput from '../components/CurrencyInput';
+import { currencyInputToNumber } from '../utils/currency';
 
 const socket = io(getApiBaseUrl() || undefined);
 
@@ -176,8 +178,7 @@ const percent = (value) => `${((Number(value || 0)) * 100).toLocaleString('pt-BR
 
 const getResponsibleName = (name) => name || 'Aguardando distribuição';
 const dateBr = (value) => value ? new Date(value).toLocaleDateString('pt-BR') : 'Sem data';
-const currencyToNumber = (value) => Number(String(value || '').replace(/\D/g, '')) / 100;
-const maskCurrency = (value) => money(currencyToNumber(value));
+const currencyToNumber = currencyInputToNumber;
 const whatsappLeadMessage = (lead = {}) => encodeURIComponent(
   `Olá ${lead.nome || ''}! Sou da DRM Energia Solar. Vi sua simulação no nosso site e quero te passar as melhores condições para você economizar na conta de energia. Podemos conversar agora?`
 );
@@ -1175,7 +1176,7 @@ const AdminDashboard = () => {
   };
 
   const updatePriceCurrency = (field, value) => {
-    setPriceForm(prev => ({ ...prev, [field]: maskCurrency(value) }));
+    setPriceForm(prev => ({ ...prev, [field]: String(value || '').replace(/\D/g, '') }));
     setPriceError('');
   };
 
@@ -1359,15 +1360,15 @@ const AdminDashboard = () => {
           <div className="equipment-form product-editor-grid">
             <label>
               Valor do sistema
-              <input type="number" step="0.01" value={equipamentoForm.valorSistema} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSistema: e.target.value }))} />
+              <CurrencyInput value={equipamentoForm.valorSistema} onValueChange={(value) => setEquipamentoForm(prev => ({ ...prev, valorSistema: value }))} />
             </label>
             <label>
               Entrada
-              <input type="number" step="0.01" value={equipamentoForm.valorEntrada} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorEntrada: e.target.value }))} />
+              <CurrencyInput value={equipamentoForm.valorEntrada} onValueChange={(value) => setEquipamentoForm(prev => ({ ...prev, valorEntrada: value }))} />
             </label>
             <label>
               Saldo
-              <input type="number" step="0.01" value={equipamentoForm.valorSaldo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, valorSaldo: e.target.value }))} />
+              <CurrencyInput value={equipamentoForm.valorSaldo} onValueChange={(value) => setEquipamentoForm(prev => ({ ...prev, valorSaldo: value }))} />
             </label>
             <label>
               Prazo de execução
@@ -1789,7 +1790,12 @@ const AdminDashboard = () => {
               ))}
             </select>
           ) : (
-            <input
+            options.money ? (
+              <CurrencyInput
+                value={value}
+                onValueChange={(nextValue) => updateContractReviewField(field, nextValue)}
+              />
+            ) : <input
               type={options.type || 'text'}
               inputMode={options.inputMode}
               value={value}
@@ -2975,7 +2981,7 @@ const AdminDashboard = () => {
                       )}
                       <label>
                         Valor do sistema
-                        <input type="number" min="0" step="0.01" value={budgetForm.valorSistema} onChange={(event) => setBudgetForm(prev => ({ ...prev, valorSistema: event.target.value }))} required />
+                        <CurrencyInput value={budgetForm.valorSistema} onValueChange={(value) => setBudgetForm(prev => ({ ...prev, valorSistema: value }))} required />
                       </label>
                       <label>
                         Forma de pagamento
@@ -3396,9 +3402,9 @@ const AdminDashboard = () => {
                       <section className="ctr-review-section">
                         <h4>Sistema e valores</h4>
                         <div className="ctr-review-edit-grid">
-                          {renderContractReviewField('Valor total', 'valorProjeto', { type: 'number', inputMode: 'decimal', format: money })}
-                          {renderContractReviewField('Entrada', 'valorEntrada', { type: 'number', inputMode: 'decimal', format: money })}
-                          {renderContractReviewField('Saldo', 'valorSaldo', { type: 'number', inputMode: 'decimal', format: money })}
+                          {renderContractReviewField('Valor total', 'valorProjeto', { money: true, format: money })}
+                          {renderContractReviewField('Entrada', 'valorEntrada', { money: true, format: money })}
+                          {renderContractReviewField('Saldo', 'valorSaldo', { money: true, format: money })}
                           {renderContractReviewField('Potência kWp', 'potenciaKwp', { type: 'number', inputMode: 'decimal' })}
                           {renderContractReviewField('Geração mensal kWh', 'geracaoKwh', { type: 'number', inputMode: 'decimal' })}
                           {renderContractReviewField('Geração anual kWh', 'geracaoAnualKwh', { type: 'number', inputMode: 'decimal' })}
@@ -4377,7 +4383,7 @@ const AdminDashboard = () => {
                   </div>
                   <form className="fixed-cost-form" onSubmit={createDespesaFixa}>
                     <input placeholder="Nome. Ex: Aluguel" value={despesaForm.nome} onChange={(event) => setDespesaForm(prev => ({ ...prev, nome: event.target.value }))} required />
-                    <input placeholder="Valor" type="number" step="0.01" value={despesaForm.valor} onChange={(event) => setDespesaForm(prev => ({ ...prev, valor: event.target.value }))} required />
+                    <CurrencyInput placeholder="Valor" value={despesaForm.valor} onValueChange={(value) => setDespesaForm(prev => ({ ...prev, valor: value }))} required />
                     <input placeholder="Categoria" value={despesaForm.categoria} onChange={(event) => setDespesaForm(prev => ({ ...prev, categoria: event.target.value }))} />
                     <button className="btn btn-primary" type="submit">Registrar</button>
                   </form>
@@ -4394,12 +4400,14 @@ const AdminDashboard = () => {
                           aria-label={`Categoria do custo ${item.nome}`}
                           onBlur={event => event.target.value !== (item.categoria || 'Geral') && updateDespesaFixa(item, { categoria: event.target.value })}
                         />
-                        <input
-                          type="number"
-                          step="0.01"
-                          defaultValue={item.valor}
+                        <CurrencyInput
+                          value={item.valor}
                           aria-label={`Valor do custo ${item.nome}`}
-                          onBlur={event => Number(event.target.value) !== Number(item.valor) && updateDespesaFixa(item, { valor: event.target.value })}
+                          onValueChange={(nextValue) => setFinanceiro(prev => ({
+                            ...prev,
+                            despesasFixas: prev.despesasFixas.map(row => row.id === item.id ? { ...row, valor: nextValue } : row),
+                          }))}
+                          onCommit={(nextValue) => updateDespesaFixa(item, { valor: currencyInputToNumber(nextValue) })}
                         />
                         <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateDespesaFixa(item, { active: !item.active })}>
                           {item.active ? 'Desativar' : 'Ativar'}
@@ -4455,12 +4463,12 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="price-form-grid">
-                    <label>Valor do kit solar<input value={priceForm.valorKitSolar} onChange={(event) => updatePriceCurrency('valorKitSolar', event.target.value)} placeholder="R$ 0,00" inputMode="numeric" /></label>
-                    <label>Custo de instalação<input value={priceForm.custoInstalacao} onChange={(event) => updatePriceCurrency('custoInstalacao', event.target.value)} placeholder="R$ 0,00" inputMode="numeric" /></label>
-                    <label>Material CA<input value={priceForm.materialCA} onChange={(event) => updatePriceCurrency('materialCA', event.target.value)} placeholder="R$ 0,00" inputMode="numeric" /></label>
-                    <label>Deslocamento<input value={priceForm.deslocamento} onChange={(event) => updatePriceCurrency('deslocamento', event.target.value)} placeholder="R$ 0,00" inputMode="numeric" /></label>
-                    <label>Custo adicional<input value={priceForm.custoAdicional} onChange={(event) => updatePriceCurrency('custoAdicional', event.target.value)} placeholder="R$ 0,00" inputMode="numeric" /></label>
-                    <label>Margem da empresa<input value={priceForm.margemEmpresa} onChange={(event) => updatePriceCurrency('margemEmpresa', event.target.value)} placeholder="R$ 0,00" inputMode="numeric" /></label>
+                    <label>Valor do kit solar<CurrencyInput value={priceForm.valorKitSolar} onValueChange={(value) => updatePriceCurrency('valorKitSolar', value)} placeholder="0" /></label>
+                    <label>Custo de instalação<CurrencyInput value={priceForm.custoInstalacao} onValueChange={(value) => updatePriceCurrency('custoInstalacao', value)} placeholder="0" /></label>
+                    <label>Material CA<CurrencyInput value={priceForm.materialCA} onValueChange={(value) => updatePriceCurrency('materialCA', value)} placeholder="0" /></label>
+                    <label>Deslocamento<CurrencyInput value={priceForm.deslocamento} onValueChange={(value) => updatePriceCurrency('deslocamento', value)} placeholder="0" /></label>
+                    <label>Custo adicional<CurrencyInput value={priceForm.custoAdicional} onValueChange={(value) => updatePriceCurrency('custoAdicional', value)} placeholder="0" /></label>
+                    <label>Margem da empresa<CurrencyInput value={priceForm.margemEmpresa} onValueChange={(value) => updatePriceCurrency('margemEmpresa', value)} placeholder="0" /></label>
                     <label className="commission-field">Comissão em %<input type="number" min="0" max="99.99" step="0.01" value={priceForm.comissaoPercentual} onChange={(event) => updatePricePercent(event.target.value)} placeholder="Ex: 10" /></label>
                   </div>
 
@@ -4957,12 +4965,12 @@ const AdminDashboard = () => {
 
             {quickModal === 'precosSistemas' && (
               <form className="quick-os-form" onSubmit={calcularPrecoSistema}>
-                <input value={priceForm.valorKitSolar} onChange={(event) => updatePriceCurrency('valorKitSolar', event.target.value)} placeholder="Valor do kit solar" inputMode="numeric" />
-                <input value={priceForm.custoInstalacao} onChange={(event) => updatePriceCurrency('custoInstalacao', event.target.value)} placeholder="Custo de instalação" inputMode="numeric" />
-                <input value={priceForm.materialCA} onChange={(event) => updatePriceCurrency('materialCA', event.target.value)} placeholder="Material CA" inputMode="numeric" />
-                <input value={priceForm.deslocamento} onChange={(event) => updatePriceCurrency('deslocamento', event.target.value)} placeholder="Deslocamento" inputMode="numeric" />
-                <input value={priceForm.custoAdicional} onChange={(event) => updatePriceCurrency('custoAdicional', event.target.value)} placeholder="Custo adicional" inputMode="numeric" />
-                <input value={priceForm.margemEmpresa} onChange={(event) => updatePriceCurrency('margemEmpresa', event.target.value)} placeholder="Margem da empresa" inputMode="numeric" />
+                <CurrencyInput value={priceForm.valorKitSolar} onValueChange={(value) => updatePriceCurrency('valorKitSolar', value)} placeholder="Valor do kit solar" />
+                <CurrencyInput value={priceForm.custoInstalacao} onValueChange={(value) => updatePriceCurrency('custoInstalacao', value)} placeholder="Custo de instalação" />
+                <CurrencyInput value={priceForm.materialCA} onValueChange={(value) => updatePriceCurrency('materialCA', value)} placeholder="Material CA" />
+                <CurrencyInput value={priceForm.deslocamento} onValueChange={(value) => updatePriceCurrency('deslocamento', value)} placeholder="Deslocamento" />
+                <CurrencyInput value={priceForm.custoAdicional} onValueChange={(value) => updatePriceCurrency('custoAdicional', value)} placeholder="Custo adicional" />
+                <CurrencyInput value={priceForm.margemEmpresa} onValueChange={(value) => updatePriceCurrency('margemEmpresa', value)} placeholder="Margem da empresa" />
                 <input type="number" min="0" max="99.99" step="0.01" value={priceForm.comissaoPercentual} onChange={(event) => updatePricePercent(event.target.value)} placeholder="Comissão %" />
                 {priceError && <p className="review-error">{priceError}</p>}
                 <button className="btn btn-primary" type="submit">Calcular preço</button>
@@ -5049,15 +5057,15 @@ const AdminDashboard = () => {
               </label>
               <label>
                 Valor do sistema
-                <input type="number" step="0.01" value={contractModal.manual.valorSistema} onChange={(event) => updateContractManual('valorSistema', event.target.value)} placeholder="Ex: 14675" required />
+                <CurrencyInput value={contractModal.manual.valorSistema} onValueChange={(value) => updateContractManual('valorSistema', value)} placeholder="Ex: 14675" required />
               </label>
               <label>
                 Entrada
-                <input type="number" step="0.01" value={contractModal.manual.valorEntrada} onChange={(event) => updateContractManual('valorEntrada', event.target.value)} placeholder="Ex: 2000" />
+                <CurrencyInput value={contractModal.manual.valorEntrada} onValueChange={(value) => updateContractManual('valorEntrada', value)} placeholder="Ex: 2000" />
               </label>
               <label>
                 Saldo
-                <input type="number" step="0.01" value={contractModal.manual.valorSaldo} onChange={(event) => updateContractManual('valorSaldo', event.target.value)} placeholder="Ex: 12675" />
+                <CurrencyInput value={contractModal.manual.valorSaldo} onValueChange={(value) => updateContractManual('valorSaldo', value)} placeholder="Ex: 12675" />
               </label>
               <label>
                 Prazo de execução

@@ -4,6 +4,7 @@ import './LeadSimulationModal.css';
 import { makeWhatsAppLink } from '../utils/whatsapp';
 import { withApiBase } from '../utils/apiBase';
 import { trackSiteEvent } from '../utils/analytics';
+import CurrencyInput from './CurrencyInput';
 
 const initialLead = { nome: '', telefone: '', cidade: '' };
 const initialSimulation = { contaEnergia: '' };
@@ -126,8 +127,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
     setError('');
   };
 
-  const handleCustomContaChange = (event) => {
-    const val = event.target.value.replace(/\D/g, '');
+  const handleCustomContaChange = (val) => {
     setSelectedOption(null);
     setSimulation((prev) => ({ ...prev, contaEnergia: val }));
   };
@@ -302,12 +302,10 @@ function LeadSimulationModal({ isOpen, onClose }) {
                 <p className="lead-or-label">ou digite o valor exato</p>
                 <div className="lead-money-input-wrap">
                   <span className="lead-money-prefix">R$</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
+                  <CurrencyInput
                     placeholder="450"
                     value={simulation.contaEnergia}
-                    onChange={handleCustomContaChange}
+                    onValueChange={handleCustomContaChange}
                     className="lead-money-input"
                     aria-label="Valor da conta de energia"
                   />
