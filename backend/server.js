@@ -1042,21 +1042,25 @@ const normalizeEquipamentoPayload = (body = {}) => ({
   observacoes: String(body.observacoes || '').trim() || null,
 });
 
+const firstFilled = (...values) => (
+  values.find(value => value !== '' && typeof value !== 'undefined' && value !== null) ?? ''
+);
+
 const mergeManualWithEquipamento = (manual = {}, equipamento = {}) => ({
   ...manual,
-  geracaoKwh: manual.geracaoKwh || equipamento?.geracaoKwh || '',
-  geracaoAnualKwh: manual.geracaoAnualKwh || equipamento?.geracaoAnualKwh || '',
-  potenciaKwp: manual.potenciaKwp || equipamento?.potenciaKwp || '',
-  numeroPaineis: manual.numeroPaineis || equipamento?.numeroPaineis || '',
-  quantidadeCabo: manual.quantidadeCabo || equipamento?.quantidadeCabo || '',
-  painel: manual.painel || equipamento?.placaModelo || '',
-  inversor: manual.inversor || equipamento?.inversorModelo || '',
-  valorSistema: manual.valorSistema || equipamento?.valorSistema || '',
-  valorEntrada: manual.valorEntrada || equipamento?.valorEntrada || '',
-  valorSaldo: manual.valorSaldo || equipamento?.valorSaldo || '',
-  prazoExecucao: manual.prazoExecucao || equipamento?.prazoExecucao || '',
-  formaPagamentoTipo: manual.formaPagamentoTipo || equipamento?.formaPagamentoTipo || '',
-  formaPagamento: manual.formaPagamento || equipamento?.formaPagamento || '',
+  geracaoKwh: firstFilled(manual.geracaoKwh, equipamento?.geracaoKwh),
+  geracaoAnualKwh: firstFilled(manual.geracaoAnualKwh, equipamento?.geracaoAnualKwh),
+  potenciaKwp: firstFilled(manual.potenciaKwp, equipamento?.potenciaKwp),
+  numeroPaineis: firstFilled(manual.numeroPaineis, equipamento?.numeroPaineis),
+  quantidadeCabo: firstFilled(manual.quantidadeCabo, equipamento?.quantidadeCabo),
+  painel: firstFilled(manual.painel, equipamento?.placaModelo),
+  inversor: firstFilled(manual.inversor, equipamento?.inversorModelo),
+  valorSistema: firstFilled(manual.valorSistema, equipamento?.valorSistema),
+  valorEntrada: firstFilled(manual.valorEntrada, equipamento?.valorEntrada),
+  valorSaldo: firstFilled(manual.valorSaldo, equipamento?.valorSaldo),
+  prazoExecucao: firstFilled(manual.prazoExecucao, equipamento?.prazoExecucao),
+  formaPagamentoTipo: firstFilled(manual.formaPagamentoTipo, equipamento?.formaPagamentoTipo),
+  formaPagamento: firstFilled(manual.formaPagamento, equipamento?.formaPagamento),
 });
 
 const isMasterAdmin = (user = {}) => (
@@ -3998,7 +4002,10 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
   const normalizedFinanceiro = {
     ...financeiro,
     preco_final_cliente_rs: moneyNumberOrNull(financeiro.preco_final_cliente_rs || financeiro.valorSistema) || 0,
+    entrada_rs: moneyNumberOrNull(financeiro.entrada_rs || financeiro.valorEntrada) || 0,
+    saldo_rs: moneyNumberOrNull(financeiro.saldo_rs || financeiro.valorSaldo) || 0,
     forma_pagamento: financeiro.forma_pagamento || financeiro.formaPagamento || '',
+    forma_pagamento_tipo: financeiro.forma_pagamento_tipo || financeiro.formaPagamentoTipo || financeiro.forma_pagamento || financeiro.formaPagamento || '',
     condicoes_pagamento: financeiro.condicoes_pagamento || financeiro.condicoesPagamento || '',
   };
 
@@ -4291,14 +4298,32 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   const equipamento = equipamentoId
     ? await db.get('SELECT * FROM equipamentos WHERE id = ?', equipamentoId)
     : await db.get('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id DESC LIMIT 1');
-  const manualFinal = mergeManualWithEquipamento(manual, equipamento);
+  const manualFromOrcamento = {
+    geracaoKwh: dimensionamento.geracao_estimada_kwh || '',
+    geracaoAnualKwh: dimensionamento.geracao_anual_kwh || dimensionamento.geracao_anual_estimada_kwh || (dimensionamento.geracao_estimada_kwh ? Number(dimensionamento.geracao_estimada_kwh) * 12 : ''),
+    potenciaKwp: dimensionamento.potencia_real_instalada_kwp || '',
+    numeroPaineis: dimensionamento.numero_paineis_necessarios || '',
+    painel: dimensionamento.placa_modelo || '',
+    inversor: dimensionamento.inversor_modelo || '',
+    quantidadeCabo: dimensionamento.quantidade_cabo_cc || '',
+    valorSistema: financeiro.preco_final_cliente_rs || '',
+    valorEntrada: financeiro.entrada_rs ?? '',
+    valorSaldo: financeiro.saldo_rs ?? '',
+    prazoExecucao: '',
+    formaPagamentoTipo: financeiro.forma_pagamento_tipo || financeiro.forma_pagamento || '',
+    formaPagamento: financeiro.condicoes_pagamento || '',
+  };
+  const manualOverrides = Object.fromEntries(
+    Object.entries(manual || {}).filter(([, value]) => value !== '' && typeof value !== 'undefined' && value !== null)
+  );
+  const manualFinal = mergeManualWithEquipamento({ ...manualFromOrcamento, ...manualOverrides }, equipamento);
   const now = new Date().toISOString();
   const dados = {
     dimensionamento,
     financeiro,
     manual: manualFinal,
     statusOrigem: orcamento.status,
-    observacao: 'Contrato gerado no sistema e aguardando aprovação do responsável administrativo.',
+    observacao: dimensionamento.observacoes || 'Contrato gerado no sistema e aguardando aprovação do responsável administrativo.',
   };
 
   const result = await db.run(

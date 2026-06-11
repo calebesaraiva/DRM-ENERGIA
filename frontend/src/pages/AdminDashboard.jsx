@@ -262,21 +262,25 @@ const equipamentoToForm = (item = {}) => ({
   formaPagamentoTipo: item.formaPagamentoTipo || emptyEquipamentoForm.formaPagamentoTipo,
 });
 
+const firstFilled = (...values) => (
+  values.find(value => value !== '' && typeof value !== 'undefined' && value !== null) ?? ''
+);
+
 const applyEquipamentoToManual = (manual = {}, equipamento = {}) => ({
   ...manual,
-  geracaoKwh: equipamento?.geracaoKwh || manual.geracaoKwh || '',
-  geracaoAnualKwh: equipamento?.geracaoAnualKwh || manual.geracaoAnualKwh || '',
-  potenciaKwp: equipamento?.potenciaKwp || manual.potenciaKwp || '',
-  numeroPaineis: equipamento?.numeroPaineis || manual.numeroPaineis || '',
-  quantidadeCabo: equipamento?.quantidadeCabo || manual.quantidadeCabo || '',
-  painel: equipamento?.placaModelo || manual.painel || '',
-  inversor: equipamento?.inversorModelo || manual.inversor || '',
-  valorSistema: equipamento?.valorSistema || manual.valorSistema || '',
-  valorEntrada: equipamento?.valorEntrada || manual.valorEntrada || '',
-  valorSaldo: equipamento?.valorSaldo || manual.valorSaldo || '',
-  prazoExecucao: equipamento?.prazoExecucao || manual.prazoExecucao || '',
-  formaPagamentoTipo: equipamento?.formaPagamentoTipo || manual.formaPagamentoTipo || 'avista',
-  formaPagamento: equipamento?.formaPagamento || manual.formaPagamento || '',
+  geracaoKwh: firstFilled(manual.geracaoKwh, equipamento?.geracaoKwh),
+  geracaoAnualKwh: firstFilled(manual.geracaoAnualKwh, equipamento?.geracaoAnualKwh),
+  potenciaKwp: firstFilled(manual.potenciaKwp, equipamento?.potenciaKwp),
+  numeroPaineis: firstFilled(manual.numeroPaineis, equipamento?.numeroPaineis),
+  quantidadeCabo: firstFilled(manual.quantidadeCabo, equipamento?.quantidadeCabo),
+  painel: firstFilled(manual.painel, equipamento?.placaModelo),
+  inversor: firstFilled(manual.inversor, equipamento?.inversorModelo),
+  valorSistema: firstFilled(manual.valorSistema, equipamento?.valorSistema),
+  valorEntrada: firstFilled(manual.valorEntrada, equipamento?.valorEntrada),
+  valorSaldo: firstFilled(manual.valorSaldo, equipamento?.valorSaldo),
+  prazoExecucao: firstFilled(manual.prazoExecucao, equipamento?.prazoExecucao),
+  formaPagamentoTipo: firstFilled(manual.formaPagamentoTipo, equipamento?.formaPagamentoTipo, 'avista'),
+  formaPagamento: firstFilled(manual.formaPagamento, equipamento?.formaPagamento),
 });
 
 const emptyClientForm = {
@@ -418,9 +422,21 @@ const emptyBudgetForm = {
   perdaPercentual: '20',
   geracaoKwh: '',
   valorSistema: '',
+  valorEntrada: '',
+  valorSaldo: '',
   formaPagamentoTipo: 'avista',
   condicoesPagamento: '',
   observacoes: '',
+};
+
+const budgetDraftStorageKey = 'drmAdminBudgetDraft';
+const budgetDraftOpenStorageKey = 'drmAdminBudgetDraftOpen';
+const getInitialBudgetForm = () => {
+  try {
+    return JSON.parse(localStorage.getItem(budgetDraftStorageKey) || 'null') || emptyBudgetForm;
+  } catch {
+    return emptyBudgetForm;
+  }
 };
 
 const emptyUserForm = {
@@ -486,8 +502,8 @@ const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [orcamentos, setOrcamentos] = useState([]);
   const [selectedOrcamento, setSelectedOrcamento] = useState(null);
-  const [budgetForm, setBudgetForm] = useState(emptyBudgetForm);
-  const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(false);
+  const [budgetForm, setBudgetForm] = useState(getInitialBudgetForm);
+  const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(() => localStorage.getItem(budgetDraftOpenStorageKey) === '1');
   const [budgetStatus, setBudgetStatus] = useState('');
   const [contratos, setContratos] = useState([]);
   const [procuracoes, setProcuracoes] = useState([]);
@@ -953,6 +969,11 @@ const AdminDashboard = () => {
   useEffect(() => { setLeadsPage(1); }, [leadSearch, leadStatusFilter, leadOwnerFilter]);
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
   useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
+  useEffect(() => {
+    if (!isBudgetFormOpen) return;
+    localStorage.setItem(budgetDraftOpenStorageKey, '1');
+    localStorage.setItem(budgetDraftStorageKey, JSON.stringify(budgetForm));
+  }, [budgetForm, isBudgetFormOpen]);
 
   useEffect(() => {
     if (!selectedContrato || typeof document === 'undefined') return undefined;
@@ -1626,13 +1647,18 @@ const AdminDashboard = () => {
           },
           financeiro: {
             preco_final_cliente_rs: budgetForm.valorSistema,
+            entrada_rs: budgetForm.valorEntrada,
+            saldo_rs: budgetForm.valorSaldo,
             forma_pagamento: budgetForm.formaPagamentoTipo,
+            forma_pagamento_tipo: budgetForm.formaPagamentoTipo,
             condicoes_pagamento: budgetForm.condicoesPagamento,
           },
         }),
       });
       setOrcamentos(prev => [orcamento, ...prev.filter(item => item.id !== orcamento.id)]);
       setSelectedOrcamento(orcamento);
+      localStorage.removeItem(budgetDraftStorageKey);
+      localStorage.removeItem(budgetDraftOpenStorageKey);
       setBudgetForm(emptyBudgetForm);
       setBudgetStatus('Orçamento criado. Agora você pode gerar o contrato a partir dele.');
       setIsBudgetFormOpen(false);
@@ -1651,27 +1677,32 @@ const AdminDashboard = () => {
     setActiveTab(action.tab);
   };
 
-  const openContractModal = (orcamento) => {
-    const equipamento = equipamentos.find(item => item.id === Number(selectedEquipamentos[orcamento.id])) || equipamentos.find(item => item.active);
+  const buildContractManualFromOrcamento = (orcamento, equipamento) => {
+    const geracaoMensal = orcamento.dimensionamento?.geracao_estimada_kwh || '';
+    const geracaoAnual = orcamento.dimensionamento?.geracao_anual_kwh || orcamento.dimensionamento?.geracao_anual_estimada_kwh || (geracaoMensal ? Number(geracaoMensal) * 12 : '');
     const baseManual = {
       ...emptyContractManual,
-      geracaoKwh: orcamento.dimensionamento?.geracao_estimada_kwh || '',
-      geracaoAnualKwh: orcamento.dimensionamento?.geracao_estimada_kwh ? Number(orcamento.dimensionamento.geracao_estimada_kwh) * 12 : '',
+      geracaoKwh: geracaoMensal,
+      geracaoAnualKwh: geracaoAnual,
       potenciaKwp: orcamento.dimensionamento?.potencia_real_instalada_kwp || '',
       numeroPaineis: orcamento.dimensionamento?.numero_paineis_necessarios || '',
       painel: orcamento.dimensionamento?.placa_modelo || '',
       inversor: orcamento.dimensionamento?.inversor_modelo || '',
       quantidadeCabo: orcamento.dimensionamento?.quantidade_cabo_cc || '',
       valorSistema: orcamento.financeiro?.preco_final_cliente_rs || '',
-      formaPagamentoTipo: orcamento.financeiro?.forma_pagamento || 'avista',
+      valorEntrada: orcamento.financeiro?.entrada_rs ?? '',
+      valorSaldo: orcamento.financeiro?.saldo_rs ?? '',
+      formaPagamentoTipo: orcamento.financeiro?.forma_pagamento_tipo || orcamento.financeiro?.forma_pagamento || 'avista',
       formaPagamento: orcamento.financeiro?.condicoes_pagamento || '',
+      observacao: orcamento.dimensionamento?.observacoes || '',
     };
-    setContractModal({
-      open: true,
-      orcamento,
-      equipamentoId: equipamento?.id || '',
-      manual: applyEquipamentoToManual(baseManual, equipamento),
-    });
+    return applyEquipamentoToManual(baseManual, equipamento);
+  };
+
+  const openContractModal = async (orcamento) => {
+    const equipamento = equipamentos.find(item => item.id === Number(selectedEquipamentos[orcamento.id])) || equipamentos.find(item => item.active);
+    const manual = buildContractManualFromOrcamento(orcamento, equipamento);
+    await gerarContratoPorOrcamento(orcamento, equipamento?.id || '', manual);
   };
 
   const getClientContract = (cliente) => contratos.find(contrato => (
@@ -1792,6 +1823,31 @@ const AdminDashboard = () => {
     setContractModal(prev => ({ ...prev, manual: { ...prev.manual, [field]: value } }));
   };
 
+  const handleContratoGerado = (contrato) => {
+    setContratos(prev => {
+      const exists = prev.some(item => item.id === contrato.id);
+      return exists ? prev.map(item => item.id === contrato.id ? contrato : item) : [contrato, ...prev];
+    });
+    setSelectedContrato(null);
+    setContractModal({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
+    setActiveTab('contratos');
+    showToast(`Contrato ${contractNumber(contrato)} gerado com os dados do orçamento.`, 'success');
+  };
+
+  const gerarContratoPorOrcamento = async (orcamento, equipamentoId, manual) => {
+    try {
+      const contrato = await request('/api/admin/contratos', {
+        method: 'POST',
+        body: JSON.stringify({ orcamentoId: orcamento.id, equipamentoId, manual }),
+      });
+      handleContratoGerado(contrato);
+      return contrato;
+    } catch (err) {
+      showToast(`Não foi possível gerar o contrato: ${err.message}`, 'error');
+      return null;
+    }
+  };
+
   const gerarContrato = async (event) => {
     event.preventDefault();
     const { orcamento, equipamentoId, manual } = contractModal;
@@ -1804,13 +1860,7 @@ const AdminDashboard = () => {
         ? { clienteId: orcamento.clienteId, equipamentoId, manual }
         : { orcamentoId: orcamento.id, equipamentoId, manual }),
     });
-    setContratos(prev => {
-      const exists = prev.some(item => item.id === contrato.id);
-      return exists ? prev.map(item => item.id === contrato.id ? contrato : item) : [contrato, ...prev];
-    });
-    setSelectedContrato(contrato);
-    setContractModal({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
-    setActiveTab('contratos');
+    handleContratoGerado(contrato);
   };
 
   const closeContractReview = () => {
@@ -3122,6 +3172,14 @@ const AdminDashboard = () => {
                         <CurrencyInput value={budgetForm.valorSistema} onValueChange={(value) => setBudgetForm(prev => ({ ...prev, valorSistema: value }))} required />
                       </label>
                       <label>
+                        Entrada
+                        <CurrencyInput value={budgetForm.valorEntrada} onValueChange={(value) => setBudgetForm(prev => ({ ...prev, valorEntrada: value }))} placeholder="Opcional" />
+                      </label>
+                      <label>
+                        Saldo
+                        <CurrencyInput value={budgetForm.valorSaldo} onValueChange={(value) => setBudgetForm(prev => ({ ...prev, valorSaldo: value }))} placeholder="Opcional" />
+                      </label>
+                      <label>
                         Forma de pagamento
                         <select value={budgetForm.formaPagamentoTipo} onChange={(event) => setBudgetForm(prev => ({ ...prev, formaPagamentoTipo: event.target.value }))}>
                           {pagamentoTypeOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -3143,7 +3201,17 @@ const AdminDashboard = () => {
                       <div><span>Valor</span><strong>{money(budgetForm.valorSistema)}</strong></div>
                     </div>
                     <div className="actions-footer">
-                      <button type="button" className="btn btn-outline" onClick={() => setBudgetForm(emptyBudgetForm)}>Limpar</button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => {
+                          localStorage.removeItem(budgetDraftStorageKey);
+                          localStorage.removeItem(budgetDraftOpenStorageKey);
+                          setBudgetForm(emptyBudgetForm);
+                        }}
+                      >
+                        Limpar
+                      </button>
                       <button type="submit" className="btn btn-primary">Salvar orçamento</button>
                     </div>
                     {budgetStatus && <p className="muted-text">{budgetStatus}</p>}
