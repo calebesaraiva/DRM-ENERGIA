@@ -178,6 +178,9 @@ const percent = (value) => `${((Number(value || 0)) * 100).toLocaleString('pt-BR
 
 const getResponsibleName = (name) => name || 'Aguardando distribuição';
 const dateBr = (value) => value ? new Date(value).toLocaleDateString('pt-BR') : 'Sem data';
+const contractNumber = (contrato = {}) => (
+  `CT-${String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(contrato.id || '').padStart(4, '0')}`
+);
 const currencyToNumber = currencyInputToNumber;
 const whatsappLeadMessage = (lead = {}) => encodeURIComponent(
   `Olá ${lead.nome || ''}! Sou da DRM Energia Solar. Vi sua simulação no nosso site e quero te passar as melhores condições para você economizar na conta de energia. Podemos conversar agora?`
@@ -1728,21 +1731,27 @@ const AdminDashboard = () => {
     adminUser.role === 'ADM' && contrato && (contrato.status !== 'Aprovado' || isMasterAdmin)
   );
 
-  const saveContractReview = async (contrato = selectedContrato) => {
+  const saveContractReview = async (contrato = selectedContrato, options = {}) => {
     if (!contrato || !canEditReviewedContract(contrato)) return contrato;
     if (!String(contractReviewForm.clienteNome || '').trim()) {
       setReviewError('Informe o nome do cliente antes de salvar.');
       return null;
     }
 
-    const updated = await request(`/api/admin/contratos/${contrato.id}`, {
-      method: 'PUT',
-      body: JSON.stringify(contractReviewForm),
-    });
-    setContratos(prev => prev.map(item => item.id === updated.id ? updated : item));
-    setSelectedContrato(updated);
-    setContractReviewForm(contractToReviewForm(updated));
-    return updated;
+    try {
+      const updated = await request(`/api/admin/contratos/${contrato.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(contractReviewForm),
+      });
+      setContratos(prev => prev.map(item => item.id === updated.id ? updated : item));
+      setSelectedContrato(updated);
+      setContractReviewForm(contractToReviewForm(updated));
+      if (!options.silent) showToast(`Contrato ${contractNumber(updated)} salvo com sucesso.`, 'success');
+      return updated;
+    } catch (err) {
+      showToast(`Não foi possível salvar o contrato ${contractNumber(contrato)}: ${err.message}`, 'error');
+      return null;
+    }
   };
 
   const revisarContrato = async (contratoId, status) => {
@@ -1753,17 +1762,30 @@ const AdminDashboard = () => {
     }
 
     setReviewError('');
-    const saved = await saveContractReview(selectedContrato);
-    if (!saved) return;
+    const currentContract = selectedContrato || contratos.find(item => item.id === contratoId);
 
-    const contrato = await request(`/api/admin/contratos/${contratoId}/revisao`, {
-      method: 'PUT',
-      body: JSON.stringify({ status, observacaoAnalise: normalizedReviewNote }),
-    });
-    setContratos(prev => prev.map(item => item.id === contrato.id ? contrato : item));
-    setSelectedContrato(null);
-    setReviewNote('');
-    setReviewError('');
+    try {
+      if (!currentContract) throw new Error('Contrato não encontrado.');
+      if (selectedContrato) {
+        const saved = await saveContractReview(currentContract, { silent: true });
+        if (!saved) return;
+      }
+
+      const contrato = await request(`/api/admin/contratos/${contratoId}/revisao`, {
+        method: 'PUT',
+        body: JSON.stringify({ status, observacaoAnalise: normalizedReviewNote }),
+      });
+      setContratos(prev => prev.map(item => item.id === contrato.id ? contrato : item));
+      setSelectedContrato(null);
+      setReviewNote('');
+      setReviewError('');
+      showToast(
+        `Contrato ${contractNumber(contrato)} ${status === 'Aprovado' ? 'aprovado' : 'recusado'} com sucesso.`,
+        status === 'Aprovado' ? 'success' : 'warning'
+      );
+    } catch (err) {
+      showToast(`Não foi possível finalizar o contrato ${contractNumber(currentContract)}: ${err.message}`, 'error');
+    }
   };
 
   const getContratoDownloadUrl = (contratoId) => (
@@ -3375,7 +3397,7 @@ const AdminDashboard = () => {
                     <div className="contract-modal-header">
                       <div>
                         <span>Revisão do contrato</span>
-                        <h3 id="contract-review-title">CT-{String(selectedContrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-{String(selectedContrato.id).padStart(4, '0')}</h3>
+                        <h3 id="contract-review-title">{contractNumber(selectedContrato)}</h3>
                         <p>{selectedContrato.clienteNome}</p>
                       </div>
                       <div className="ctr-detail-header-right">
