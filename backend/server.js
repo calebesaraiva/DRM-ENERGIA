@@ -1487,12 +1487,17 @@ const buildContratoHtml = async (contrato) => {
     .logo { text-align: ${logoAlign}; }
     .logo img { width: ${Number(template.visual.logoWidth) || 86}px; max-width: 100%; height: auto; }
     h1 {
-      margin: 4px 0 4px;
+      max-width: 178mm;
+      margin: 18px auto 10px;
       color: #111827;
       font-size: 15px;
       font-weight: 900;
       letter-spacing: 0.2px;
+      line-height: 1.25;
+      text-align: center;
       text-transform: uppercase;
+      overflow-wrap: normal;
+      word-break: normal;
     }
     .meta { color: #6b7280; font-size: 9.5px; font-weight: 700; text-transform: uppercase; }
     .contract-id {
@@ -1579,8 +1584,9 @@ const buildContratoHtml = async (contrato) => {
     .signatures {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 34px;
-      margin-top: 34px;
+      column-gap: 34px;
+      row-gap: 90px;
+      margin-top: 95px;
       page-break-inside: avoid;
     }
     .line {
@@ -1615,12 +1621,13 @@ const buildContratoHtml = async (contrato) => {
     <header class="top">
       <div>
         <div class="meta">Contrato gerado pelo sistema DRM Solar</div>
-        <h1>${escapeHtml(template.titulo || DEFAULT_CONTRACT_TEMPLATE.titulo)}</h1>
         <div class="meta">${escapeHtml(template.empresa.nome)} • ${escapeHtml(template.empresa.endereco || '')}</div>
         <span class="contract-id">Contrato #${parsed.id} • ${escapeHtml(parsed.status)}</span>
       </div>
       <div class="logo"><img src="${getLogoDataUri()}" alt="${escapeHtml(template.empresa.nome)}" /></div>
     </header>
+
+    <h1>${escapeHtml(template.titulo || DEFAULT_CONTRACT_TEMPLATE.titulo)}</h1>
 
     <section class="intro">
       Pelo presente instrumento particular, de um lado <strong>${escapeHtml(template.empresa.nome)}</strong>, inscrita no CNPJ
@@ -1798,7 +1805,8 @@ const buildContratoPdf = async (contrato) => {
     const border = '#E5E7EB';
     const soft = '#F8FAFC';
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const footerTop = doc.page.height - 42;
+    const footerTop = doc.page.height - 32;
+    const contentBottom = doc.page.height - doc.page.margins.bottom;
     const sanitize = (value) => String(value ?? 'Não informado').replace(/\s+/g, ' ').trim() || 'Não informado';
 
     const drawHeader = () => {
@@ -1816,20 +1824,21 @@ const buildContratoPdf = async (contrato) => {
     };
 
     const drawFooter = (pageNumber, totalPages) => {
+      const originalBottomMargin = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
       doc.save();
-      doc.strokeColor(border).lineWidth(1).moveTo(doc.page.margins.left, footerTop - 8).lineTo(doc.page.margins.left + pageWidth, footerTop - 8).stroke();
+      doc.strokeColor(border).lineWidth(1).moveTo(doc.page.margins.left, footerTop - 7).lineTo(doc.page.margins.left + pageWidth, footerTop - 7).stroke();
       doc.font('Helvetica').fontSize(7.4).fillColor(muted)
-        .text(`${sanitize(template.empresa.telefone)}${template.empresa.email ? ` - ${sanitize(template.empresa.email)}` : ''}`, doc.page.margins.left, footerTop, { width: pageWidth * 0.72 });
+        .text(`${sanitize(template.empresa.telefone)}${template.empresa.email ? ` - ${sanitize(template.empresa.email)}` : ''}`, doc.page.margins.left, footerTop, { width: pageWidth * 0.72, lineBreak: false });
       doc.font('Helvetica-Bold').fontSize(7.4).fillColor(orange)
-        .text(`Página ${pageNumber} de ${totalPages}`, doc.page.margins.left + pageWidth * 0.72, footerTop, { width: pageWidth * 0.28, align: 'right' });
+        .text(`Página ${pageNumber} de ${totalPages}`, doc.page.margins.left + pageWidth * 0.72, footerTop, { width: pageWidth * 0.28, align: 'right', lineBreak: false });
       doc.restore();
+      doc.page.margins.bottom = originalBottomMargin;
     };
 
     const ensureSpace = (height = 80) => {
-      if (doc.y + height > doc.page.height - doc.page.margins.bottom) {
+      if (doc.y + height > contentBottom) {
         doc.addPage();
-        drawHeader();
-        doc.y = 92;
       }
     };
     const sectionTitle = (title) => {
@@ -1844,6 +1853,7 @@ const buildContratoPdf = async (contrato) => {
     const keyValueCard = (x, y, width, label, value) => {
       const labelText = sanitize(label).toUpperCase();
       const valueText = sanitize(value);
+      doc.font('Helvetica-Bold').fontSize(7.2);
       const labelHeight = doc.heightOfString(labelText, { width: width - 18 });
       const valueHeight = doc.font('Helvetica').fontSize(8.7).heightOfString(valueText, { width: width - 18, lineGap: 1.8 });
       const height = Math.max(52, labelHeight + valueHeight + 25);
@@ -1856,32 +1866,29 @@ const buildContratoPdf = async (contrato) => {
     const cardGrid = (rows, columns = 2) => {
       const gap = 8;
       const width = (pageWidth - gap * (columns - 1)) / columns;
-      let x = doc.page.margins.left;
-      let y = doc.y;
-      let rowHeight = 0;
-      rows.forEach(([label, value], index) => {
-        const col = index % columns;
-        if (col === 0 && index > 0) {
-          y += rowHeight + gap;
-          x = doc.page.margins.left;
-          rowHeight = 0;
-        }
-        const estimatedHeight = Math.max(
-          52,
-          doc.font('Helvetica').fontSize(8.7).heightOfString(sanitize(value), { width: width - 18, lineGap: 1.8 }) + 27
-        );
-        if (col === 0) ensureSpace(estimatedHeight + gap);
-        const height = keyValueCard(x, y, width, label, value);
-        rowHeight = Math.max(rowHeight, height);
-        x += width + gap;
-      });
-      doc.y = y + rowHeight + 4;
+      for (let index = 0; index < rows.length; index += columns) {
+        const row = rows.slice(index, index + columns);
+        const rowHeight = Math.max(...row.map(([label, value]) => {
+          doc.font('Helvetica-Bold').fontSize(7.2);
+          const labelHeight = doc.heightOfString(sanitize(label).toUpperCase(), { width: width - 18 });
+          const valueHeight = doc.font('Helvetica').fontSize(8.7).heightOfString(sanitize(value), { width: width - 18, lineGap: 1.8 });
+          return Math.max(52, labelHeight + valueHeight + 25);
+        }));
+        ensureSpace(rowHeight + gap);
+        const y = doc.y;
+        row.forEach(([label, value], column) => {
+          keyValueCard(doc.page.margins.left + column * (width + gap), y, width, label, value);
+        });
+        doc.y = y + rowHeight + gap;
+      }
     };
 
     const paragraph = (text, options = {}) => {
       const clean = sanitize(text);
-      ensureSpace(44);
-      doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(options.size || 8.8).fillColor(options.color || dark)
+      doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(options.size || 8.8);
+      const height = doc.heightOfString(clean, { width: pageWidth, lineGap: options.lineGap ?? 3 });
+      if (height < contentBottom - 100) ensureSpace(height + 12);
+      doc.fillColor(options.color || dark)
         .text(clean, doc.page.margins.left, doc.y, {
           width: pageWidth,
           align: 'left',
@@ -1900,25 +1907,38 @@ const buildContratoPdf = async (contrato) => {
       });
     };
 
+    doc.on('pageAdded', () => {
+      drawHeader();
+      doc.x = doc.page.margins.left;
+      doc.y = 96;
+    });
+
     drawHeader();
     doc.y = 96;
-    doc.font('Helvetica-Bold').fontSize(15).fillColor(dark)
-      .text(template.titulo || 'CONTRATO DE FORNECIMENTO E INSTALAÇÃO DE SISTEMA FOTOVOLTAICO', {
+    const title = template.titulo || 'CONTRATO DE FORNECIMENTO E INSTALAÇÃO DE SISTEMA FOTOVOLTAICO';
+    const titleSize = title.length > 85 ? 12.5 : title.length > 65 ? 13.5 : 15;
+    const titleY = doc.y;
+    doc.font('Helvetica-Bold').fontSize(titleSize).fillColor(dark)
+      .text(title, doc.page.margins.left, titleY, {
         width: pageWidth,
         align: 'center',
         lineGap: 2,
       });
-    doc.moveDown(0.6);
-    doc.roundedRect(doc.page.margins.left, doc.y, pageWidth, 72, 8).fillAndStroke('#FFFBF7', '#FED7AA');
-    const introY = doc.y + 11;
+    doc.y += 8;
+    const introText = `Pelo presente instrumento particular, ${sanitize(template.empresa.nome)}, inscrita no CNPJ ${sanitize(template.empresa.cnpj)}, e ${sanitize(parsed.clienteNome)}, CPF/CNPJ ${sanitize(contractVariables.cliente.cpfCnpj)}, firmam o presente contrato de prestação de serviços com fornecimento de materiais e instalação de sistema solar fotovoltaico.`;
+    const introHeight = Math.max(72, doc.font('Helvetica').fontSize(8.8).heightOfString(introText, { width: pageWidth - 24, lineGap: 2.5 }) + 22);
+    ensureSpace(introHeight + 4);
+    const introBoxY = doc.y;
+    doc.roundedRect(doc.page.margins.left, introBoxY, pageWidth, introHeight, 8).fillAndStroke('#FFFBF7', '#FED7AA');
+    const introY = introBoxY + 11;
     doc.font('Helvetica').fontSize(8.8).fillColor(dark)
       .text(
-        `Pelo presente instrumento particular, ${sanitize(template.empresa.nome)}, inscrita no CNPJ ${sanitize(template.empresa.cnpj)}, e ${sanitize(parsed.clienteNome)}, CPF/CNPJ ${sanitize(contractVariables.cliente.cpfCnpj)}, firmam o presente contrato de prestação de serviços com fornecimento de materiais e instalação de sistema solar fotovoltaico.`,
+        introText,
         doc.page.margins.left + 12,
         introY,
         { width: pageWidth - 24, lineGap: 2.5, align: 'left' }
       );
-    doc.y = introY + 58;
+    doc.y = introBoxY + introHeight + 4;
 
     sectionTitle('Dados do contratante');
     cardGrid([
@@ -1941,10 +1961,10 @@ const buildContratoPdf = async (contrato) => {
     sectionTitle('Cláusulas contratuais');
     renderClauses();
 
-    ensureSpace(145);
+    ensureSpace(225);
     sectionTitle('Assinaturas');
     doc.font('Helvetica').fontSize(9).fillColor(dark).text(`${parsed.clienteCidade || 'Imperatriz'}, ${new Date().toLocaleDateString('pt-BR')}.`, { align: 'center' });
-    doc.moveDown(2.5);
+    doc.moveDown(7);
     const signatureY = doc.y;
     doc.strokeColor(dark).moveTo(doc.page.margins.left, signatureY).lineTo(doc.page.margins.left + 205, signatureY).stroke();
     doc.moveTo(doc.page.margins.left + pageWidth - 205, signatureY).lineTo(doc.page.margins.left + pageWidth, signatureY).stroke();
@@ -1952,6 +1972,7 @@ const buildContratoPdf = async (contrato) => {
     doc.text(parsed.clienteNome, doc.page.margins.left + pageWidth - 205, signatureY + 7, { width: 205, align: 'center' });
     doc.font('Helvetica').fontSize(8).fillColor(muted).text('CONTRATADA', doc.page.margins.left, signatureY + 20, { width: 205, align: 'center' });
     doc.text('CONTRATANTE', doc.page.margins.left + pageWidth - 205, signatureY + 20, { width: 205, align: 'center' });
+    doc.y = signatureY + 42;
 
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i += 1) {
@@ -4241,6 +4262,9 @@ app.put('/api/admin/contratos/:id/revisao', authRequired, requirePermission('con
 
   const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id);
   if (!contrato) return res.status(404).json({ message: 'Contrato não encontrado.' });
+  if (contrato.status === 'Aprovado' && !isMasterAdmin(req.user)) {
+    return res.status(403).json({ message: 'Contrato aprovado só pode ser alterado pelo admin master.' });
+  }
 
   await db.run(
     `UPDATE contratos

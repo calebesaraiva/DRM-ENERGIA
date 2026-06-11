@@ -3331,26 +3331,15 @@ const AdminDashboard = () => {
                                   <span className="ctr-action-waiting">Aguardando aprovação</span>
                                 )}
                                 {contrato.status === 'Aprovado' && (
-                                  <>
-                                    <a
-                                      className="orc-action-btn"
-                                      href={getContratoDownloadUrl(contrato.id)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      title="Baixar contrato PDF"
-                                    >
-                                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-18v12l-5-5-1.4 1.4L12 17l6.4-6.6L17 9l-5 5V2h-2Z" fill="currentColor"/></svg>
-                                    </a>
-                                    <a
-                                      className="orc-action-btn orc-action-wa"
-                                      href={`https://wa.me/55${String(contrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência.')}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      title="Enviar via WhatsApp"
-                                    >
-                                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" fill="currentColor"/></svg>
-                                    </a>
-                                  </>
+                                  <a
+                                    className="orc-action-btn"
+                                    href={getContratoDownloadUrl(contrato.id)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Baixar contrato PDF"
+                                  >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-18v12l-5-5-1.4 1.4L12 17l6.4-6.6L17 9l-5 5V2h-2Z" fill="currentColor"/></svg>
+                                  </a>
                                 )}
                                 {contrato.status === 'Recusado' && (
                                   <span className="ctr-action-waiting">Revisar dados</span>
@@ -3480,11 +3469,10 @@ const AdminDashboard = () => {
 
                     {selectedContrato.status === 'Aprovado' && (
                       <div className="approved-actions">
-                        <div><strong>Contrato liberado</strong><span>{isMasterAdmin ? 'Admin master pode salvar ajustes finais.' : 'O arquivo pode ser baixado e enviado para o cliente.'}</span></div>
+                        <div><strong>Contrato liberado</strong><span>{isMasterAdmin ? 'Admin master pode salvar ajustes finais.' : 'Contrato aprovado disponível somente para download.'}</span></div>
                         <div className="approved-actions-buttons">
                           {canEditReviewedContract(selectedContrato) && <button type="button" className="btn btn-outline" onClick={() => saveContractReview(selectedContrato)}>Salvar alterações</button>}
                           <a className="btn btn-outline" href={getContratoDownloadUrl(selectedContrato.id)} target="_blank" rel="noopener noreferrer">Baixar contrato</a>
-                          <a className="btn btn-primary" href={`https://wa.me/55${String(selectedContrato.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Seu contrato da DRM Energia Solar foi aprovado. Vou te enviar o arquivo para conferência e te orientar nos próximos passos da instalação.')}`} target="_blank" rel="noopener noreferrer">Enviar ao cliente</a>
                         </div>
                       </div>
                     )}
