@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import io from 'socket.io-client'; // v2
 import './AdminDashboard.css';
@@ -937,6 +938,15 @@ const AdminDashboard = () => {
   useEffect(() => { setLeadsPage(1); }, [leadSearch, leadStatusFilter, leadOwnerFilter]);
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
   useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
+
+  useEffect(() => {
+    if (!selectedContrato || typeof document === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedContrato]);
 
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
@@ -3353,8 +3363,8 @@ const AdminDashboard = () => {
               </div>
 
               {/* ── Contract review modal ── */}
-              {selectedContrato && (
-                <div className="contract-modal-backdrop">
+              {selectedContrato && typeof document !== 'undefined' && createPortal((
+                <div className="contract-modal-backdrop ctr-review-backdrop">
                   <div className="contract-modal ctr-review-modal" role="dialog" aria-modal="true" aria-labelledby="contract-review-title">
                     <div className="contract-modal-header">
                       <div>
@@ -3452,7 +3462,7 @@ const AdminDashboard = () => {
                     )}
                   </div>
                 </div>
-              )}
+              ), document.body)}
 
               {/* ── Bottom legend ── */}
               <div className="ctr-legend">
