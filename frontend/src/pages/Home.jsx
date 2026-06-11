@@ -47,8 +47,8 @@ const Home = () => {
       <div className="reveal-section"><TrustBar /></div>
       <div className="reveal-section"><SocialProof /></div>
       <div className="reveal-section"><ProjectGallery /></div>
-      <div className="reveal-section"><Benefits onOpenSimulation={openSimulation} /></div>
-      <div className="reveal-section"><HowItWorks onOpenSimulation={openSimulation} /></div>
+      <div className="reveal-section"><Benefits /></div>
+      <div className="reveal-section"><HowItWorks /></div>
 
       <LeadSimulationModal
         isOpen={isSimulationOpen}

@@ -102,10 +102,10 @@ const Hero = ({ onOpenSimulation = () => {} }) => {
           </div>
 
           <div className="hero-lp-actions">
-            <button type="button" className="btn-lp-green" onClick={handleSimulate}>
+            <a className="btn-lp-green" href={heroSimularLink} target="_blank" rel="noopener noreferrer">
               <WhatsAppIcon />
               Simular economia agora
-            </button>
+            </a>
             <a href="#projetos" className="btn-lp-outline">
               Ver projetos entregues
             </a>

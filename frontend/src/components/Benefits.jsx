@@ -73,7 +73,7 @@ const benefitsList = [
   },
 ];
 
-const Benefits = ({ onOpenSimulation }) => (
+const Benefits = () => (
   <section className="benefits-section" id="beneficios">
     <div className="container">
       <div className="section-header benefits-header">
@@ -93,14 +93,15 @@ const Benefits = ({ onOpenSimulation }) => (
       </div>
 
       <div className="benefits-cta">
-        <button
-          type="button"
+        <a
           className="btn-lp-orange"
-          onClick={() => onOpenSimulation?.()}
+          href={makeWhatsAppLink('secao_beneficios')}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           <WhatsAppIcon />
           Quero reduzir minha conta
-        </button>
+        </a>
         <a
           className="btn-lp-green-outline"
           href={makeWhatsAppLink('secao_beneficios')}

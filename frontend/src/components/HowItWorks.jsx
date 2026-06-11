@@ -36,7 +36,7 @@ const FaqItem = ({ q, a }) => {
   );
 };
 
-const HowItWorks = ({ onOpenSimulation = () => {} }) => (
+const HowItWorks = () => (
   <>
     {/* HOW IT WORKS */}
     <section className="hiw-section" id="como-funciona">
@@ -61,10 +61,15 @@ const HowItWorks = ({ onOpenSimulation = () => {} }) => (
         </div>
 
         <div className="hiw-cta">
-          <button type="button" className="btn-lp-green" onClick={() => onOpenSimulation()}>
+          <a
+            className="btn-lp-green"
+            href={makeWhatsAppLink('secao_como_funciona')}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <WhatsAppIcon />
             Receber estudo gratuito no WhatsApp
-          </button>
+          </a>
         </div>
       </div>
     </section>

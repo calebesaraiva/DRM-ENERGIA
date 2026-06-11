@@ -1,5 +1,3 @@
-export const WHATSAPP_PHONE = '5599985127056';
-
 const whatsappMessages = {
   cta_fixo: 'Olá! Vi o site da DRM Energia Solar e quero falar com um especialista para saber quanto posso economizar na minha conta de energia.',
   popup_mobile: 'Olá! Estou no site da DRM Energia Solar pelo celular e quero atendimento para fazer minha proposta de energia solar.',
@@ -15,6 +13,8 @@ const whatsappMessages = {
 
 export function makeWhatsAppLink(source, text) {
   const message = text || whatsappMessages[source] || 'Olá! Vim pelo site da DRM Energia Solar e quero uma proposta de energia solar.';
-  const encoded = encodeURIComponent(message);
-  return `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${encoded}`;
+  const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  params.set('source', source || 'site');
+  params.set('text', message);
+  return `/rleads?${params.toString()}`;
 }
