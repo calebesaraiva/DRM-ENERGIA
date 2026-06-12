@@ -595,16 +595,18 @@
 .admin-topbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.9rem 1.5rem;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding: 1rem 1.5rem 0.95rem;
   border-bottom: 1px solid #e6eaf0;
-  background-color: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  backdrop-filter: blur(14px);
   position: sticky;
   top: 0;
   z-index: 20;
   min-width: 0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.045);
 }
 
 .mobile-menu-toggle {
@@ -617,94 +619,116 @@
 
 .admin-topbar h2 {
   color: #0f172a;
-  font-size: 1.25rem;
+  font-size: 1.22rem;
   font-weight: 950;
   margin: 0;
+  line-height: 1.15;
 }
 
 .topbar-main {
   min-width: 0;
   display: grid;
-  gap: 0.7rem;
+  gap: 0.62rem;
   flex: 1;
+  position: relative;
 }
 
 .quick-action-bar {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.42rem;
   overflow-x: auto;
-  max-width: min(100%, 860px);
-  padding-bottom: 0.12rem;
-  scrollbar-width: thin;
+  max-width: min(100%, 900px);
+  padding: 0.08rem 0.2rem 0.12rem 0;
+  scrollbar-width: none;
+  mask-image: linear-gradient(90deg, #000 calc(100% - 34px), transparent);
+}
+
+.quick-action-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .quick-action-btn {
-  min-height: 40px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.48rem 0.75rem;
-  border: 1px solid #dfe6ef;
+  gap: 0.4rem;
+  padding: 0.35rem 0.62rem;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: #fff;
-  color: #334155;
+  background: transparent;
+  color: #475569;
   font: inherit;
-  font-size: 0.84rem;
-  font-weight: 900;
+  font-size: 0.82rem;
+  font-weight: 850;
   white-space: nowrap;
   cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.quick-action-btn:hover,
-.quick-action-btn.active {
-  border-color: var(--cor-primaria);
-  background: #fff7ed;
+.quick-action-btn:hover {
+  background: #fff;
+  border-color: #e2e8f0;
   color: #111827;
-  transform: translateY(-1px);
+}
+
+.quick-action-btn.active {
+  border-color: rgba(249, 115, 22, 0.42);
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.10);
 }
 
 .quick-action-icon {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #f1f5f9;
+  background: #eef2f7;
+  color: #64748b;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.quick-action-btn.active .quick-action-icon {
+  background: #fff7ed;
+  color: #f97316;
 }
 
 .quick-action-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   fill: currentColor;
 }
 
 .quick-action-btn em {
-  min-width: 20px;
-  height: 20px;
+  min-width: 19px;
+  height: 19px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 0.35rem;
+  padding: 0 0.32rem;
   border-radius: 999px;
   background: var(--cor-primaria);
   color: #111827;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-style: normal;
+  font-weight: 950;
+  box-shadow: 0 5px 12px rgba(249, 115, 22, 0.22);
 }
 
 .system-status {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0.35rem 0.75rem;
+  min-height: 34px;
+  padding: 0.36rem 0.8rem;
   border: 1px solid var(--cor-borda);
   border-radius: 999px;
-  color: var(--cor-texto-mutado);
+  background: #fff;
+  color: #64748b;
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 850;
 }
 
 .topbar-actions {
@@ -712,17 +736,18 @@
   align-items: center;
   gap: 0.65rem;
   flex-shrink: 0;
+  padding-top: 0.02rem;
 }
 
 .topbar-logout {
-  min-height: 38px;
-  padding: 0.45rem 0.85rem;
+  min-height: 34px;
+  padding: 0.38rem 0.82rem;
   border: 1px solid #fee2e2;
   border-radius: 999px;
   background: #fff;
   color: #b91c1c;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 800;
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
@@ -4686,9 +4711,9 @@
   }
 
   .admin-topbar {
-    padding: 0.75rem 1rem;
+    padding: 0.72rem 1rem;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
   }
 
   .admin-body {
@@ -4708,7 +4733,7 @@
   }
 
   .topbar-main {
-    gap: 0.55rem;
+    gap: 0.48rem;
   }
 
   .orcamentos-view-grid {
@@ -5176,7 +5201,7 @@
     gap: 0.5rem;
     align-items: center;
     flex-wrap: wrap;
-    padding: 0.55rem 0.65rem;
+    padding: 0.55rem 0.65rem 0.62rem;
   }
 
   .admin-topbar h2 {
@@ -5193,14 +5218,26 @@
   .quick-action-bar {
     width: 100%;
     margin-left: 0;
-    padding-bottom: 0.25rem;
-    gap: 0.45rem;
+    padding: 0.05rem 0 0.05rem;
+    gap: 0.35rem;
+    max-width: 100%;
   }
 
   .quick-action-btn {
-    min-height: 38px;
-    padding: 0.48rem 0.64rem;
-    font-size: 0.76rem;
+    min-height: 34px;
+    padding: 0.34rem 0.52rem;
+    font-size: 0.74rem;
+  }
+
+  .quick-action-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .quick-action-btn em {
+    min-width: 18px;
+    height: 18px;
+    font-size: 0.66rem;
   }
 
   .admin-body {
@@ -5212,9 +5249,9 @@
   }
 
   .topbar-logout {
-    min-height: 36px;
-    padding: 0.4rem 0.72rem;
-    font-size: 0.8rem;
+    min-height: 34px;
+    padding: 0.36rem 0.68rem;
+    font-size: 0.78rem;
   }
 
   .topbar-actions {
