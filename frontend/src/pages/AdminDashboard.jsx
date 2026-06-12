@@ -132,6 +132,7 @@ const emptyManualLeadForm = {
 
 const getOrcStatusClass = (status) => {
   switch (String(status || '')) {
+    case 'Orçamento aprovado': return 'orc-status-venda';
     case 'Em atendimento': return 'orc-status-atendimento';
     case 'Proposta enviada': return 'orc-status-proposta';
     case 'Aguardando retorno': return 'orc-status-aguardando';
@@ -788,7 +789,11 @@ const AdminDashboard = () => {
   const orcClientTotalPages = Math.max(1, Math.ceil(filteredOrcClientes.length / ORC_CLIENTS_PER_PAGE));
 
   const clientOrcamentos = useMemo(
-    () => selectedOrcClient ? orcamentos.filter(o => String(o.clienteId) === String(selectedOrcClient.id)) : [],
+    () => selectedOrcClient
+      ? orcamentos
+          .filter(o => String(o.clienteId) === String(selectedOrcClient.id))
+          .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))
+      : [],
     [selectedOrcClient, orcamentos]
   );
 
@@ -1687,7 +1692,7 @@ const AdminDashboard = () => {
         method: 'POST',
         body: JSON.stringify({
           clienteId: budgetForm.clienteId,
-          status: 'Orçamento interno',
+          status: 'Orçamento salvo',
           dimensionamento: {
             potencia_placa_w: budgetForm.potenciaPlacaW,
             placa_modelo: budgetForm.placaModelo,
@@ -1769,6 +1774,23 @@ const AdminDashboard = () => {
     const equipamento = equipamentos.find(item => item.id === Number(selectedEquipamentos[orcamento.id])) || equipamentos.find(item => item.active);
     const manual = buildContractManualFromOrcamento(orcamento, equipamento);
     await gerarContratoPorOrcamento(orcamento, equipamento?.id || '', manual);
+  };
+
+  const aprovarOrcamentoParaContrato = async (orcamento) => {
+    try {
+      const updated = orcamento.status === 'Orçamento aprovado'
+        ? orcamento
+        : await request(`/api/admin/orcamentos/${orcamento.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'Orçamento aprovado' }),
+          });
+      setOrcamentos(prev => prev.map(item => item.id === updated.id ? updated : item));
+      setSelectedOrcamento(updated);
+      showToast(`Orçamento #${updated.id} aprovado. Gerando contrato com o kit escolhido.`, 'success');
+      await openContractModal(updated);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const getClientContract = (cliente) => contratos.find(contrato => (
@@ -3083,17 +3105,21 @@ const AdminDashboard = () => {
 
                 <div className="orc-client-table">
                   <div className="orc-client-thead">NOME COMPLETO</div>
-                  {paginatedOrcClientes.map(c => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className={`orc-client-row ${selectedOrcClient?.id === c.id ? 'active' : ''}`}
-                      onClick={() => { setSelectedOrcClient(c); setIsBudgetFormOpen(false); setSelectedOrcamento(null); }}
-                    >
-                      <span>{c.nome}</span>
-                      <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16"><path d="M9 18l6-6-6-6" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
-                  ))}
+                  {paginatedOrcClientes.map(c => {
+                    const totalOrcamentosCliente = orcamentos.filter(o => String(o.clienteId) === String(c.id)).length;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`orc-client-row ${selectedOrcClient?.id === c.id ? 'active' : ''}`}
+                        onClick={() => { setSelectedOrcClient(c); setIsBudgetFormOpen(false); setSelectedOrcamento(null); }}
+                      >
+                        <span>{c.nome}</span>
+                        <em>{totalOrcamentosCliente}</em>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16"><path d="M9 18l6-6-6-6" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                    );
+                  })}
                   {paginatedOrcClientes.length === 0 && (
                     <div className="orc-client-empty">Nenhum cliente encontrado.</div>
                   )}
@@ -3305,6 +3331,7 @@ const AdminDashboard = () => {
                                 <tr>
                                   <th>ID</th>
                                   <th>DATA</th>
+                                  <th>SISTEMA</th>
                                   <th>VALOR</th>
                                   <th>STATUS</th>
                                   <th>AÇÕES</th>
@@ -3319,6 +3346,12 @@ const AdminDashboard = () => {
                                   >
                                     <td className="orc-td-id">#{orc.id}</td>
                                     <td>{orc.data}</td>
+                                    <td>
+                                      <div className="orc-system-cell">
+                                        <strong>{orc.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</strong>
+                                        <span>{orc.dimensionamento?.numero_paineis_necessarios || 0} placas • {orc.dimensionamento?.inversor_modelo || 'Inversor'}</span>
+                                      </div>
+                                    </td>
                                     <td className="orc-td-valor">{money(orc.financeiro?.preco_final_cliente_rs)}</td>
                                     <td>
                                       <span className={`orc-status-badge ${getOrcStatusClass(orc.status)}`}>
@@ -3330,11 +3363,11 @@ const AdminDashboard = () => {
                                         {hasPermission('contratos') && (
                                           <button
                                             type="button"
-                                            className="orc-action-btn"
-                                            title="Emitir contrato"
-                                            onClick={() => openContractModal(orc)}
+                                            className="orc-action-btn orc-action-approve"
+                                            title="Aprovar orçamento e gerar contrato"
+                                            onClick={() => aprovarOrcamentoParaContrato(orc)}
                                           >
-                                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 1.5L18.5 9H13V3.5ZM8 17h8v1H8v-1Zm0-3h8v1H8v-1Zm0-3h5v1H8v-1Z" fill="currentColor"/></svg>
+                                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.1-4.1-1.4 1.4 5.5 5.5L20.5 8.1l-1.4-1.4-9.9 9.9Z" fill="currentColor"/></svg>
                                           </button>
                                         )}
                                         <a
@@ -3384,9 +3417,9 @@ const AdminDashboard = () => {
                                 ))}
                               </select>
                             )}
-                            <button type="button" className="orc-bar-btn" onClick={() => openContractModal(selectedOrcamento)}>
-                              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 1.5L18.5 9H13V3.5ZM8 17h8v1H8v-1Zm0-3h8v1H8v-1Zm0-3h5v1H8v-1Z" fill="currentColor"/></svg>
-                              Emitir Contrato
+                            <button type="button" className="orc-bar-btn orc-bar-btn-approve" onClick={() => aprovarOrcamentoParaContrato(selectedOrcamento)}>
+                              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.1-4.1-1.4 1.4 5.5 5.5L20.5 8.1l-1.4-1.4-9.9 9.9Z" fill="currentColor"/></svg>
+                              Aprovar orçamento
                             </button>
                           </>
                         )}

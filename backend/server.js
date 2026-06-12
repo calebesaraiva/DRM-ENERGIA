@@ -4102,6 +4102,25 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
   res.status(201).json(orcamento);
 });
 
+app.put('/api/admin/orcamentos/:id', authRequired, requirePermission('orcamentos'), async (req, res) => {
+  const orcamento = await db.get('SELECT * FROM orcamentos WHERE id = ?', req.params.id);
+  if (!orcamento) return res.status(404).json({ message: 'Orçamento não encontrado.' });
+  if (!can(req.user, 'verTodosLeads') && orcamento.assignedUserId !== req.user.id) {
+    return res.status(403).json({ message: 'Este orçamento pertence a outro responsável.' });
+  }
+
+  const status = String(req.body.status || '').trim();
+  if (!status) return res.status(400).json({ message: 'Informe o status do orçamento.' });
+
+  await db.run('UPDATE orcamentos SET status = ? WHERE id = ?', status, req.params.id);
+  const updated = await db.get('SELECT * FROM orcamentos WHERE id = ?', req.params.id);
+  res.json({
+    ...updated,
+    dimensionamento: parseJsonField(updated.dimensionamento),
+    financeiro: parseJsonField(updated.financeiro),
+  });
+});
+
 app.get('/api/admin/orcamentos/:id/download', authRequired, requirePermission('orcamentos'), async (req, res) => {
   const orcamento = await db.get('SELECT * FROM orcamentos WHERE id = ?', req.params.id);
   if (!orcamento) return res.status(404).json({ message: 'Orçamento não encontrado.' });

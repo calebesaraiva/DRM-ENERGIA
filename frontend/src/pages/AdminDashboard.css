@@ -6995,6 +6995,26 @@
   color: #cbd5e1;
 }
 
+.orc-client-row em {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.orc-client-row.active em {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
 .orc-client-row.active svg {
   color: #f97316;
 }
@@ -7287,6 +7307,26 @@
   color: #0f172a;
 }
 
+.orc-system-cell {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 180px;
+}
+
+.orc-system-cell strong {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.orc-system-cell span {
+  max-width: 260px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Status badges */
 .orc-status-badge {
   display: inline-flex;
@@ -7377,6 +7417,18 @@
 
 .orc-action-wa:hover {
   background: #bbf7d0;
+  color: #15803d;
+}
+
+.orc-action-approve {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #16a34a;
+}
+
+.orc-action-approve:hover {
+  background: #dcfce7;
+  border-color: #22c55e;
   color: #15803d;
 }
 
@@ -7472,6 +7524,18 @@
 
 .orc-bar-btn-wa:hover {
   background: #bbf7d0;
+}
+
+.orc-bar-btn-approve {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+  font-weight: 800;
+}
+
+.orc-bar-btn-approve:hover {
+  background: #15803d;
+  border-color: #15803d;
 }
 
 /* Responsive */
