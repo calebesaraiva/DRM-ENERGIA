@@ -633,12 +633,21 @@
   position: relative;
 }
 
+.quick-action-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: min(100%, 960px);
+}
+
 .quick-action-bar {
   display: flex;
   align-items: center;
   gap: 0.42rem;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
-  max-width: min(100%, 900px);
   padding: 0.08rem 0.2rem 0.12rem 0;
   scrollbar-width: none;
   mask-image: linear-gradient(90deg, #000 calc(100% - 34px), transparent);
@@ -718,19 +727,41 @@
   box-shadow: 0 5px 12px rgba(249, 115, 22, 0.22);
 }
 
-.quick-action-edit {
+.quick-action-edit,
+.quick-action-edit-button {
   border-style: dashed;
   color: #64748b;
 }
 
-.quick-action-edit .quick-action-icon {
+.quick-action-edit .quick-action-icon,
+.quick-action-edit-button .quick-action-icon {
   background: #f8fafc;
   color: #64748b;
 }
 
-.quick-action-edit:hover {
+.quick-action-edit:hover,
+.quick-action-edit-button:hover {
   border-color: #cbd5e1;
   color: #0f172a;
+}
+
+.quick-action-edit-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.35rem 0.58rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
 }
 
 .quick-action-editor-backdrop {
@@ -5334,6 +5365,11 @@
     max-width: 100%;
   }
 
+  .quick-action-row {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .quick-action-btn {
     min-height: 34px;
     padding: 0.34rem 0.52rem;
@@ -5351,8 +5387,17 @@
     font-size: 0.66rem;
   }
 
-  .quick-action-edit span:last-child {
+  .quick-action-edit span:last-child,
+  .quick-action-edit-button span:last-child {
     display: none;
+  }
+
+  .quick-action-edit-button {
+    min-width: 34px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
   }
 
   .quick-action-option {

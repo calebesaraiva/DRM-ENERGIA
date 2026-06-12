@@ -2281,22 +2281,24 @@ const AdminDashboard = () => {
           </button>
           <div className="topbar-main">
             <h2>{tabs.find(tab => tab.id === activeTab)?.label || 'Painel'}</h2>
-            <div className="quick-action-bar" aria-label="Ações rápidas">
-              {quickActions.map(action => (
-                <button
-                  key={action.id}
-                  className={`quick-action-btn ${activeTab === action.tab ? 'active' : ''}`}
-                  onClick={() => handleQuickAction(action)}
-                  type="button"
-                >
-                  <span className="quick-action-icon"><SidebarIcon name={action.tab} /></span>
-                  <span>{action.label}</span>
-                  {Number(action.badge || 0) > 0 && <em>{action.badge}</em>}
-                </button>
-              ))}
+            <div className="quick-action-row">
+              <div className="quick-action-bar" aria-label="Ações rápidas">
+                {quickActions.map(action => (
+                  <button
+                    key={action.id}
+                    className={`quick-action-btn ${activeTab === action.tab ? 'active' : ''}`}
+                    onClick={() => handleQuickAction(action)}
+                    type="button"
+                  >
+                    <span className="quick-action-icon"><SidebarIcon name={action.tab} /></span>
+                    <span>{action.label}</span>
+                    {Number(action.badge || 0) > 0 && <em>{action.badge}</em>}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
-                className="quick-action-btn quick-action-edit"
+                className="quick-action-edit-button"
                 onClick={openQuickActionEditor}
                 title="Editar ações rápidas"
               >
