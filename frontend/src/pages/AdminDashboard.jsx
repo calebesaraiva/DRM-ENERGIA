@@ -506,6 +506,7 @@ const AdminDashboard = () => {
   const [whatsappMessages, setWhatsappMessages] = useState([]);
   const [whatsappReply, setWhatsappReply] = useState('');
   const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [whatsappFilter, setWhatsappFilter] = useState('aguardando');
   const [orcamentoSearch, setOrcamentoSearch] = useState('');
   const [orcClientSearch, setOrcClientSearch] = useState('');
   const [orcClientPage, setOrcClientPage] = useState(1);
@@ -683,6 +684,30 @@ const AdminDashboard = () => {
     acc[group].push(action);
     return acc;
   }, {});
+
+  const whatsappSummary = useMemo(() => {
+    const aguardando = whatsappConversations.filter(item => item.status === 'Aguardando atendimento').length;
+    const emAtendimento = whatsappConversations.filter(item => item.status === 'Em atendimento').length;
+    const minhas = whatsappConversations.filter(item => Number(item.assignedUserId) === Number(adminUser.id)).length;
+    const naoLidas = whatsappConversations.reduce((total, item) => total + Number(item.unreadCount || 0), 0);
+    return { aguardando, emAtendimento, minhas, naoLidas, total: whatsappConversations.length };
+  }, [adminUser.id, whatsappConversations]);
+
+  const filteredWhatsappConversations = useMemo(() => {
+    if (whatsappFilter === 'aguardando') {
+      return whatsappConversations.filter(item => item.status === 'Aguardando atendimento');
+    }
+    if (whatsappFilter === 'atendimento') {
+      return whatsappConversations.filter(item => item.status === 'Em atendimento');
+    }
+    if (whatsappFilter === 'minhas') {
+      return whatsappConversations.filter(item => Number(item.assignedUserId) === Number(adminUser.id));
+    }
+    if (whatsappFilter === 'finalizadas') {
+      return whatsappConversations.filter(item => item.status === 'Finalizada');
+    }
+    return whatsappConversations;
+  }, [adminUser.id, whatsappConversations, whatsappFilter]);
 
   const leadSummary = useMemo(() => {
     const countsByOwner = leads.reduce((acc, lead) => {
@@ -1151,7 +1176,10 @@ const AdminDashboard = () => {
     };
 
     const handleWhatsappConversation = (conversation) => {
-      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson') || Number(conversation.assignedUserId) === Number(loggedInUser.id);
+      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson')
+        || Number(conversation.assignedUserId) === Number(loggedInUser.id)
+        || !conversation.assignedUserId
+        || conversation.status === 'Aguardando atendimento';
       if (!canSee) return;
       setWhatsappConversations(prev => {
         const exists = prev.some(item => item.id === conversation.id);
@@ -1207,6 +1235,38 @@ const AdminDashboard = () => {
       const messages = await request(`/api/admin/whatsapp/conversations/${conversation.id}/messages`);
       setWhatsappMessages(messages);
       setWhatsappConversations(prev => prev.map(item => item.id === conversation.id ? { ...item, unreadCount: 0 } : item));
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  const claimWhatsappConversation = async (conversation = selectedWhatsappConversation) => {
+    if (!conversation) return;
+    setWhatsappLoading(true);
+    try {
+      const updated = await request(`/api/admin/whatsapp/conversations/${conversation.id}/claim`, { method: 'POST' });
+      setSelectedWhatsappConversation(updated);
+      setWhatsappConversations(prev => prev.map(item => item.id === updated.id ? updated : item));
+      const messages = await request(`/api/admin/whatsapp/conversations/${updated.id}/messages`);
+      setWhatsappMessages(messages);
+      showToast(`Atendimento iniciado com ${updated.clienteNome || updated.clienteTelefone}.`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  const closeWhatsappConversation = async () => {
+    if (!selectedWhatsappConversation) return;
+    setWhatsappLoading(true);
+    try {
+      const updated = await request(`/api/admin/whatsapp/conversations/${selectedWhatsappConversation.id}/close`, { method: 'POST' });
+      setSelectedWhatsappConversation(updated);
+      setWhatsappConversations(prev => prev.map(item => item.id === updated.id ? updated : item));
+      showToast('Atendimento finalizado.', 'success');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -2322,6 +2382,10 @@ const AdminDashboard = () => {
     setFinanceiro(await request('/api/admin/financeiro'));
   };
 
+  const selectedWhatsappIsPending = selectedWhatsappConversation?.status === 'Aguardando atendimento' || !selectedWhatsappConversation?.assignedUserId;
+  const selectedWhatsappIsMine = Number(selectedWhatsappConversation?.assignedUserId) === Number(adminUser.id);
+  const canReplyWhatsapp = Boolean(selectedWhatsappConversation) && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && !selectedWhatsappIsPending;
+
   return (
     <div className={`admin-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
       {/* Toast notifications */}
@@ -3061,13 +3125,21 @@ const AdminDashboard = () => {
                   <div className="whatsapp-inbox-head">
                     <div>
                       <h4>Conversas</h4>
-                      <p>{whatsappConversations.length} atendimento{whatsappConversations.length === 1 ? '' : 's'}</p>
+                      <p>{whatsappSummary.aguardando} aguardando • {whatsappSummary.emAtendimento} em atendimento</p>
                     </div>
                     <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => loadData(adminUser).catch(err => showToast(err.message, 'error'))}>Atualizar</button>
                   </div>
 
+                  <div className="whatsapp-queue-tabs" aria-label="Filtros do chatbox">
+                    <button type="button" className={whatsappFilter === 'aguardando' ? 'active' : ''} onClick={() => setWhatsappFilter('aguardando')}>Aguardando <span>{whatsappSummary.aguardando}</span></button>
+                    <button type="button" className={whatsappFilter === 'atendimento' ? 'active' : ''} onClick={() => setWhatsappFilter('atendimento')}>Em atendimento <span>{whatsappSummary.emAtendimento}</span></button>
+                    <button type="button" className={whatsappFilter === 'minhas' ? 'active' : ''} onClick={() => setWhatsappFilter('minhas')}>Minhas <span>{whatsappSummary.minhas}</span></button>
+                    {isMasterAdmin && <button type="button" className={whatsappFilter === 'todas' ? 'active' : ''} onClick={() => setWhatsappFilter('todas')}>Todas <span>{whatsappSummary.total}</span></button>}
+                    <button type="button" className={whatsappFilter === 'finalizadas' ? 'active' : ''} onClick={() => setWhatsappFilter('finalizadas')}>Finalizadas</button>
+                  </div>
+
                   <div className="whatsapp-conversation-list">
-                    {whatsappConversations.map(conversation => (
+                    {filteredWhatsappConversations.map(conversation => (
                       <button
                         key={conversation.id}
                         type="button"
@@ -3078,15 +3150,16 @@ const AdminDashboard = () => {
                         <span className="wa-conversation-main">
                           <strong>{conversation.clienteNome || conversation.clienteTelefone}</strong>
                           <small>{conversation.lastMessage || 'Sem mensagens no histórico'}</small>
-                          <em>{conversation.assignedUserName || 'Sem responsável'} • {conversation.clienteTelefone}</em>
+                          <em>{conversation.assignedUserName || 'Fila compartilhada'} • {conversation.clienteTelefone}</em>
+                          <i className={`wa-status-chip wa-status-${String(conversation.status || 'aguardando').toLowerCase().replace(/\s+/g, '-')}`}>{conversation.status || 'Aguardando atendimento'}</i>
                         </span>
                         {Number(conversation.unreadCount || 0) > 0 && <span className="wa-unread">{conversation.unreadCount}</span>}
                       </button>
                     ))}
-                    {whatsappConversations.length === 0 && (
+                    {filteredWhatsappConversations.length === 0 && (
                       <div className="whatsapp-empty">
-                        <strong>Nenhuma conversa ainda</strong>
-                        <p>Quando um lead tiver telefone ou chegar mensagem pelo webhook, ele aparece aqui.</p>
+                        <strong>Nenhuma conversa nessa fila</strong>
+                        <p>Quando chegar um lead novo pelo WhatsApp, ele entra como aguardando atendimento.</p>
                       </div>
                     )}
                   </div>
@@ -3098,17 +3171,36 @@ const AdminDashboard = () => {
                       <div className="whatsapp-chat-head">
                         <div>
                           <h4>{selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone}</h4>
-                          <p>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Sem responsável'}</p>
+                          <p>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Fila compartilhada'} • {selectedWhatsappConversation.status || 'Aguardando atendimento'}</p>
                         </div>
-                        <a
-                          className="btn btn-outline btn-sm-admin"
-                          href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Abrir WhatsApp
-                        </a>
+                        <div className="whatsapp-chat-actions">
+                          {selectedWhatsappIsPending && (
+                            <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => claimWhatsappConversation()} disabled={whatsappLoading}>
+                              Iniciar atendimento
+                            </button>
+                          )}
+                          {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
+                            <button type="button" className="btn btn-outline btn-sm-admin" onClick={closeWhatsappConversation} disabled={whatsappLoading}>
+                              Finalizar
+                            </button>
+                          )}
+                          <a
+                            className="btn btn-outline btn-sm-admin"
+                            href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Abrir WhatsApp
+                          </a>
+                        </div>
                       </div>
+
+                      {selectedWhatsappIsPending && (
+                        <div className="whatsapp-claim-banner">
+                          <strong>Conversa aguardando atendimento</strong>
+                          <span>Inicie o atendimento para responder pelo sistema usando o número conectado da DRM.</span>
+                        </div>
+                      )}
 
                       <div className="whatsapp-messages">
                         {whatsappLoading && whatsappMessages.length === 0 && <p className="muted-text">Carregando mensagens...</p>}
@@ -3130,10 +3222,11 @@ const AdminDashboard = () => {
                         <textarea
                           value={whatsappReply}
                           onChange={(event) => setWhatsappReply(event.target.value)}
-                          placeholder="Digite a resposta para o cliente..."
+                          placeholder={canReplyWhatsapp ? 'Digite a resposta para o cliente...' : 'Inicie o atendimento para responder pelo sistema'}
                           rows={3}
+                          disabled={!canReplyWhatsapp}
                         />
-                        <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappReply.trim()}>
+                        <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp}>
                           Enviar mensagem
                         </button>
                       </form>

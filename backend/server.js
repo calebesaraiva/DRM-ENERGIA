@@ -261,7 +261,10 @@ const getWhatsAppProviderStatus = () => {
 };
 
 const canAccessWhatsAppConversation = (user, conversation = {}) => (
-  isMasterAdminUser(user) || Number(conversation.assignedUserId) === Number(user?.id)
+  isMasterAdminUser(user)
+    || Number(conversation.assignedUserId) === Number(user?.id)
+    || !conversation.assignedUserId
+    || conversation.status === 'Aguardando atendimento'
 );
 
 const getWhatsAppConversationById = async (id) => db.get('SELECT * FROM whatsapp_conversations WHERE id = ?', id);
@@ -272,7 +275,7 @@ const upsertWhatsAppConversation = async ({
   telefone = '',
   assignedUserId = null,
   assignedUserName = '',
-  status = 'Aberta',
+  status = 'Aguardando atendimento',
 } = {}) => {
   const phone = normalizeWhatsAppPhone(telefone);
   if (!phone) return null;
@@ -281,17 +284,19 @@ const upsertWhatsAppConversation = async ({
   const now = new Date().toISOString();
   if (conversation) {
     const nextLeadId = conversation.leadId || leadId || null;
-    const nextOwnerId = conversation.assignedUserId || assignedUserId || null;
-    const nextOwnerName = conversation.assignedUserName || assignedUserName || null;
+    const shouldReopen = conversation.status === 'Finalizada';
+    const nextOwnerId = shouldReopen ? null : (conversation.assignedUserId || assignedUserId || null);
+    const nextOwnerName = shouldReopen ? null : (conversation.assignedUserName || assignedUserName || null);
+    const nextStatus = shouldReopen ? 'Aguardando atendimento' : (conversation.status || status);
     await db.run(
       `UPDATE whatsapp_conversations
-       SET leadId = ?, clienteNome = ?, assignedUserId = ?, assignedUserName = ?, status = COALESCE(status, ?), updatedAt = ?
+       SET leadId = ?, clienteNome = ?, assignedUserId = ?, assignedUserName = ?, status = ?, updatedAt = ?
        WHERE id = ?`,
       nextLeadId,
       conversation.clienteNome || nome || phone,
       nextOwnerId,
       nextOwnerName,
-      status,
+      nextStatus,
       now,
       conversation.id
     );
@@ -4253,11 +4258,73 @@ app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('wh
   const conversations = isMasterAdminUser(req.user)
     ? await db.all('SELECT * FROM whatsapp_conversations ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC')
     : await db.all(
-      'SELECT * FROM whatsapp_conversations WHERE assignedUserId = ? ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC',
+      `SELECT * FROM whatsapp_conversations
+       WHERE assignedUserId = ? OR assignedUserId IS NULL OR status = 'Aguardando atendimento'
+       ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC`,
       req.user.id
     );
 
   res.json(conversations);
+});
+
+app.post('/api/admin/whatsapp/conversations/:id/claim', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const conversation = await getWhatsAppConversationById(req.params.id);
+  if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+
+  if (
+    conversation.assignedUserId
+    && Number(conversation.assignedUserId) !== Number(req.user.id)
+    && conversation.status !== 'Aguardando atendimento'
+    && !isMasterAdminUser(req.user)
+  ) {
+    return res.status(409).json({ message: `Essa conversa já está em atendimento com ${conversation.assignedUserName || 'outro consultor'}.` });
+  }
+
+  const now = new Date().toISOString();
+  const result = await db.run(
+    `UPDATE whatsapp_conversations
+     SET assignedUserId = ?, assignedUserName = ?, status = 'Em atendimento', unreadCount = 0, updatedAt = ?
+     WHERE id = ?
+       AND (
+         status = 'Aguardando atendimento'
+         OR assignedUserId IS NULL
+         OR assignedUserId = ?
+         OR ? = 1
+       )`,
+    req.user.id,
+    req.user.nome || req.user.username,
+    now,
+    conversation.id,
+    req.user.id,
+    isMasterAdminUser(req.user) ? 1 : 0
+  );
+  if (!result.changes) {
+    const current = await getWhatsAppConversationById(conversation.id);
+    return res.status(409).json({ message: `Essa conversa já está em atendimento com ${current?.assignedUserName || 'outro consultor'}.` });
+  }
+  const updated = await getWhatsAppConversationById(conversation.id);
+  io.emit('whatsapp_conversation_updated', updated);
+  res.json(updated);
+});
+
+app.post('/api/admin/whatsapp/conversations/:id/close', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const conversation = await getWhatsAppConversationById(req.params.id);
+  if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+  if (!canAccessWhatsAppConversation(req.user, conversation)) {
+    return res.status(403).json({ message: 'Você não tem acesso a esta conversa.' });
+  }
+
+  const now = new Date().toISOString();
+  await db.run(
+    `UPDATE whatsapp_conversations
+     SET status = 'Finalizada', unreadCount = 0, updatedAt = ?
+     WHERE id = ?`,
+    now,
+    conversation.id
+  );
+  const updated = await getWhatsAppConversationById(conversation.id);
+  io.emit('whatsapp_conversation_updated', updated);
+  res.json(updated);
 });
 
 app.get('/api/admin/whatsapp/conversations/:id/messages', authRequired, requirePermission('whatsapp'), async (req, res) => {
@@ -4282,10 +4349,30 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
     return res.status(403).json({ message: 'Você não tem acesso a esta conversa.' });
   }
 
+  let activeConversation = conversation;
+  if (conversation.status === 'Aguardando atendimento' || !conversation.assignedUserId) {
+    const claimResult = await db.run(
+      `UPDATE whatsapp_conversations
+       SET assignedUserId = ?, assignedUserName = ?, status = 'Em atendimento', updatedAt = ?
+       WHERE id = ? AND (status = 'Aguardando atendimento' OR assignedUserId IS NULL OR assignedUserId = ? OR ? = 1)`,
+      req.user.id,
+      req.user.nome || req.user.username,
+      new Date().toISOString(),
+      conversation.id,
+      req.user.id,
+      isMasterAdminUser(req.user) ? 1 : 0
+    );
+    if (!claimResult.changes) {
+      const current = await getWhatsAppConversationById(conversation.id);
+      return res.status(409).json({ message: `Essa conversa já está em atendimento com ${current?.assignedUserName || 'outro consultor'}.` });
+    }
+    activeConversation = await getWhatsAppConversationById(conversation.id);
+  }
+
   try {
-    const providerResult = await sendWhatsAppTextMessage(conversation.clienteTelefone, text);
+    const providerResult = await sendWhatsAppTextMessage(activeConversation.clienteTelefone, text);
     const message = await createWhatsAppMessage({
-      conversationId: conversation.id,
+      conversationId: activeConversation.id,
       direction: 'outgoing',
       text,
       providerMessageId: providerResult.providerMessageId,
@@ -4294,7 +4381,7 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
       senderName: req.user.nome || req.user.username,
       rawPayload: providerResult.payload || providerResult,
     });
-    const updatedConversation = await getWhatsAppConversationById(conversation.id);
+    const updatedConversation = await getWhatsAppConversationById(activeConversation.id);
     io.emit('whatsapp_message_created', { message, conversation: updatedConversation });
     io.emit('whatsapp_conversation_updated', updatedConversation);
     res.status(201).json({ message, conversation: updatedConversation, provider: providerResult });
