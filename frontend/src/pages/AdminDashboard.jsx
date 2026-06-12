@@ -643,13 +643,33 @@ const AdminDashboard = () => {
   const tabs = navigationGroups.flatMap(group => group.tabs);
 
   const availableQuickActions = [
-    { id: 'qa-novo-orcamento', label: 'Novo orçamento', tab: 'orcamentos', action: 'newBudget', permission: 'orcamentos', badge: clientes.length },
-    { id: 'qa-leads', label: 'Cadastrar lead', tab: 'leads', action: 'newLead', permission: 'leads', badge: leads.filter(item => item.status === 'Novo').length },
-    { id: 'qa-contratos', label: 'Aprovar contrato', tab: 'contratos', permission: 'contratos', badge: contratos.filter(item => item.status === 'Pendente').length },
-    { id: 'qa-homologacao', label: 'Homologação', tab: 'homologacao', permission: 'equipeTecnica', badge: projetos.filter(item => ['Pendência da concessionária', 'Reenviar projeto', 'Aguardando parecer de acesso', 'Vistoria reprovada'].includes(item.etapa)).length },
-    { id: 'qa-os', label: 'O.S abertas', tab: 'ordensServico', permission: 'ordensServico', badge: ordensServico.filter(item => item.status === 'Aberta').length },
+    { id: 'qa-dashboard', label: 'Painel geral', tab: 'dashboard', permission: 'dashboard', group: 'Principal', description: 'Resumo da operação e indicadores.' },
+    { id: 'qa-clientes', label: 'Clientes', tab: 'clientes', permission: 'clientes', group: 'Comercial', description: 'Base comercial e cadastro de clientes.', badge: clientes.length },
+    { id: 'qa-leads-lista', label: 'Leads', tab: 'leads', permission: 'leads', group: 'Comercial', description: 'Lista e filtros dos leads captados.', badge: leads.filter(item => item.status === 'Novo').length },
+    { id: 'qa-leads', label: 'Cadastrar lead', tab: 'leads', action: 'newLead', permission: 'leads', group: 'Ações diretas', description: 'Abre o cadastro rápido de lead.', badge: leads.filter(item => item.status === 'Novo').length },
+    { id: 'qa-orcamentos', label: 'Orçamentos', tab: 'orcamentos', permission: 'orcamentos', group: 'Comercial', description: 'Consultar propostas por cliente.', badge: orcamentos.length },
+    { id: 'qa-novo-orcamento', label: 'Novo orçamento', tab: 'orcamentos', action: 'newBudget', permission: 'orcamentos', group: 'Ações diretas', description: 'Criar orçamento de forma rápida.', badge: clientes.length },
+    { id: 'qa-contratos-lista', label: 'Contratos', tab: 'contratos', permission: 'contratos', group: 'Comercial', description: 'Consultar contratos gerados.', badge: contratos.length },
+    { id: 'qa-contratos', label: 'Aprovar contrato', tab: 'contratos', permission: 'contratos', group: 'Ações diretas', description: 'Ir para contratos pendentes.', badge: contratos.filter(item => item.status === 'Pendente').length },
+    { id: 'qa-procuracoes', label: 'Procurações', tab: 'procuracoes', permission: 'contratos', group: 'Comercial', description: 'Documentos de procuração e aprovação.', badge: procuracoes.filter(item => item.status === 'Pendente').length },
+    { id: 'qa-homologacao', label: 'Homologação', tab: 'homologacao', permission: 'equipeTecnica', group: 'Operação', description: 'Rotina de documentação técnica.', badge: projetos.filter(item => ['Pendência da concessionária', 'Reenviar projeto', 'Aguardando parecer de acesso', 'Vistoria reprovada'].includes(item.etapa)).length },
+    { id: 'qa-instalacoes', label: 'Instalações', tab: 'projetos', permission: 'equipeTecnica', group: 'Operação', description: 'Projetos e andamento de instalação.', badge: projetos.filter(item => item.etapa !== 'Projeto concluído').length },
+    { id: 'qa-os', label: 'O.S abertas', tab: 'ordensServico', permission: 'ordensServico', group: 'Operação', description: 'Abrir e acompanhar suporte técnico.', badge: ordensServico.filter(item => item.status === 'Aberta').length },
+    { id: 'qa-produtos', label: 'Produtos e kits', tab: 'produtosPacotes', permission: 'contratos', group: 'Catálogo', description: 'Kits e equipamentos cadastrados.', badge: equipamentos.filter(item => item.active).length },
+    { id: 'qa-precos', label: 'Preço dos sistemas', tab: 'precosSistemas', permission: 'precosSistemas', group: 'Catálogo', description: 'Calculadora e tabelas de preço.' },
+    { id: 'qa-financeiro', label: 'Financeiro', tab: 'financeiro', permission: 'financeiro', group: 'Gestão', description: 'Números financeiros e despesas.' },
+    { id: 'qa-comunicacoes', label: 'Comunicações', tab: 'comunicacoes', permission: 'usuarios', group: 'Gestão', description: 'Mensagens, e-mail e disparos.' },
+    { id: 'qa-usuarios', label: 'Acessos', tab: 'usuarios', permission: 'usuarios', group: 'Gestão', description: 'Usuários, permissões e senhas.', badge: usuarios.length },
   ].filter(action => hasPermission(action.permission));
-  const quickActions = (quickActionPrefs === null ? availableQuickActions : availableQuickActions.filter(action => quickActionPrefs.includes(action.id)));
+  const quickActions = availableQuickActions.filter(action => (
+    quickActionPrefs === null ? defaultQuickActionIds.includes(action.id) : quickActionPrefs.includes(action.id)
+  ));
+  const quickActionEditorGroups = availableQuickActions.reduce((acc, action) => {
+    const group = action.group || 'Outros';
+    acc[group] = acc[group] || [];
+    acc[group].push(action);
+    return acc;
+  }, {});
 
   const leadSummary = useMemo(() => {
     const countsByOwner = leads.reduce((acc, lead) => {
@@ -5203,32 +5223,43 @@ const AdminDashboard = () => {
       {quickActionEditorOpen && (
         <div className="contract-modal-backdrop quick-action-editor-backdrop">
           <div className="quick-action-editor-modal" role="dialog" aria-modal="true" aria-labelledby="quick-action-editor-title">
-            <div className="contract-modal-header">
+            <div className="quick-action-editor-header">
               <div>
                 <span className="section-kicker">Ações rápidas</span>
                 <h3 id="quick-action-editor-title">Personalizar barra superior</h3>
-                <p>Escolha os atalhos que ficam visíveis no seu painel.</p>
+                <p>{quickActionDraft.length} de {availableQuickActions.length} atalhos selecionados.</p>
               </div>
               <button type="button" className="lead-modal-close" onClick={() => setQuickActionEditorOpen(false)} aria-label="Fechar">×</button>
             </div>
             <div className="quick-action-editor-list">
-              {availableQuickActions.map(action => (
-                <label key={action.id} className={`quick-action-option ${quickActionDraft.includes(action.id) ? 'active' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={quickActionDraft.includes(action.id)}
-                    onChange={() => toggleQuickActionDraft(action.id)}
-                  />
-                  <span className="quick-action-option-icon"><SidebarIcon name={action.tab} /></span>
-                  <span>
-                    <strong>{action.label}</strong>
-                    <small>{permissionDescriptions[action.permission] || 'Atalho do painel'}</small>
-                  </span>
-                </label>
+              {Object.entries(quickActionEditorGroups).map(([group, actions]) => (
+                <div className="quick-action-option-group" key={group}>
+                  <div className="quick-action-option-group-title">
+                    <strong>{group}</strong>
+                    <span>{actions.filter(action => quickActionDraft.includes(action.id)).length}/{actions.length}</span>
+                  </div>
+                  <div className="quick-action-option-grid">
+                    {actions.map(action => (
+                      <label key={action.id} className={`quick-action-option ${quickActionDraft.includes(action.id) ? 'active' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={quickActionDraft.includes(action.id)}
+                          onChange={() => toggleQuickActionDraft(action.id)}
+                        />
+                        <span className="quick-action-option-icon"><SidebarIcon name={action.tab} /></span>
+                        <span>
+                          <strong>{action.label}</strong>
+                          <small>{action.description || permissionDescriptions[action.permission] || 'Atalho do painel'}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
             <div className="quick-action-editor-footer">
               <button type="button" className="btn btn-outline" onClick={() => setQuickActionDraft(availableQuickActions.map(action => action.id))}>Marcar todos</button>
+              <button type="button" className="btn btn-outline" onClick={() => setQuickActionDraft(defaultQuickActionIds.filter(id => availableQuickActions.some(action => action.id === id)))}>Padrão</button>
               <button type="button" className="btn btn-outline" onClick={() => setQuickActionEditorOpen(false)}>Cancelar</button>
               <button type="button" className="btn btn-primary" onClick={saveQuickActionPrefs}>Salvar preferências</button>
             </div>
