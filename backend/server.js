@@ -25,6 +25,12 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const DEFAULT_WHATSAPP_PHONE = '559985127056';
 const WHATSAPP_AUTH_DIR = path.join(__dirname, 'whatsapp-session');
+const WHATSAPP_NEW_LEAD_NOTIFY_PHONES = [
+  '559991675608',
+  '559985127056',
+  '559984632324',
+  '559992276744',
+];
 const ROUND_ROBIN_SELLERS = [
   { position: 1, phone: '5599984632324', name: 'Vendedor 1' },
   { position: 2, phone: '5599992276744', name: 'Vendedor 2' },
@@ -279,6 +285,18 @@ const buildWhatsAppClaimNotice = (consultantName) => [
   `${consultantName} começou o seu atendimento.`,
 ].join('\n');
 
+const buildWhatsAppNewLeadNotice = ({ nome = '', telefone = '', mensagem = '', teste = false } = {}) => [
+  '*DRM ENERGIA SOLAR*',
+  '',
+  teste ? 'Teste de aviso de lead novo.' : 'Chegou um lead novo aguardando atendimento.',
+  '',
+  `Cliente: ${nome || 'Sem nome'}`,
+  `WhatsApp: ${telefone || 'Sem telefone'}`,
+  mensagem ? `Mensagem: ${String(mensagem).slice(0, 280)}` : '',
+  '',
+  'Abra o painel > WhatsApp e inicie o atendimento.',
+].filter(Boolean).join('\n');
+
 const buildWhatsAppLink = (phone, text) => {
   const normalizedPhone = normalizeWhatsAppPhone(phone) || DEFAULT_WHATSAPP_PHONE;
   const encoded = encodeURIComponent(text || 'Ola, vim do site e quero uma proposta de energia solar.');
@@ -387,6 +405,8 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       io.emit('novo_lead', lead);
     }
 
+    const previousConversation = await db.get('SELECT * FROM whatsapp_conversations WHERE clienteTelefone = ?', phone);
+    const shouldNotifyNewLead = !previousConversation || ['Finalizada', 'Arquivada'].includes(previousConversation.status);
     const conversation = await upsertWhatsAppConversation({
       leadId: lead.id,
       nome: lead.nome || message.pushName || phone,
@@ -408,6 +428,11 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     const updatedConversation = await getWhatsAppConversationById(conversation.id);
     io.emit('whatsapp_message_created', { message: savedMessage, conversation: updatedConversation });
     io.emit('whatsapp_conversation_updated', updatedConversation);
+    if (shouldNotifyNewLead && updatedConversation?.status === 'Aguardando atendimento') {
+      notifyConsultantsAboutNewWhatsAppLead({ conversation: updatedConversation, text })
+        .catch(error => console.error('Erro ao enviar avisos de lead novo:', error));
+      io.emit('whatsapp_new_lead_waiting', { conversation: updatedConversation });
+    }
   } catch (error) {
     console.error('Erro ao processar mensagem WhatsApp QR:', error);
   }
@@ -602,7 +627,7 @@ const upsertWhatsAppConversation = async ({
   const now = new Date().toISOString();
   if (conversation) {
     const nextLeadId = conversation.leadId || leadId || null;
-    const shouldReopen = conversation.status === 'Finalizada';
+    const shouldReopen = ['Finalizada', 'Arquivada'].includes(conversation.status) && status === 'Aguardando atendimento';
     const nextOwnerId = shouldReopen ? null : (conversation.assignedUserId || assignedUserId || null);
     const nextOwnerName = shouldReopen ? null : (conversation.assignedUserName || assignedUserName || null);
     const nextStatus = shouldReopen ? 'Aguardando atendimento' : (conversation.status || status);
@@ -753,6 +778,29 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
     providerMessageId: data?.messages?.[0]?.id || '',
     payload: data,
   };
+};
+
+const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', test = false } = {}) => {
+  const notice = buildWhatsAppNewLeadNotice({
+    nome: conversation?.clienteNome,
+    telefone: conversation?.clienteTelefone,
+    mensagem: text,
+    teste: test,
+  });
+  const results = await Promise.allSettled(
+    WHATSAPP_NEW_LEAD_NOTIFY_PHONES.map(phone => sendWhatsAppTextMessage(phone, notice))
+  );
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.error(`Erro ao avisar consultor ${WHATSAPP_NEW_LEAD_NOTIFY_PHONES[index]} sobre lead novo:`, result.reason?.message || result.reason);
+    }
+  });
+  return results.map((result, index) => ({
+    phone: WHATSAPP_NEW_LEAD_NOTIFY_PHONES[index],
+    ok: result.status === 'fulfilled',
+    status: result.status === 'fulfilled' ? result.value?.status : 'erro',
+    error: result.status === 'rejected' ? result.reason?.message || 'Falha ao enviar aviso.' : '',
+  }));
 };
 
 const getAppUrl = () => String(process.env.APP_URL || 'http://127.0.0.1:5173').replace(/\/+$/, '');
@@ -4635,6 +4683,22 @@ app.post('/api/admin/whatsapp/connect', authRequired, requirePermission('whatsap
   const force = Boolean(req.body?.force);
   const status = await startWhatsAppQrSession({ force });
   res.json({ ...status, visibility: isMasterAdminUser(req.user) ? 'todos' : 'proprios' });
+});
+
+app.post('/api/admin/whatsapp/test-new-lead-notifications', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  if (!isMasterAdminUser(req.user)) {
+    return res.status(403).json({ message: 'Apenas o ADM master pode enviar teste de aviso para os consultores.' });
+  }
+  const fakeConversation = {
+    clienteNome: 'Teste DRM Energia Solar',
+    clienteTelefone: normalizeWhatsAppPhone(req.body?.telefone || DEFAULT_WHATSAPP_PHONE),
+  };
+  const results = await notifyConsultantsAboutNewWhatsAppLead({
+    conversation: fakeConversation,
+    text: req.body?.mensagem || 'Mensagem de teste para confirmar o aviso de lead novo.',
+    test: true,
+  });
+  res.json({ ok: results.every(item => item.ok), results });
 });
 
 app.post('/api/admin/whatsapp/disconnect', authRequired, requirePermission('whatsapp'), async (req, res) => {

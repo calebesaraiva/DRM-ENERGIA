@@ -609,6 +609,32 @@ const AdminDashboard = () => {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4800);
   }, []);
 
+  const playNewLeadAlert = useCallback(() => {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      const audioContext = new AudioContextClass();
+      const gain = audioContext.createGain();
+      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 2);
+      gain.connect(audioContext.destination);
+
+      [0, 0.38, 0.76, 1.14, 1.52].forEach((offset) => {
+        const oscillator = audioContext.createOscillator();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime + offset);
+        oscillator.connect(gain);
+        oscillator.start(audioContext.currentTime + offset);
+        oscillator.stop(audioContext.currentTime + offset + 0.22);
+      });
+      setTimeout(() => audioContext.close().catch(() => {}), 2300);
+      if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
+    } catch {
+      // O navegador pode bloquear áudio antes da primeira interação do usuário.
+    }
+  }, []);
+
   const navigationGroups = [
     {
       title: 'Início',
@@ -1224,6 +1250,12 @@ const AdminDashboard = () => {
       setWhatsappStatus(prev => ({ ...(prev || {}), ...status }));
     };
 
+    const handleWhatsappNewLeadWaiting = ({ conversation } = {}) => {
+      if (conversation) handleWhatsappConversation(conversation);
+      playNewLeadAlert();
+      showToast(`Lead novo aguardando atendimento: ${conversation?.clienteNome || conversation?.clienteTelefone || 'WhatsApp'}`, 'warning');
+    };
+
     socket.on('novo_orcamento', handleNewOrcamento);
     socket.on('novo_lead', handleNewLead);
     socket.on('contrato_atualizado', handleContratoAtualizado);
@@ -1235,6 +1267,7 @@ const AdminDashboard = () => {
     socket.on('whatsapp_message_created', handleWhatsappMessage);
     socket.on('whatsapp_message_status_updated', handleWhatsappMessageStatus);
     socket.on('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
+    socket.on('whatsapp_new_lead_waiting', handleWhatsappNewLeadWaiting);
 
     return () => {
       socket.off('novo_orcamento', handleNewOrcamento);
@@ -1248,8 +1281,9 @@ const AdminDashboard = () => {
       socket.off('whatsapp_message_created', handleWhatsappMessage);
       socket.off('whatsapp_message_status_updated', handleWhatsappMessageStatus);
       socket.off('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
+      socket.off('whatsapp_new_lead_waiting', handleWhatsappNewLeadWaiting);
     };
-  }, [loadData, navigate, selectedWhatsappConversation?.id, showToast]);
+  }, [loadData, navigate, playNewLeadAlert, selectedWhatsappConversation?.id, showToast]);
 
   const handleSair = () => {
     localStorage.removeItem('role');
