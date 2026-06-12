@@ -338,7 +338,7 @@ const isSupportedIncomingWhatsAppJid = (remoteJid = '') => {
   if (remoteJid.endsWith('@g.us')) return false;
   if (remoteJid.endsWith('@broadcast')) return false;
   if (remoteJid.endsWith('@newsletter')) return false;
-  return remoteJid.endsWith('@s.whatsapp.net') || remoteJid.endsWith('@lid');
+  return remoteJid.endsWith('@s.whatsapp.net');
 };
 
 const extractIncomingWhatsAppText = (content = {}) => {
@@ -367,7 +367,7 @@ const extractIncomingWhatsAppText = (content = {}) => {
 const handleIncomingWhatsAppWebMessage = async (message) => {
   try {
     const remoteJid = message.key?.remoteJid || '';
-    if (message.key?.fromMe || !isSupportedIncomingWhatsAppJid(remoteJid)) return;
+    if (message.key?.fromMe || message.key?.participant || !isSupportedIncomingWhatsAppJid(remoteJid)) return;
 
     const timestampMs = getBaileysMessageTimestampMs(message);
     if (whatsappRuntime.acceptIncomingAfter && timestampMs && timestampMs < whatsappRuntime.acceptIncomingAfter) return;
@@ -3328,6 +3328,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
        OR remoteJid = 'status@broadcast'
        OR remoteJid LIKE '%@broadcast'
        OR remoteJid LIKE '%@newsletter'
+       OR remoteJid LIKE '%@lid'
   `);
   const pendingQueueCleaned = await getSetting('whatsappPendingQueueCleanedForNewInboxV1', false);
   if (!pendingQueueCleaned) {
@@ -4712,10 +4713,12 @@ app.post('/api/admin/whatsapp/disconnect', authRequired, requirePermission('what
 app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('whatsapp'), async (req, res) => {
   const visibleWhere = `
     status != 'Arquivada'
+    AND COALESCE(remoteJid, '') LIKE '%@s.whatsapp.net'
     AND COALESCE(remoteJid, '') NOT LIKE '%@g.us'
     AND COALESCE(remoteJid, '') != 'status@broadcast'
     AND COALESCE(remoteJid, '') NOT LIKE '%@broadcast'
     AND COALESCE(remoteJid, '') NOT LIKE '%@newsletter'
+    AND COALESCE(remoteJid, '') NOT LIKE '%@lid'
   `;
 
   const conversations = isMasterAdminUser(req.user)
