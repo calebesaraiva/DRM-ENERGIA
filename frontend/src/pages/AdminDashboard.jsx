@@ -1372,6 +1372,13 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleWhatsappReplyKeyDown = (event) => {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    if (whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp) return;
+    sendWhatsappReply(event);
+  };
+
   const updateLeadStatus = async (leadId, status) => {
     await request(`/api/admin/leads/${leadId}`, {
       method: 'PUT',
@@ -2511,7 +2518,7 @@ const AdminDashboard = () => {
         </div>
       </aside>
 
-      <main className="admin-main-content">
+      <main className={`admin-main-content ${activeTab === 'whatsapp' ? 'whatsapp-active' : ''}`}>
         <header className="admin-topbar">
           <button className="mobile-menu-toggle" onClick={() => setIsSidebarOpen(true)}>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
@@ -3301,6 +3308,7 @@ const AdminDashboard = () => {
                         <textarea
                           value={whatsappReply}
                           onChange={(event) => setWhatsappReply(event.target.value)}
+                          onKeyDown={handleWhatsappReplyKeyDown}
                           placeholder={canReplyWhatsapp ? 'Digite a resposta para o cliente...' : whatsappStatus?.connected ? 'Inicie o atendimento para responder pelo sistema' : 'Conecte o WhatsApp por QR Code para responder'}
                           rows={3}
                           disabled={!canReplyWhatsapp}
