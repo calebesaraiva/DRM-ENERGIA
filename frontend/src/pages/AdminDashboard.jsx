@@ -507,6 +507,8 @@ const AdminDashboard = () => {
   const [whatsappReply, setWhatsappReply] = useState('');
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [whatsappFilter, setWhatsappFilter] = useState('aguardando');
+  const [whatsappConnectOpen, setWhatsappConnectOpen] = useState(false);
+  const [whatsappConnectLoading, setWhatsappConnectLoading] = useState(false);
   const [orcamentoSearch, setOrcamentoSearch] = useState('');
   const [orcClientSearch, setOrcClientSearch] = useState('');
   const [orcClientPage, setOrcClientPage] = useState(1);
@@ -1104,6 +1106,16 @@ const AdminDashboard = () => {
   }, [showManualLeadForm]);
 
   useEffect(() => {
+    if (!whatsappConnectOpen || !hasPermission('whatsapp')) return undefined;
+    const timer = setInterval(() => {
+      request('/api/admin/whatsapp/status')
+        .then(setWhatsappStatus)
+        .catch(() => {});
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [hasPermission, request, whatsappConnectOpen]);
+
+  useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
     const token = localStorage.getItem('token');
 
@@ -1198,6 +1210,10 @@ const AdminDashboard = () => {
       ));
     };
 
+    const handleWhatsappRuntimeStatus = (status) => {
+      setWhatsappStatus(prev => ({ ...(prev || {}), ...status }));
+    };
+
     socket.on('novo_orcamento', handleNewOrcamento);
     socket.on('novo_lead', handleNewLead);
     socket.on('contrato_atualizado', handleContratoAtualizado);
@@ -1207,6 +1223,7 @@ const AdminDashboard = () => {
     socket.on('os_atualizada', handleOsAtualizada);
     socket.on('whatsapp_conversation_updated', handleWhatsappConversation);
     socket.on('whatsapp_message_created', handleWhatsappMessage);
+    socket.on('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
 
     return () => {
       socket.off('novo_orcamento', handleNewOrcamento);
@@ -1218,6 +1235,7 @@ const AdminDashboard = () => {
       socket.off('os_atualizada', handleOsAtualizada);
       socket.off('whatsapp_conversation_updated', handleWhatsappConversation);
       socket.off('whatsapp_message_created', handleWhatsappMessage);
+      socket.off('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
     };
   }, [loadData, navigate, selectedWhatsappConversation?.id, showToast]);
 
@@ -1274,6 +1292,51 @@ const AdminDashboard = () => {
     }
   };
 
+  const openWhatsappConnectModal = async () => {
+    setWhatsappConnectOpen(true);
+    setWhatsappConnectLoading(true);
+    try {
+      const status = await request('/api/admin/whatsapp/connect', {
+        method: 'POST',
+        body: JSON.stringify({ force: false }),
+      });
+      setWhatsappStatus(status);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappConnectLoading(false);
+    }
+  };
+
+  const refreshWhatsappQr = async () => {
+    setWhatsappConnectLoading(true);
+    try {
+      const status = await request('/api/admin/whatsapp/connect', {
+        method: 'POST',
+        body: JSON.stringify({ force: true }),
+      });
+      setWhatsappStatus(status);
+      showToast('Novo QR Code gerado.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappConnectLoading(false);
+    }
+  };
+
+  const disconnectWhatsapp = async () => {
+    setWhatsappConnectLoading(true);
+    try {
+      const status = await request('/api/admin/whatsapp/disconnect', { method: 'POST' });
+      setWhatsappStatus(status);
+      showToast('WhatsApp desconectado.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappConnectLoading(false);
+    }
+  };
+
   const sendWhatsappReply = async (event) => {
     event.preventDefault();
     if (!selectedWhatsappConversation || !whatsappReply.trim()) return;
@@ -1292,7 +1355,7 @@ const AdminDashboard = () => {
         return exists ? prev.map(item => item.id === data.conversation.id ? data.conversation : item) : [data.conversation, ...prev];
       });
       if (data.provider?.configured === false) {
-        showToast('Mensagem salva. Configure a API oficial do WhatsApp na VPS para envio real.', 'warning');
+        showToast('Mensagem salva. Conecte o WhatsApp por QR Code para envio real.', 'warning');
       }
     } catch (err) {
       setWhatsappReply(text);
@@ -3099,24 +3162,28 @@ const AdminDashboard = () => {
               <div className={`whatsapp-status-card ${whatsappStatus?.connected ? 'connected' : 'pending'}`}>
                 <div>
                   <span className="section-kicker">Atendimento WhatsApp</span>
-                  <h3>{whatsappStatus?.connected ? 'WhatsApp conectado ao painel' : 'Conectar WhatsApp oficial'}</h3>
+                  <h3>{whatsappStatus?.connected ? 'WhatsApp conectado ao painel' : 'Conectar WhatsApp por QR Code'}</h3>
                   <p>
                     {whatsappStatus?.connected
-                      ? 'As conversas ficam vinculadas ao responsável do lead. Consultores veem apenas os próprios atendimentos.'
-                      : 'Configure a API oficial da Meta na VPS para enviar e receber mensagens dentro do sistema.'}
+                      ? 'Todos os vendedores atendem pelo sistema usando o mesmo número conectado.'
+                      : 'Escaneie o QR Code uma vez com o WhatsApp oficial da DRM para liberar o chatbox.'}
                   </p>
                 </div>
                 <div className="whatsapp-status-badges">
                   <span>{whatsappStatus?.visibility === 'todos' ? 'Visão master' : 'Meus leads'}</span>
-                  <span>{whatsappStatus?.webhookReady ? 'Webhook pronto' : 'Webhook pendente'}</span>
+                  <span>{whatsappStatus?.connected ? 'Online' : whatsappStatus?.status || 'Desconectado'}</span>
+                  {whatsappStatus?.phone && <span>{whatsappStatus.phone}</span>}
                 </div>
+                <button type="button" className="btn btn-primary btn-sm-admin" onClick={openWhatsappConnectModal}>
+                  {whatsappStatus?.connected ? 'Ver conexão' : 'Conectar WhatsApp'}
+                </button>
               </div>
 
               {!whatsappStatus?.connected && (
                 <div className="admin-card whatsapp-config-card">
-                  <strong>Para ativar o envio real</strong>
-                  <p>Defina as variáveis `WHATSAPP_CLOUD_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` e `WHATSAPP_VERIFY_TOKEN` na VPS. Depois, no painel da Meta, use este webhook:</p>
-                  <code>{whatsappStatus?.webhookUrl || 'https://drmenergiasolar.com.br/api/whatsapp/webhook'}</code>
+                  <strong>O chatbox ainda não está enviando mensagens pelo WhatsApp</strong>
+                  <p>Clique em conectar, escaneie o QR Code com o celular do número oficial e mantenha o atendimento todo pelo sistema.</p>
+                  <button type="button" className="btn btn-outline btn-sm-admin" onClick={openWhatsappConnectModal}>Abrir QR Code</button>
                 </div>
               )}
 
@@ -5515,6 +5582,70 @@ const AdminDashboard = () => {
           )}
         </div>
       </main>
+
+      {whatsappConnectOpen && (
+        <div className="contract-modal-backdrop whatsapp-connect-backdrop">
+          <div className="whatsapp-connect-modal" role="dialog" aria-modal="true" aria-labelledby="whatsapp-connect-title">
+            <div className="whatsapp-connect-header">
+              <div>
+                <span className="section-kicker">Conexão WhatsApp</span>
+                <h3 id="whatsapp-connect-title">Conectar número oficial</h3>
+                <p>Escaneie o QR Code com o WhatsApp que será usado por todos os vendedores no chatbox.</p>
+              </div>
+              <button type="button" className="lead-modal-close" onClick={() => setWhatsappConnectOpen(false)} aria-label="Fechar">×</button>
+            </div>
+
+            <div className="whatsapp-connect-body">
+              <div className="whatsapp-qr-panel">
+                {whatsappStatus?.connected ? (
+                  <div className="whatsapp-connected-state">
+                    <span className="wa-connect-icon">✓</span>
+                    <h4>WhatsApp conectado</h4>
+                    <p>{whatsappStatus.phone ? `Número conectado: ${whatsappStatus.phone}` : 'Sessão ativa e pronta para atendimento.'}</p>
+                  </div>
+                ) : whatsappStatus?.qr ? (
+                  <img src={whatsappStatus.qr} alt="QR Code para conectar WhatsApp" className="whatsapp-qr-image" />
+                ) : (
+                  <div className="whatsapp-qr-loading">
+                    <span className="wa-connect-icon">QR</span>
+                    <h4>{whatsappConnectLoading ? 'Gerando QR Code...' : 'QR Code ainda não gerado'}</h4>
+                    <p>Clique em gerar QR Code e escaneie pelo celular do WhatsApp oficial.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="whatsapp-connect-info">
+                <div className={`whatsapp-connect-status ${whatsappStatus?.connected ? 'online' : ''}`}>
+                  <strong>{whatsappStatus?.connected ? 'Online' : whatsappStatus?.status || 'Desconectado'}</strong>
+                  <span>{whatsappStatus?.message || 'Aguardando início da conexão.'}</span>
+                </div>
+                <div className="whatsapp-connect-steps">
+                  <div><strong>1</strong><span>Abra o WhatsApp no celular oficial da DRM.</span></div>
+                  <div><strong>2</strong><span>Vá em Aparelhos conectados e escolha conectar um aparelho.</span></div>
+                  <div><strong>3</strong><span>Escaneie o QR Code. Depois disso, todos atendem pelo painel.</span></div>
+                </div>
+                <div className="whatsapp-connect-meta">
+                  <span>Modo: QR Code server-side</span>
+                  <span>Fila: número único para vários vendedores</span>
+                  {whatsappStatus?.lastUpdate && <span>Atualizado: {new Date(whatsappStatus.lastUpdate).toLocaleString('pt-BR')}</span>}
+                </div>
+              </div>
+            </div>
+
+            <div className="whatsapp-connect-footer">
+              <button type="button" className="btn btn-outline" onClick={() => setWhatsappConnectOpen(false)}>Fechar</button>
+              <button type="button" className="btn btn-outline" onClick={refreshWhatsappQr} disabled={whatsappConnectLoading}>
+                Gerar novo QR
+              </button>
+              {isMasterAdmin && whatsappStatus?.connected && (
+                <button type="button" className="btn btn-outline danger-outline" onClick={disconnectWhatsapp} disabled={whatsappConnectLoading}>
+                  Desconectar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {quickActionEditorOpen && (
         <div className="contract-modal-backdrop quick-action-editor-backdrop">

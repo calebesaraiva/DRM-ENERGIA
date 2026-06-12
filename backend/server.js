@@ -12,10 +12,19 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+const QRCode = require('qrcode');
+const pino = require('pino');
+const {
+  default: makeWASocket,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  useMultiFileAuthState,
+} = require('@whiskeysockets/baileys');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const DEFAULT_WHATSAPP_PHONE = '559985127056';
+const WHATSAPP_AUTH_DIR = path.join(__dirname, 'whatsapp-session');
 const ROUND_ROBIN_SELLERS = [
   { position: 1, phone: '5599984632324', name: 'Vendedor 1' },
   { position: 2, phone: '5599992276744', name: 'Vendedor 2' },
@@ -242,13 +251,226 @@ const buildWhatsAppLink = (phone, text) => {
   return `https://api.whatsapp.com/send?phone=${normalizedPhone}&text=${encoded}`;
 };
 
+const whatsappRuntime = {
+  socket: null,
+  starting: false,
+  connected: false,
+  qr: '',
+  qrDataUrl: '',
+  status: 'desconectado',
+  message: 'WhatsApp ainda não conectado.',
+  phone: '',
+  lastUpdate: '',
+};
+
+const emitWhatsAppRuntimeStatus = () => {
+  io.emit('whatsapp_runtime_status', getWhatsAppProviderStatus());
+};
+
+const getWhatsAppJid = (phone) => `${normalizeWhatsAppPhone(phone)}@s.whatsapp.net`;
+
+const handleIncomingWhatsAppWebMessage = async (message) => {
+  try {
+    const remoteJid = message.key?.remoteJid || '';
+    if (!remoteJid || remoteJid.endsWith('@g.us') || message.key?.fromMe) return;
+
+    const phone = normalizeWhatsAppPhone(remoteJid.split('@')[0]);
+    if (!phone) return;
+
+    const content = message.message || {};
+    const text = content.conversation
+      || content.extendedTextMessage?.text
+      || content.imageMessage?.caption
+      || content.videoMessage?.caption
+      || content.buttonsResponseMessage?.selectedDisplayText
+      || content.listResponseMessage?.title
+      || '[mensagem recebida]';
+
+    let lead = await db.get('SELECT * FROM leads WHERE telefone = ? OR telefone = ?', phone, phone.replace(/^55/, ''));
+    let owner = null;
+
+    if (!lead) {
+      owner = await getNextLeadOwner();
+      const result = await db.run(
+        `INSERT INTO leads
+          (nome, telefone, email, cidade, origem, status, dataCadastro, assignedUserId, assignedUserName, observacoes, tipoCadastro, criadoPorId, criadoPorNome)
+         VALUES (?, ?, '', '', 'WhatsApp QR', 'Novo', ?, ?, ?, 'Mensagem recebida pelo WhatsApp conectado via QR Code.', 'site', NULL, 'WhatsApp')`,
+        message.pushName || phone,
+        phone,
+        new Date().toISOString().split('T')[0],
+        owner.id,
+        owner.nome
+      );
+      lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
+      io.emit('novo_lead', lead);
+    } else if (lead.assignedUserId) {
+      owner = { id: lead.assignedUserId, nome: lead.assignedUserName };
+    } else {
+      owner = await getNextLeadOwner();
+      await db.run('UPDATE leads SET assignedUserId = ?, assignedUserName = ? WHERE id = ?', owner.id, owner.nome, lead.id);
+      lead = await db.get('SELECT * FROM leads WHERE id = ?', lead.id);
+      io.emit('novo_lead', lead);
+    }
+
+    const conversation = await upsertWhatsAppConversation({
+      leadId: lead.id,
+      nome: lead.nome || message.pushName || phone,
+      telefone: phone,
+      assignedUserId: null,
+      assignedUserName: '',
+      status: 'Aguardando atendimento',
+    });
+    const savedMessage = await createWhatsAppMessage({
+      conversationId: conversation.id,
+      direction: 'incoming',
+      messageType: 'text',
+      text,
+      providerMessageId: message.key?.id || '',
+      status: 'recebida',
+      rawPayload: message,
+    });
+    const updatedConversation = await getWhatsAppConversationById(conversation.id);
+    io.emit('whatsapp_message_created', { message: savedMessage, conversation: updatedConversation });
+    io.emit('whatsapp_conversation_updated', updatedConversation);
+  } catch (error) {
+    console.error('Erro ao processar mensagem WhatsApp QR:', error);
+  }
+};
+
+const startWhatsAppQrSession = async ({ force = false } = {}) => {
+  if (whatsappRuntime.starting) return getWhatsAppProviderStatus();
+  if (whatsappRuntime.socket && !force) return getWhatsAppProviderStatus();
+
+  whatsappRuntime.starting = true;
+  whatsappRuntime.status = 'conectando';
+  whatsappRuntime.message = 'Preparando sessão do WhatsApp. Aguarde o QR Code aparecer.';
+  whatsappRuntime.lastUpdate = new Date().toISOString();
+  emitWhatsAppRuntimeStatus();
+
+  try {
+    if (force && whatsappRuntime.socket) {
+      try {
+        whatsappRuntime.socket.end?.();
+        whatsappRuntime.socket.ws?.close?.();
+      } catch {}
+      whatsappRuntime.socket = null;
+    }
+
+    fs.mkdirSync(WHATSAPP_AUTH_DIR, { recursive: true });
+    const { state, saveCreds } = await useMultiFileAuthState(WHATSAPP_AUTH_DIR);
+    const { version } = await fetchLatestBaileysVersion();
+    const socket = makeWASocket({
+      version,
+      auth: state,
+      printQRInTerminal: false,
+      browser: ['DRM Energia Solar', 'Chrome', '1.0.0'],
+      logger: pino({ level: 'silent' }),
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
+    });
+
+    whatsappRuntime.socket = socket;
+    socket.ev.on('creds.update', saveCreds);
+    socket.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+      if (qr) {
+        whatsappRuntime.qr = qr;
+        whatsappRuntime.qrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 320 });
+        whatsappRuntime.connected = false;
+        whatsappRuntime.status = 'aguardando_qrcode';
+        whatsappRuntime.message = 'Escaneie o QR Code com o WhatsApp do número oficial.';
+        whatsappRuntime.lastUpdate = new Date().toISOString();
+        emitWhatsAppRuntimeStatus();
+      }
+
+      if (connection === 'open') {
+        whatsappRuntime.connected = true;
+        whatsappRuntime.qr = '';
+        whatsappRuntime.qrDataUrl = '';
+        whatsappRuntime.status = 'conectado';
+        whatsappRuntime.phone = normalizeWhatsAppPhone(socket.user?.id?.split(':')[0] || socket.user?.id?.split('@')[0] || '');
+        whatsappRuntime.message = 'WhatsApp conectado. Os vendedores já podem atender pelo sistema.';
+        whatsappRuntime.lastUpdate = new Date().toISOString();
+        emitWhatsAppRuntimeStatus();
+      }
+
+      if (connection === 'close') {
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        whatsappRuntime.connected = false;
+        whatsappRuntime.socket = null;
+        whatsappRuntime.status = shouldReconnect ? 'reconectando' : 'desconectado';
+        whatsappRuntime.message = shouldReconnect
+          ? 'Conexão caiu. Tentando reconectar automaticamente.'
+          : 'Sessão desconectada. Gere um novo QR Code para conectar.';
+        whatsappRuntime.lastUpdate = new Date().toISOString();
+        emitWhatsAppRuntimeStatus();
+        if (shouldReconnect) {
+          setTimeout(() => startWhatsAppQrSession().catch(error => console.error('Erro ao reconectar WhatsApp:', error)), 2500);
+        }
+      }
+    });
+
+    socket.ev.on('messages.upsert', async ({ messages = [], type }) => {
+      if (type !== 'notify') return;
+      for (const message of messages) {
+        await handleIncomingWhatsAppWebMessage(message);
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao iniciar WhatsApp QR:', error);
+    whatsappRuntime.connected = false;
+    whatsappRuntime.status = 'erro';
+    whatsappRuntime.message = error.message || 'Não foi possível iniciar a conexão por QR Code.';
+    whatsappRuntime.lastUpdate = new Date().toISOString();
+  } finally {
+    whatsappRuntime.starting = false;
+    emitWhatsAppRuntimeStatus();
+  }
+
+  return getWhatsAppProviderStatus();
+};
+
+const disconnectWhatsAppQrSession = async () => {
+  try {
+    if (whatsappRuntime.socket) {
+      await whatsappRuntime.socket.logout().catch(() => {});
+      whatsappRuntime.socket.end?.();
+      whatsappRuntime.socket.ws?.close?.();
+    }
+  } catch (error) {
+    console.error('Erro ao desconectar WhatsApp:', error);
+  }
+  whatsappRuntime.socket = null;
+  whatsappRuntime.connected = false;
+  whatsappRuntime.qr = '';
+  whatsappRuntime.qrDataUrl = '';
+  whatsappRuntime.status = 'desconectado';
+  whatsappRuntime.message = 'WhatsApp desconectado. Clique em conectar para gerar novo QR Code.';
+  whatsappRuntime.phone = '';
+  whatsappRuntime.lastUpdate = new Date().toISOString();
+  fs.rmSync(WHATSAPP_AUTH_DIR, { recursive: true, force: true });
+  emitWhatsAppRuntimeStatus();
+  return getWhatsAppProviderStatus();
+};
+
 const getWhatsAppProviderStatus = () => {
   const token = process.env.WHATSAPP_CLOUD_TOKEN || process.env.META_WHATSAPP_TOKEN || '';
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '';
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || process.env.META_WHATSAPP_VERIFY_TOKEN || '';
   const businessPhone = normalizeWhatsAppPhone(process.env.WHATSAPP_BUSINESS_PHONE || process.env.META_WHATSAPP_BUSINESS_PHONE || '');
   return {
-    connected: Boolean(token && phoneNumberId),
+    mode: 'qrcode',
+    connected: whatsappRuntime.connected,
+    qrConnected: whatsappRuntime.connected,
+    qr: whatsappRuntime.qrDataUrl,
+    rawQr: whatsappRuntime.qr,
+    status: whatsappRuntime.status,
+    message: whatsappRuntime.message,
+    phone: whatsappRuntime.phone || businessPhone,
+    lastUpdate: whatsappRuntime.lastUpdate,
+    starting: whatsappRuntime.starting,
+    cloudConnected: Boolean(token && phoneNumberId),
     webhookReady: Boolean(verifyToken),
     businessPhone,
     phoneNumberId: phoneNumberId ? `${phoneNumberId.slice(0, 4)}...${phoneNumberId.slice(-4)}` : '',
@@ -361,10 +583,21 @@ const createWhatsAppMessage = async ({
 };
 
 const sendWhatsAppTextMessage = async (to, text) => {
+  if (whatsappRuntime.connected && whatsappRuntime.socket) {
+    const result = await whatsappRuntime.socket.sendMessage(getWhatsAppJid(to), { text });
+    return {
+      configured: true,
+      mode: 'qrcode',
+      status: 'enviada',
+      providerMessageId: result?.key?.id || '',
+      payload: result,
+    };
+  }
+
   const token = process.env.WHATSAPP_CLOUD_TOKEN || process.env.META_WHATSAPP_TOKEN || '';
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '';
   if (!token || !phoneNumberId) {
-    return { configured: false, status: 'aguardando_configuracao', providerMessageId: '' };
+    return { configured: false, mode: 'qrcode', status: 'aguardando_qrcode', providerMessageId: '' };
   }
 
   const response = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
@@ -4240,6 +4473,20 @@ app.get('/api/admin/whatsapp/status', authRequired, requirePermission('whatsapp'
   });
 });
 
+app.post('/api/admin/whatsapp/connect', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const force = Boolean(req.body?.force);
+  const status = await startWhatsAppQrSession({ force });
+  res.json({ ...status, visibility: isMasterAdminUser(req.user) ? 'todos' : 'proprios' });
+});
+
+app.post('/api/admin/whatsapp/disconnect', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  if (!isMasterAdminUser(req.user)) {
+    return res.status(403).json({ message: 'Apenas o ADM master pode desconectar o WhatsApp oficial.' });
+  }
+  const status = await disconnectWhatsAppQrSession();
+  res.json({ ...status, visibility: 'todos' });
+});
+
 app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('whatsapp'), async (req, res) => {
   const visibleLeads = isMasterAdminUser(req.user)
     ? await db.all('SELECT * FROM leads WHERE telefone IS NOT NULL AND telefone != ""')
@@ -6077,4 +6324,7 @@ io.on('connection', (socket) => {
 // --- INICIAR SERVIDOR ---
 server.listen(PORT, () => {
   console.log(`Backend rodando em http://localhost:${PORT}`);
+  if (fs.existsSync(WHATSAPP_AUTH_DIR)) {
+    startWhatsAppQrSession().catch(error => console.error('Erro ao restaurar sessão WhatsApp:', error));
+  }
 });
