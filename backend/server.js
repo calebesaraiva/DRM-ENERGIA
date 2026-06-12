@@ -98,6 +98,7 @@ const DEFAULT_PERMISSIONS = {
   orcamentos: false,
   contratos: false,
   ordensServico: false,
+  whatsapp: false,
   precosSistemas: false,
   financeiro: false,
   equipeTecnica: false,
@@ -126,6 +127,7 @@ const INTERNAL_USERS = [
       orcamentos: true,
       contratos: true,
       ordensServico: true,
+      whatsapp: true,
       precosSistemas: true,
       financeiro: true,
       equipeTecnica: true,
@@ -149,6 +151,7 @@ const INTERNAL_USERS = [
       orcamentos: true,
       contratos: true,
       ordensServico: true,
+      whatsapp: true,
       precosSistemas: true,
       equipeTecnica: true,
     },
@@ -165,6 +168,7 @@ const INTERNAL_USERS = [
       leads: true,
       orcamentos: true,
       contratos: true,
+      whatsapp: true,
     },
   },
   {
@@ -179,6 +183,7 @@ const INTERNAL_USERS = [
       leads: true,
       orcamentos: true,
       contratos: true,
+      whatsapp: true,
     },
   },
   {
@@ -193,6 +198,7 @@ const INTERNAL_USERS = [
       leads: true,
       orcamentos: true,
       contratos: true,
+      whatsapp: true,
     },
   },
 ];
@@ -234,6 +240,155 @@ const buildWhatsAppLink = (phone, text) => {
   const normalizedPhone = normalizeWhatsAppPhone(phone) || DEFAULT_WHATSAPP_PHONE;
   const encoded = encodeURIComponent(text || 'Ola, vim do site e quero uma proposta de energia solar.');
   return `https://api.whatsapp.com/send?phone=${normalizedPhone}&text=${encoded}`;
+};
+
+const getWhatsAppProviderStatus = () => {
+  const token = process.env.WHATSAPP_CLOUD_TOKEN || process.env.META_WHATSAPP_TOKEN || '';
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '';
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || process.env.META_WHATSAPP_VERIFY_TOKEN || '';
+  const businessPhone = normalizeWhatsAppPhone(process.env.WHATSAPP_BUSINESS_PHONE || process.env.META_WHATSAPP_BUSINESS_PHONE || '');
+  return {
+    connected: Boolean(token && phoneNumberId),
+    webhookReady: Boolean(verifyToken),
+    businessPhone,
+    phoneNumberId: phoneNumberId ? `${phoneNumberId.slice(0, 4)}...${phoneNumberId.slice(-4)}` : '',
+    missing: [
+      !token ? 'WHATSAPP_CLOUD_TOKEN' : null,
+      !phoneNumberId ? 'WHATSAPP_PHONE_NUMBER_ID' : null,
+      !verifyToken ? 'WHATSAPP_VERIFY_TOKEN' : null,
+    ].filter(Boolean),
+  };
+};
+
+const canAccessWhatsAppConversation = (user, conversation = {}) => (
+  isMasterAdminUser(user) || Number(conversation.assignedUserId) === Number(user?.id)
+);
+
+const getWhatsAppConversationById = async (id) => db.get('SELECT * FROM whatsapp_conversations WHERE id = ?', id);
+
+const upsertWhatsAppConversation = async ({
+  leadId = null,
+  nome = '',
+  telefone = '',
+  assignedUserId = null,
+  assignedUserName = '',
+  status = 'Aberta',
+} = {}) => {
+  const phone = normalizeWhatsAppPhone(telefone);
+  if (!phone) return null;
+
+  let conversation = await db.get('SELECT * FROM whatsapp_conversations WHERE clienteTelefone = ?', phone);
+  const now = new Date().toISOString();
+  if (conversation) {
+    const nextLeadId = conversation.leadId || leadId || null;
+    const nextOwnerId = conversation.assignedUserId || assignedUserId || null;
+    const nextOwnerName = conversation.assignedUserName || assignedUserName || null;
+    await db.run(
+      `UPDATE whatsapp_conversations
+       SET leadId = ?, clienteNome = ?, assignedUserId = ?, assignedUserName = ?, status = COALESCE(status, ?), updatedAt = ?
+       WHERE id = ?`,
+      nextLeadId,
+      conversation.clienteNome || nome || phone,
+      nextOwnerId,
+      nextOwnerName,
+      status,
+      now,
+      conversation.id
+    );
+    return getWhatsAppConversationById(conversation.id);
+  }
+
+  const result = await db.run(
+    `INSERT INTO whatsapp_conversations
+      (leadId, clienteNome, clienteTelefone, assignedUserId, assignedUserName, status, lastMessage, lastMessageAt, unreadCount, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, '', ?, 0, ?, ?)`,
+    leadId,
+    nome || phone,
+    phone,
+    assignedUserId,
+    assignedUserName,
+    status,
+    now,
+    now,
+    now
+  );
+  return getWhatsAppConversationById(result.lastID);
+};
+
+const createWhatsAppMessage = async ({
+  conversationId,
+  direction = 'incoming',
+  messageType = 'text',
+  text = '',
+  providerMessageId = '',
+  status = 'recebida',
+  senderId = null,
+  senderName = '',
+  rawPayload = null,
+} = {}) => {
+  const now = new Date().toISOString();
+  const result = await db.run(
+    `INSERT INTO whatsapp_messages
+      (conversationId, direction, messageType, text, providerMessageId, status, senderId, senderName, createdAt, rawPayload)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    conversationId,
+    direction,
+    messageType,
+    text,
+    providerMessageId,
+    status,
+    senderId,
+    senderName,
+    now,
+    rawPayload ? JSON.stringify(rawPayload) : null
+  );
+  await db.run(
+    `UPDATE whatsapp_conversations
+     SET lastMessage = ?, lastMessageAt = ?, unreadCount = unreadCount + ?, updatedAt = ?
+     WHERE id = ?`,
+    text,
+    now,
+    direction === 'incoming' ? 1 : 0,
+    now,
+    conversationId
+  );
+  return db.get('SELECT * FROM whatsapp_messages WHERE id = ?', result.lastID);
+};
+
+const sendWhatsAppTextMessage = async (to, text) => {
+  const token = process.env.WHATSAPP_CLOUD_TOKEN || process.env.META_WHATSAPP_TOKEN || '';
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '';
+  if (!token || !phoneNumberId) {
+    return { configured: false, status: 'aguardando_configuracao', providerMessageId: '' };
+  }
+
+  const response = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: normalizeWhatsAppPhone(to),
+      type: 'text',
+      text: { preview_url: false, body: text },
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data?.error?.message || 'Falha ao enviar mensagem pela API do WhatsApp.';
+    const error = new Error(message);
+    error.payload = data;
+    throw error;
+  }
+  return {
+    configured: true,
+    status: 'enviada',
+    providerMessageId: data?.messages?.[0]?.id || '',
+    payload: data,
+  };
 };
 
 const getAppUrl = () => String(process.env.APP_URL || 'http://127.0.0.1:5173').replace(/\/+$/, '');
@@ -2487,6 +2642,37 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       createdAt TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS whatsapp_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      leadId INTEGER,
+      clienteNome TEXT,
+      clienteTelefone TEXT NOT NULL,
+      assignedUserId INTEGER,
+      assignedUserName TEXT,
+      status TEXT DEFAULT 'Aberta',
+      lastMessage TEXT,
+      lastMessageAt TEXT,
+      unreadCount INTEGER DEFAULT 0,
+      createdAt TEXT,
+      updatedAt TEXT,
+      UNIQUE(clienteTelefone)
+    );
+
+    CREATE TABLE IF NOT EXISTS whatsapp_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversationId INTEGER NOT NULL,
+      direction TEXT NOT NULL,
+      messageType TEXT DEFAULT 'text',
+      text TEXT,
+      providerMessageId TEXT,
+      status TEXT,
+      senderId INTEGER,
+      senderName TEXT,
+      createdAt TEXT,
+      rawPayload TEXT,
+      FOREIGN KEY (conversationId) REFERENCES whatsapp_conversations(id)
+    );
+
     CREATE TABLE IF NOT EXISTS tabelas_precos_sistemas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT NOT NULL,
@@ -2630,6 +2816,9 @@ const sendOrcamentoPdf = async (res, orcamento) => {
 
     CREATE INDEX IF NOT EXISTS idx_lead_redirect_logs_createdAt ON lead_redirect_logs(createdAt);
     CREATE INDEX IF NOT EXISTS idx_lead_redirect_logs_sellerPhone ON lead_redirect_logs(sellerPhone);
+    CREATE INDEX IF NOT EXISTS idx_whatsapp_conversations_assigned ON whatsapp_conversations(assignedUserId);
+    CREATE INDEX IF NOT EXISTS idx_whatsapp_conversations_updated ON whatsapp_conversations(updatedAt);
+    CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_conversation ON whatsapp_messages(conversationId, createdAt);
   `);
 
   await db.run(
@@ -2830,6 +3019,13 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       await db.run(
         'UPDATE usuarios SET permissions = ? WHERE id = ?',
         JSON.stringify(mergePermissions({ ...rawPermissions, precosSistemas: true })),
+        savedUser.id
+      );
+    }
+    if (rawPermissions.leads === true && typeof rawPermissions.whatsapp === 'undefined') {
+      await db.run(
+        'UPDATE usuarios SET permissions = ? WHERE id = ?',
+        JSON.stringify(mergePermissions({ ...rawPermissions, whatsapp: true })),
         savedUser.id
       );
     }
@@ -4029,6 +4225,166 @@ app.post('/api/admin/leads', authRequired, requirePermission('leads'), async (re
   const lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
   io.emit('novo_lead', lead);
   res.status(201).json(lead);
+});
+
+app.get('/api/admin/whatsapp/status', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  res.json({
+    ...getWhatsAppProviderStatus(),
+    webhookUrl: `${getAppUrl()}/api/whatsapp/webhook`,
+    visibility: isMasterAdminUser(req.user) ? 'todos' : 'proprios',
+  });
+});
+
+app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const visibleLeads = isMasterAdminUser(req.user)
+    ? await db.all('SELECT * FROM leads WHERE telefone IS NOT NULL AND telefone != ""')
+    : await db.all('SELECT * FROM leads WHERE assignedUserId = ? AND telefone IS NOT NULL AND telefone != ""', req.user.id);
+
+  for (const lead of visibleLeads) {
+    await upsertWhatsAppConversation({
+      leadId: lead.id,
+      nome: lead.nome,
+      telefone: lead.telefone,
+      assignedUserId: lead.assignedUserId,
+      assignedUserName: lead.assignedUserName,
+    });
+  }
+
+  const conversations = isMasterAdminUser(req.user)
+    ? await db.all('SELECT * FROM whatsapp_conversations ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC')
+    : await db.all(
+      'SELECT * FROM whatsapp_conversations WHERE assignedUserId = ? ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC',
+      req.user.id
+    );
+
+  res.json(conversations);
+});
+
+app.get('/api/admin/whatsapp/conversations/:id/messages', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const conversation = await getWhatsAppConversationById(req.params.id);
+  if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+  if (!canAccessWhatsAppConversation(req.user, conversation)) {
+    return res.status(403).json({ message: 'Você não tem acesso a esta conversa.' });
+  }
+
+  await db.run('UPDATE whatsapp_conversations SET unreadCount = 0 WHERE id = ?', conversation.id);
+  const messages = await db.all('SELECT * FROM whatsapp_messages WHERE conversationId = ? ORDER BY createdAt ASC, id ASC', conversation.id);
+  res.json(messages);
+});
+
+app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const text = String(req.body.text || '').trim();
+  if (!text) return res.status(400).json({ message: 'Digite uma mensagem para enviar.' });
+
+  const conversation = await getWhatsAppConversationById(req.params.id);
+  if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+  if (!canAccessWhatsAppConversation(req.user, conversation)) {
+    return res.status(403).json({ message: 'Você não tem acesso a esta conversa.' });
+  }
+
+  try {
+    const providerResult = await sendWhatsAppTextMessage(conversation.clienteTelefone, text);
+    const message = await createWhatsAppMessage({
+      conversationId: conversation.id,
+      direction: 'outgoing',
+      text,
+      providerMessageId: providerResult.providerMessageId,
+      status: providerResult.status,
+      senderId: req.user.id,
+      senderName: req.user.nome || req.user.username,
+      rawPayload: providerResult.payload || providerResult,
+    });
+    const updatedConversation = await getWhatsAppConversationById(conversation.id);
+    io.emit('whatsapp_message_created', { message, conversation: updatedConversation });
+    io.emit('whatsapp_conversation_updated', updatedConversation);
+    res.status(201).json({ message, conversation: updatedConversation, provider: providerResult });
+  } catch (error) {
+    console.error('Erro ao enviar WhatsApp:', error);
+    res.status(502).json({ message: error.message || 'Não foi possível enviar pelo WhatsApp agora.' });
+  }
+});
+
+app.get('/api/whatsapp/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || process.env.META_WHATSAPP_VERIFY_TOKEN || '';
+
+  if (mode === 'subscribe' && verifyToken && token === verifyToken) {
+    return res.status(200).send(challenge);
+  }
+  return res.sendStatus(403);
+});
+
+app.post('/api/whatsapp/webhook', async (req, res) => {
+  res.sendStatus(200);
+
+  try {
+    const entries = Array.isArray(req.body?.entry) ? req.body.entry : [];
+    for (const entry of entries) {
+      const changes = Array.isArray(entry.changes) ? entry.changes : [];
+      for (const change of changes) {
+        const value = change.value || {};
+        const contacts = Array.isArray(value.contacts) ? value.contacts : [];
+        const messages = Array.isArray(value.messages) ? value.messages : [];
+        for (const incoming of messages) {
+          const phone = normalizeWhatsAppPhone(incoming.from);
+          if (!phone) continue;
+
+          const contact = contacts.find(item => normalizeWhatsAppPhone(item.wa_id) === phone) || {};
+          const name = contact.profile?.name || phone;
+          let lead = await db.get('SELECT * FROM leads WHERE telefone = ? OR telefone = ?', phone, phone.replace(/^55/, ''));
+          let owner = null;
+
+          if (!lead) {
+            owner = await getNextLeadOwner();
+            const result = await db.run(
+              `INSERT INTO leads
+                (nome, telefone, email, cidade, origem, status, dataCadastro, assignedUserId, assignedUserName, observacoes, tipoCadastro, criadoPorId, criadoPorNome)
+               VALUES (?, ?, '', '', 'WhatsApp', 'Novo', ?, ?, ?, 'Mensagem recebida pelo WhatsApp conectado.', 'site', NULL, 'WhatsApp')`,
+              name,
+              phone,
+              new Date().toISOString().split('T')[0],
+              owner.id,
+              owner.nome
+            );
+            lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
+            io.emit('novo_lead', lead);
+          } else if (lead.assignedUserId) {
+            owner = { id: lead.assignedUserId, nome: lead.assignedUserName };
+          } else {
+            owner = await getNextLeadOwner();
+            await db.run('UPDATE leads SET assignedUserId = ?, assignedUserName = ? WHERE id = ?', owner.id, owner.nome, lead.id);
+            lead = await db.get('SELECT * FROM leads WHERE id = ?', lead.id);
+            io.emit('novo_lead', lead);
+          }
+
+          const text = incoming.text?.body || incoming.button?.text || incoming.interactive?.button_reply?.title || `[${incoming.type || 'mensagem'}]`;
+          const conversation = await upsertWhatsAppConversation({
+            leadId: lead.id,
+            nome: lead.nome || name,
+            telefone: phone,
+            assignedUserId: owner?.id || lead.assignedUserId,
+            assignedUserName: owner?.nome || lead.assignedUserName,
+          });
+          const message = await createWhatsAppMessage({
+            conversationId: conversation.id,
+            direction: 'incoming',
+            messageType: incoming.type || 'text',
+            text,
+            providerMessageId: incoming.id || '',
+            status: 'recebida',
+            rawPayload: incoming,
+          });
+          const updatedConversation = await getWhatsAppConversationById(conversation.id);
+          io.emit('whatsapp_message_created', { message, conversation: updatedConversation });
+          io.emit('whatsapp_conversation_updated', updatedConversation);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao processar webhook do WhatsApp:', error);
+  }
 });
 
 app.get('/api/admin/round-robin-leads', authRequired, requirePermission('dashboard'), async (req, res) => {

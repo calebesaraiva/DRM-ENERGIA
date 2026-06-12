@@ -18,6 +18,7 @@ const permissionLabels = {
   orcamentos: 'Orçamentos',
   contratos: 'Contratos',
   ordensServico: 'O.S',
+  whatsapp: 'WhatsApp',
   precosSistemas: 'Preço dos Sistemas',
   financeiro: 'Financeiro',
   equipeTecnica: 'Equipe técnica',
@@ -34,6 +35,7 @@ const permissionDescriptions = {
   orcamentos: 'Visualiza simulações e propostas',
   contratos: 'Gera e acompanha contratos',
   ordensServico: 'Abre e acompanha ordens de serviço',
+  whatsapp: 'Atende conversas conectadas ao WhatsApp',
   precosSistemas: 'Calcula preço final dos sistemas',
   financeiro: 'Acessa números financeiros',
   equipeTecnica: 'Acessa rotinas técnicas',
@@ -77,6 +79,9 @@ const SidebarIcon = ({ name }) => {
     ),
     leads: (
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.3 7 13 7 13s7-7.7 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z" /></svg>
+    ),
+    whatsapp: (
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2A10 10 0 0 0 3.6 17.4L2.3 22l4.8-1.2A10 10 0 1 0 12 2Zm5.4 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.5-2.8-1.2-4.6-4-4.8-4.2-.1-.2-1.1-1.5-1.1-2.9 0-1.4.7-2.1 1-2.4.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .6l-.3.5-.4.5c-.1.1-.2.3-.1.5.2.3.7 1.1 1.6 1.9 1.1.9 2 1.3 2.3 1.4.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.3.7-.2.2.1 1.6.8 1.9.9.3.1.4.2.5.3.1.2.1.8-.1 1.4Z" /></svg>
     ),
     orcamentos: (
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5ZM8 12h8v2H8v-2Zm0 4h8v2H8v-2Z" /></svg>
@@ -476,7 +481,7 @@ const getInitialAdminUser = () => {
 const resolveInitialTab = (user, pathname = '') => {
   if (pathname === '/admin/leads') return 'leads';
   if (!user) return 'leads';
-  const firstTab = ['dashboard', 'leads', 'orcamentos', 'contratos', 'equipeTecnica', 'ordensServico', 'precosSistemas', 'clientes', 'financeiro', 'usuarios']
+  const firstTab = ['dashboard', 'leads', 'whatsapp', 'orcamentos', 'contratos', 'equipeTecnica', 'ordensServico', 'precosSistemas', 'clientes', 'financeiro', 'usuarios']
     .find(permission => user.role === 'ADM' || user.permissions?.[permission]);
   return firstTab === 'equipeTecnica' ? 'projetos' : firstTab || 'leads';
 };
@@ -495,6 +500,12 @@ const AdminDashboard = () => {
   const [leadSourceFilter, setLeadSourceFilter] = useState('todos');
   const [showManualLeadForm, setShowManualLeadForm] = useState(false);
   const [manualLeadForm, setManualLeadForm] = useState(emptyManualLeadForm);
+  const [whatsappStatus, setWhatsappStatus] = useState(null);
+  const [whatsappConversations, setWhatsappConversations] = useState([]);
+  const [selectedWhatsappConversation, setSelectedWhatsappConversation] = useState(null);
+  const [whatsappMessages, setWhatsappMessages] = useState([]);
+  const [whatsappReply, setWhatsappReply] = useState('');
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [orcamentoSearch, setOrcamentoSearch] = useState('');
   const [orcClientSearch, setOrcClientSearch] = useState('');
   const [orcClientPage, setOrcClientPage] = useState(1);
@@ -583,7 +594,7 @@ const AdminDashboard = () => {
   }), []);
 
   const hasPermission = useCallback((permission) => (
-    adminUser.role === 'ADM' || adminUser.permissions?.[permission]
+    adminUser.role === 'ADM' || adminUser.permissions?.[permission] || (permission === 'whatsapp' && adminUser.permissions?.leads)
   ), [adminUser.permissions, adminUser.role]);
 
   const isMasterAdmin = adminUser.role === 'ADM' && String(adminUser.username || '').toLowerCase() === 'deivson';
@@ -607,6 +618,7 @@ const AdminDashboard = () => {
       tabs: [
         { id: 'clientes', label: 'Clientes', permission: 'clientes' },
         { id: 'leads', label: 'Leads', permission: 'leads' },
+        { id: 'whatsapp', label: 'WhatsApp', permission: 'whatsapp' },
         { id: 'orcamentos', label: 'Orçamentos', permission: 'orcamentos' },
         { id: 'contratos', label: 'Contratos', permission: 'contratos' },
         { id: 'procuracoes', label: 'Procurações', permission: 'contratos' },
@@ -647,6 +659,7 @@ const AdminDashboard = () => {
     { id: 'qa-clientes', label: 'Clientes', tab: 'clientes', permission: 'clientes', group: 'Comercial', description: 'Base comercial e cadastro de clientes.', badge: clientes.length },
     { id: 'qa-leads-lista', label: 'Leads', tab: 'leads', permission: 'leads', group: 'Comercial', description: 'Lista e filtros dos leads captados.', badge: leads.filter(item => item.status === 'Novo').length },
     { id: 'qa-leads', label: 'Cadastrar lead', tab: 'leads', action: 'newLead', permission: 'leads', group: 'Ações diretas', description: 'Abre o cadastro rápido de lead.', badge: leads.filter(item => item.status === 'Novo').length },
+    { id: 'qa-whatsapp', label: 'WhatsApp', tab: 'whatsapp', permission: 'whatsapp', group: 'Comercial', description: 'Atender conversas no painel.', badge: whatsappConversations.reduce((total, item) => total + Number(item.unreadCount || 0), 0) },
     { id: 'qa-orcamentos', label: 'Orçamentos', tab: 'orcamentos', permission: 'orcamentos', group: 'Comercial', description: 'Consultar propostas por cliente.', badge: orcamentos.length },
     { id: 'qa-novo-orcamento', label: 'Novo orçamento', tab: 'orcamentos', action: 'newBudget', permission: 'orcamentos', group: 'Ações diretas', description: 'Criar orçamento de forma rápida.', badge: clientes.length },
     { id: 'qa-contratos-lista', label: 'Contratos', tab: 'contratos', permission: 'contratos', group: 'Comercial', description: 'Consultar contratos gerados.', badge: contratos.length },
@@ -995,6 +1008,10 @@ const AdminDashboard = () => {
       calls.push(request('/api/admin/leads').then(setLeads));
       calls.push(request('/api/admin/atividades').then(setAtividades));
     }
+    if (user.role === 'ADM' || user.permissions?.whatsapp || user.permissions?.leads) {
+      calls.push(request('/api/admin/whatsapp/status').then(setWhatsappStatus));
+      calls.push(request('/api/admin/whatsapp/conversations').then(setWhatsappConversations));
+    }
     if (user.role === 'ADM' || user.permissions?.orcamentos) {
       calls.push(request('/api/admin/orcamentos').then(setOrcamentos));
     }
@@ -1133,6 +1150,26 @@ const AdminDashboard = () => {
       });
     };
 
+    const handleWhatsappConversation = (conversation) => {
+      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson') || Number(conversation.assignedUserId) === Number(loggedInUser.id);
+      if (!canSee) return;
+      setWhatsappConversations(prev => {
+        const exists = prev.some(item => item.id === conversation.id);
+        const next = exists ? prev.map(item => item.id === conversation.id ? conversation : item) : [conversation, ...prev];
+        return next.sort((a, b) => String(b.lastMessageAt || b.updatedAt || '').localeCompare(String(a.lastMessageAt || a.updatedAt || '')));
+      });
+      setSelectedWhatsappConversation(prev => prev?.id === conversation.id ? conversation : prev);
+    };
+
+    const handleWhatsappMessage = ({ message, conversation }) => {
+      handleWhatsappConversation(conversation);
+      setWhatsappMessages(prev => (
+        selectedWhatsappConversation?.id === message.conversationId && !prev.some(item => item.id === message.id)
+          ? [...prev, message]
+          : prev
+      ));
+    };
+
     socket.on('novo_orcamento', handleNewOrcamento);
     socket.on('novo_lead', handleNewLead);
     socket.on('contrato_atualizado', handleContratoAtualizado);
@@ -1140,6 +1177,8 @@ const AdminDashboard = () => {
     socket.on('atividade_criada', handleAtividadeCriada);
     socket.on('projeto_foto_criada', handleProjetoFotoCriada);
     socket.on('os_atualizada', handleOsAtualizada);
+    socket.on('whatsapp_conversation_updated', handleWhatsappConversation);
+    socket.on('whatsapp_message_created', handleWhatsappMessage);
 
     return () => {
       socket.off('novo_orcamento', handleNewOrcamento);
@@ -1149,14 +1188,58 @@ const AdminDashboard = () => {
       socket.off('atividade_criada', handleAtividadeCriada);
       socket.off('projeto_foto_criada', handleProjetoFotoCriada);
       socket.off('os_atualizada', handleOsAtualizada);
+      socket.off('whatsapp_conversation_updated', handleWhatsappConversation);
+      socket.off('whatsapp_message_created', handleWhatsappMessage);
     };
-  }, [loadData, navigate]);
+  }, [loadData, navigate, selectedWhatsappConversation?.id, showToast]);
 
   const handleSair = () => {
     localStorage.removeItem('role');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/');
+  };
+
+  const openWhatsappConversation = async (conversation) => {
+    setSelectedWhatsappConversation(conversation);
+    setWhatsappLoading(true);
+    try {
+      const messages = await request(`/api/admin/whatsapp/conversations/${conversation.id}/messages`);
+      setWhatsappMessages(messages);
+      setWhatsappConversations(prev => prev.map(item => item.id === conversation.id ? { ...item, unreadCount: 0 } : item));
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  const sendWhatsappReply = async (event) => {
+    event.preventDefault();
+    if (!selectedWhatsappConversation || !whatsappReply.trim()) return;
+    const text = whatsappReply.trim();
+    setWhatsappReply('');
+    setWhatsappLoading(true);
+    try {
+      const data = await request(`/api/admin/whatsapp/conversations/${selectedWhatsappConversation.id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      });
+      setWhatsappMessages(prev => [...prev.filter(item => item.id !== data.message.id), data.message]);
+      setSelectedWhatsappConversation(data.conversation);
+      setWhatsappConversations(prev => {
+        const exists = prev.some(item => item.id === data.conversation.id);
+        return exists ? prev.map(item => item.id === data.conversation.id ? data.conversation : item) : [data.conversation, ...prev];
+      });
+      if (data.provider?.configured === false) {
+        showToast('Mensagem salva. Configure a API oficial do WhatsApp na VPS para envio real.', 'warning');
+      }
+    } catch (err) {
+      setWhatsappReply(text);
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappLoading(false);
+    }
   };
 
   const updateLeadStatus = async (leadId, status) => {
@@ -2944,6 +3027,126 @@ const AdminDashboard = () => {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {activeTab === 'whatsapp' && (
+            <div className="admin-section whatsapp-screen">
+              <div className={`whatsapp-status-card ${whatsappStatus?.connected ? 'connected' : 'pending'}`}>
+                <div>
+                  <span className="section-kicker">Atendimento WhatsApp</span>
+                  <h3>{whatsappStatus?.connected ? 'WhatsApp conectado ao painel' : 'Conectar WhatsApp oficial'}</h3>
+                  <p>
+                    {whatsappStatus?.connected
+                      ? 'As conversas ficam vinculadas ao responsável do lead. Consultores veem apenas os próprios atendimentos.'
+                      : 'Configure a API oficial da Meta na VPS para enviar e receber mensagens dentro do sistema.'}
+                  </p>
+                </div>
+                <div className="whatsapp-status-badges">
+                  <span>{whatsappStatus?.visibility === 'todos' ? 'Visão master' : 'Meus leads'}</span>
+                  <span>{whatsappStatus?.webhookReady ? 'Webhook pronto' : 'Webhook pendente'}</span>
+                </div>
+              </div>
+
+              {!whatsappStatus?.connected && (
+                <div className="admin-card whatsapp-config-card">
+                  <strong>Para ativar o envio real</strong>
+                  <p>Defina as variáveis `WHATSAPP_CLOUD_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` e `WHATSAPP_VERIFY_TOKEN` na VPS. Depois, no painel da Meta, use este webhook:</p>
+                  <code>{whatsappStatus?.webhookUrl || 'https://drmenergiasolar.com.br/api/whatsapp/webhook'}</code>
+                </div>
+              )}
+
+              <div className="whatsapp-layout">
+                <aside className="whatsapp-inbox">
+                  <div className="whatsapp-inbox-head">
+                    <div>
+                      <h4>Conversas</h4>
+                      <p>{whatsappConversations.length} atendimento{whatsappConversations.length === 1 ? '' : 's'}</p>
+                    </div>
+                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => loadData(adminUser).catch(err => showToast(err.message, 'error'))}>Atualizar</button>
+                  </div>
+
+                  <div className="whatsapp-conversation-list">
+                    {whatsappConversations.map(conversation => (
+                      <button
+                        key={conversation.id}
+                        type="button"
+                        className={`whatsapp-conversation ${selectedWhatsappConversation?.id === conversation.id ? 'active' : ''}`}
+                        onClick={() => openWhatsappConversation(conversation)}
+                      >
+                        <span className="wa-avatar">{String(conversation.clienteNome || 'W').charAt(0)}</span>
+                        <span className="wa-conversation-main">
+                          <strong>{conversation.clienteNome || conversation.clienteTelefone}</strong>
+                          <small>{conversation.lastMessage || 'Sem mensagens no histórico'}</small>
+                          <em>{conversation.assignedUserName || 'Sem responsável'} • {conversation.clienteTelefone}</em>
+                        </span>
+                        {Number(conversation.unreadCount || 0) > 0 && <span className="wa-unread">{conversation.unreadCount}</span>}
+                      </button>
+                    ))}
+                    {whatsappConversations.length === 0 && (
+                      <div className="whatsapp-empty">
+                        <strong>Nenhuma conversa ainda</strong>
+                        <p>Quando um lead tiver telefone ou chegar mensagem pelo webhook, ele aparece aqui.</p>
+                      </div>
+                    )}
+                  </div>
+                </aside>
+
+                <section className="whatsapp-chat">
+                  {selectedWhatsappConversation ? (
+                    <>
+                      <div className="whatsapp-chat-head">
+                        <div>
+                          <h4>{selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone}</h4>
+                          <p>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Sem responsável'}</p>
+                        </div>
+                        <a
+                          className="btn btn-outline btn-sm-admin"
+                          href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Abrir WhatsApp
+                        </a>
+                      </div>
+
+                      <div className="whatsapp-messages">
+                        {whatsappLoading && whatsappMessages.length === 0 && <p className="muted-text">Carregando mensagens...</p>}
+                        {whatsappMessages.map(message => (
+                          <div key={message.id} className={`whatsapp-message ${message.direction === 'outgoing' ? 'sent' : 'received'}`}>
+                            <p>{message.text}</p>
+                            <span>{message.senderName || (message.direction === 'outgoing' ? 'DRM' : selectedWhatsappConversation.clienteNome)} • {message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : ''}</span>
+                          </div>
+                        ))}
+                        {!whatsappLoading && whatsappMessages.length === 0 && (
+                          <div className="whatsapp-empty chat-empty">
+                            <strong>Conversa pronta para iniciar</strong>
+                            <p>Envie a primeira mensagem quando a API oficial estiver conectada.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <form className="whatsapp-compose" onSubmit={sendWhatsappReply}>
+                        <textarea
+                          value={whatsappReply}
+                          onChange={(event) => setWhatsappReply(event.target.value)}
+                          placeholder="Digite a resposta para o cliente..."
+                          rows={3}
+                        />
+                        <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappReply.trim()}>
+                          Enviar mensagem
+                        </button>
+                      </form>
+                    </>
+                  ) : (
+                    <div className="whatsapp-no-chat">
+                      <span className="wa-avatar large">W</span>
+                      <h4>Selecione uma conversa</h4>
+                      <p>Atenda os leads pelo painel e mantenha o histórico centralizado por responsável.</p>
+                    </div>
+                  )}
+                </section>
+              </div>
             </div>
           )}
 
