@@ -718,6 +718,117 @@
   box-shadow: 0 5px 12px rgba(249, 115, 22, 0.22);
 }
 
+.quick-action-edit {
+  border-style: dashed;
+  color: #64748b;
+}
+
+.quick-action-edit .quick-action-icon {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.quick-action-edit:hover {
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.quick-action-editor-backdrop {
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.quick-action-editor-modal {
+  width: min(620px, 100%);
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+}
+
+.quick-action-editor-list {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.quick-action-option {
+  display: grid;
+  grid-template-columns: auto 34px 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-action-option:hover,
+.quick-action-option.active {
+  border-color: rgba(249, 115, 22, 0.45);
+  background: #fff7ed;
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.08);
+}
+
+.quick-action-option input {
+  width: 17px;
+  height: 17px;
+  accent-color: #f97316;
+}
+
+.quick-action-option-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.quick-action-option.active .quick-action-option-icon {
+  background: #ffedd5;
+  color: #f97316;
+}
+
+.quick-action-option-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.quick-action-option strong,
+.quick-action-option small {
+  display: block;
+}
+
+.quick-action-option strong {
+  color: #111827;
+  font-size: 0.92rem;
+}
+
+.quick-action-option small {
+  margin-top: 0.12rem;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.quick-action-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  flex-wrap: wrap;
+}
+
 .system-status {
   display: inline-flex;
   align-items: center;
@@ -5238,6 +5349,19 @@
     min-width: 18px;
     height: 18px;
     font-size: 0.66rem;
+  }
+
+  .quick-action-edit span:last-child {
+    display: none;
+  }
+
+  .quick-action-option {
+    grid-template-columns: auto 30px 1fr;
+    padding: 0.72rem;
+  }
+
+  .quick-action-editor-footer .btn {
+    flex: 1 1 100%;
   }
 
   .admin-body {

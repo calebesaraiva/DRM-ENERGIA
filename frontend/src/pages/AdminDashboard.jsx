@@ -119,6 +119,7 @@ const SidebarIcon = ({ name }) => {
 const LEADS_PER_PAGE = 8;
 
 const LEAD_STATUS_PRESETS = ['Novo', 'Em atendimento', 'Em negociação', 'Fechando', 'Proposta enviada', 'Convertido', 'Perdido'];
+const defaultQuickActionIds = ['qa-novo-orcamento', 'qa-leads', 'qa-contratos', 'qa-homologacao', 'qa-os'];
 const emptyManualLeadForm = {
   nome: '',
   telefone: '',
@@ -556,6 +557,13 @@ const AdminDashboard = () => {
   const [priceError, setPriceError] = useState('');
   const [quickModal, setQuickModal] = useState(null);
   const [adminUser] = useState(initialUser);
+  const [quickActionPrefs, setQuickActionPrefs] = useState(() => (
+    Array.isArray(initialUser.quickActions) ? initialUser.quickActions : null
+  ));
+  const [quickActionEditorOpen, setQuickActionEditorOpen] = useState(false);
+  const [quickActionDraft, setQuickActionDraft] = useState(() => (
+    Array.isArray(initialUser.quickActions) ? initialUser.quickActions : defaultQuickActionIds
+  ));
   const [error, setError] = useState('');
   const [comunicacoes, setComunicacoes] = useState(null);
   const [tabelasPrecos, setTabelasPrecos] = useState([]);
@@ -634,13 +642,14 @@ const AdminDashboard = () => {
 
   const tabs = navigationGroups.flatMap(group => group.tabs);
 
-  const quickActions = [
+  const availableQuickActions = [
     { id: 'qa-novo-orcamento', label: 'Novo orçamento', tab: 'orcamentos', action: 'newBudget', permission: 'orcamentos', badge: clientes.length },
     { id: 'qa-leads', label: 'Cadastrar lead', tab: 'leads', action: 'newLead', permission: 'leads', badge: leads.filter(item => item.status === 'Novo').length },
     { id: 'qa-contratos', label: 'Aprovar contrato', tab: 'contratos', permission: 'contratos', badge: contratos.filter(item => item.status === 'Pendente').length },
     { id: 'qa-homologacao', label: 'Homologação', tab: 'homologacao', permission: 'equipeTecnica', badge: projetos.filter(item => ['Pendência da concessionária', 'Reenviar projeto', 'Aguardando parecer de acesso', 'Vistoria reprovada'].includes(item.etapa)).length },
     { id: 'qa-os', label: 'O.S abertas', tab: 'ordensServico', permission: 'ordensServico', badge: ordensServico.filter(item => item.status === 'Aberta').length },
   ].filter(action => hasPermission(action.permission));
+  const quickActions = (quickActionPrefs === null ? availableQuickActions : availableQuickActions.filter(action => quickActionPrefs.includes(action.id)));
 
   const leadSummary = useMemo(() => {
     const countsByOwner = leads.reduce((acc, lead) => {
@@ -949,7 +958,12 @@ const AdminDashboard = () => {
   }, [headers, navigate]);
 
   const loadData = useCallback(async (user) => {
-    const calls = [];
+    const calls = [
+      request('/api/admin/quick-actions').then(data => {
+        setQuickActionPrefs(Array.isArray(data.quickActions) ? data.quickActions : null);
+        setQuickActionDraft(Array.isArray(data.quickActions) ? data.quickActions : defaultQuickActionIds);
+      }).catch(() => {}),
+    ];
 
     if (user.role === 'ADM' || user.permissions?.clientes) {
       calls.push(request('/api/admin/clientes').then(setClientes));
@@ -1748,6 +1762,41 @@ const AdminDashboard = () => {
     setActiveTab(action.tab);
   };
 
+  const openQuickActionEditor = () => {
+    const availableIds = availableQuickActions.map(action => action.id);
+    const current = quickActionPrefs === null ? availableIds : quickActionPrefs.filter(id => availableIds.includes(id));
+    setQuickActionDraft(current.length ? current : availableIds);
+    setQuickActionEditorOpen(true);
+  };
+
+  const toggleQuickActionDraft = (actionId) => {
+    setQuickActionDraft(prev => (
+      prev.includes(actionId)
+        ? prev.filter(id => id !== actionId)
+        : [...prev, actionId]
+    ));
+  };
+
+  const saveQuickActionPrefs = async () => {
+    if (quickActionDraft.length === 0) {
+      showToast('Selecione pelo menos uma ação rápida.', 'warning');
+      return;
+    }
+    try {
+      const data = await request('/api/admin/quick-actions', {
+        method: 'PUT',
+        body: JSON.stringify({ quickActions: quickActionDraft }),
+      });
+      setQuickActionPrefs(Array.isArray(data.quickActions) ? data.quickActions : null);
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      localStorage.setItem('user', JSON.stringify({ ...currentUser, quickActions: data.quickActions }));
+      setQuickActionEditorOpen(false);
+      showToast('Ações rápidas atualizadas.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const buildContractManualFromOrcamento = (orcamento, equipamento) => {
     const geracaoMensal = orcamento.dimensionamento?.geracao_estimada_kwh || '';
     const geracaoAnual = orcamento.dimensionamento?.geracao_anual_kwh || orcamento.dimensionamento?.geracao_anual_estimada_kwh || (geracaoMensal ? Number(geracaoMensal) * 12 : '');
@@ -2245,6 +2294,17 @@ const AdminDashboard = () => {
                   {Number(action.badge || 0) > 0 && <em>{action.badge}</em>}
                 </button>
               ))}
+              <button
+                type="button"
+                className="quick-action-btn quick-action-edit"
+                onClick={openQuickActionEditor}
+                title="Editar ações rápidas"
+              >
+                <span className="quick-action-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.3V21h3.7L18.8 9.9l-3.7-3.7L4 17.3Zm17.7-11.2c.4-.4.4-1 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0L16 4.2l3.7 3.7 2-1.8Z" /></svg>
+                </span>
+                <span>Editar</span>
+              </button>
             </div>
           </div>
           <div className="topbar-actions">
@@ -5137,6 +5197,42 @@ const AdminDashboard = () => {
           )}
         </div>
       </main>
+
+      {quickActionEditorOpen && (
+        <div className="contract-modal-backdrop quick-action-editor-backdrop">
+          <div className="quick-action-editor-modal" role="dialog" aria-modal="true" aria-labelledby="quick-action-editor-title">
+            <div className="contract-modal-header">
+              <div>
+                <span className="section-kicker">Ações rápidas</span>
+                <h3 id="quick-action-editor-title">Personalizar barra superior</h3>
+                <p>Escolha os atalhos que ficam visíveis no seu painel.</p>
+              </div>
+              <button type="button" className="lead-modal-close" onClick={() => setQuickActionEditorOpen(false)} aria-label="Fechar">×</button>
+            </div>
+            <div className="quick-action-editor-list">
+              {availableQuickActions.map(action => (
+                <label key={action.id} className={`quick-action-option ${quickActionDraft.includes(action.id) ? 'active' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={quickActionDraft.includes(action.id)}
+                    onChange={() => toggleQuickActionDraft(action.id)}
+                  />
+                  <span className="quick-action-option-icon"><SidebarIcon name={action.tab} /></span>
+                  <span>
+                    <strong>{action.label}</strong>
+                    <small>{permissionDescriptions[action.permission] || 'Atalho do painel'}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="quick-action-editor-footer">
+              <button type="button" className="btn btn-outline" onClick={() => setQuickActionDraft(availableQuickActions.map(action => action.id))}>Marcar todos</button>
+              <button type="button" className="btn btn-outline" onClick={() => setQuickActionEditorOpen(false)}>Cancelar</button>
+              <button type="button" className="btn btn-primary" onClick={saveQuickActionPrefs}>Salvar preferências</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showManualLeadForm && (
         <div className="contract-modal-backdrop manual-lead-backdrop">

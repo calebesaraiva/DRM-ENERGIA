@@ -210,6 +210,15 @@ const parsePermissions = (value) => {
   }
 };
 
+const parseQuickActions = (value) => {
+  try {
+    const parsed = value ? JSON.parse(value) : null;
+    return Array.isArray(parsed) ? parsed.filter(item => typeof item === 'string') : null;
+  } catch {
+    return null;
+  }
+};
+
 const can = (user, permission) => user?.permissions?.[permission] === true;
 const isMasterAdminUser = (user) => user?.role === 'ADM' && String(user?.username || '').toLowerCase() === 'deivson';
 
@@ -633,6 +642,7 @@ const sanitizeUser = (user) => ({
   whatsapp: user.whatsapp || '',
   role: user.role,
   permissions: user.permissions,
+  quickActions: parseQuickActions(user.quickActions),
   mustChangePassword: Boolean(user.mustChangePassword),
   emailVerified: hasVerifiedEmail(user),
   requiresEmailVerification: requiresEmailVerification(user),
@@ -2760,6 +2770,9 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingUsuarioColumns.includes('whatsapp')) {
     await db.exec('ALTER TABLE usuarios ADD COLUMN whatsapp TEXT');
   }
+  if (!existingUsuarioColumns.includes('quickActions')) {
+    await db.exec('ALTER TABLE usuarios ADD COLUMN quickActions TEXT');
+  }
   for (const [field, definition] of emailVerificationColumns) {
     if (!existingUsuarioColumns.includes(field)) {
       await db.exec(`ALTER TABLE usuarios ADD COLUMN ${field} ${definition}`);
@@ -3347,6 +3360,20 @@ app.get('/api/me', authRequired, async (req, res) => {
 
   const permissions = req.user.role === 'ADM' ? ADMIN_PERMISSIONS : mergePermissions();
   res.json({ user: { id: req.user.id, nome: req.user.nome, email: req.user.email, role: req.user.role, userType: 'cliente', permissions, emailVerified: hasVerifiedEmail(req.user), requiresEmailVerification: requiresEmailVerification(req.user) } });
+});
+
+app.get('/api/admin/quick-actions', authRequired, async (req, res) => {
+  if (req.user.userType !== 'interno') return res.status(403).json({ message: 'Apenas usuários internos podem configurar ações rápidas.' });
+  res.json({ quickActions: parseQuickActions(req.user.quickActions) });
+});
+
+app.put('/api/admin/quick-actions', authRequired, async (req, res) => {
+  if (req.user.userType !== 'interno') return res.status(403).json({ message: 'Apenas usuários internos podem configurar ações rápidas.' });
+  const quickActions = Array.isArray(req.body.quickActions)
+    ? req.body.quickActions.filter(item => typeof item === 'string').slice(0, 12)
+    : null;
+  await db.run('UPDATE usuarios SET quickActions = ? WHERE id = ?', quickActions ? JSON.stringify(quickActions) : null, req.user.id);
+  res.json({ quickActions });
 });
 
 app.get('/api/cliente/portal', authRequired, requireClientUser, async (req, res) => {
