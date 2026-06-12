@@ -289,6 +289,7 @@ const whatsappRuntime = {
   socket: null,
   starting: false,
   connected: false,
+  acceptIncomingAfter: 0,
   qr: '',
   qrDataUrl: '',
   status: 'desconectado',
@@ -303,22 +304,62 @@ const emitWhatsAppRuntimeStatus = () => {
 
 const getWhatsAppJid = (phone) => `${normalizeWhatsAppPhone(phone)}@s.whatsapp.net`;
 
+const getBaileysMessageTimestampMs = (message = {}) => {
+  const timestamp = message.messageTimestamp;
+  if (!timestamp) return 0;
+  if (typeof timestamp === 'number') return timestamp * 1000;
+  if (typeof timestamp === 'bigint') return Number(timestamp) * 1000;
+  if (typeof timestamp?.toNumber === 'function') return timestamp.toNumber() * 1000;
+  if (typeof timestamp?.low === 'number') return timestamp.low * 1000;
+  return 0;
+};
+
+const isSupportedIncomingWhatsAppJid = (remoteJid = '') => {
+  if (!remoteJid) return false;
+  if (remoteJid === 'status@broadcast') return false;
+  if (remoteJid.endsWith('@g.us')) return false;
+  if (remoteJid.endsWith('@broadcast')) return false;
+  if (remoteJid.endsWith('@newsletter')) return false;
+  return remoteJid.endsWith('@s.whatsapp.net') || remoteJid.endsWith('@lid');
+};
+
+const extractIncomingWhatsAppText = (content = {}) => {
+  const text = content.conversation
+    || content.extendedTextMessage?.text
+    || content.imageMessage?.caption
+    || content.videoMessage?.caption
+    || content.buttonsResponseMessage?.selectedDisplayText
+    || content.listResponseMessage?.title
+    || content.templateButtonReplyMessage?.selectedDisplayText
+    || '';
+
+  if (String(text).trim()) return String(text).trim();
+  if (
+    content.imageMessage
+    || content.videoMessage
+    || content.audioMessage
+    || content.documentMessage
+    || content.stickerMessage
+  ) {
+    return '[midia recebida]';
+  }
+  return '';
+};
+
 const handleIncomingWhatsAppWebMessage = async (message) => {
   try {
     const remoteJid = message.key?.remoteJid || '';
-    if (!remoteJid || remoteJid.endsWith('@g.us') || message.key?.fromMe) return;
+    if (message.key?.fromMe || !isSupportedIncomingWhatsAppJid(remoteJid)) return;
+
+    const timestampMs = getBaileysMessageTimestampMs(message);
+    if (whatsappRuntime.acceptIncomingAfter && timestampMs && timestampMs < whatsappRuntime.acceptIncomingAfter) return;
 
     const phone = getPhoneFromWhatsAppJid(remoteJid);
     if (!phone) return;
 
     const content = message.message || {};
-    const text = content.conversation
-      || content.extendedTextMessage?.text
-      || content.imageMessage?.caption
-      || content.videoMessage?.caption
-      || content.buttonsResponseMessage?.selectedDisplayText
-      || content.listResponseMessage?.title
-      || '[mensagem recebida]';
+    const text = extractIncomingWhatsAppText(content);
+    if (!text) return;
 
     let lead = await db.get('SELECT * FROM leads WHERE telefone = ? OR telefone = ?', phone, phone.replace(/^55/, ''));
     let owner = null;
@@ -419,6 +460,7 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
       }
 
       if (connection === 'open') {
+        whatsappRuntime.acceptIncomingAfter = Date.now() - 60000;
         whatsappRuntime.connected = true;
         whatsappRuntime.qr = '';
         whatsappRuntime.qrDataUrl = '';
@@ -3231,6 +3273,26 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     SET remoteJid = clienteTelefone || '@s.whatsapp.net'
     WHERE (remoteJid IS NULL OR remoteJid = '') AND clienteTelefone IS NOT NULL AND clienteTelefone != ''
   `);
+  await db.exec(`
+    UPDATE whatsapp_conversations
+    SET status = 'Arquivada', unreadCount = 0, updatedAt = CURRENT_TIMESTAMP
+    WHERE remoteJid LIKE '%@g.us'
+       OR remoteJid = 'status@broadcast'
+       OR remoteJid LIKE '%@broadcast'
+       OR remoteJid LIKE '%@newsletter'
+  `);
+  const pendingQueueCleaned = await getSetting('whatsappPendingQueueCleanedForNewInboxV1', false);
+  if (!pendingQueueCleaned) {
+    await db.exec(`
+      UPDATE whatsapp_conversations
+      SET status = 'Arquivada', unreadCount = 0, updatedAt = CURRENT_TIMESTAMP
+      WHERE status = 'Aguardando atendimento'
+    `);
+    await setSetting('whatsappPendingQueueCleanedForNewInboxV1', {
+      cleanedAt: new Date().toISOString(),
+      reason: 'Fila antiga arquivada para exibir apenas novas conversas individuais recebidas pelo WhatsApp.',
+    });
+  }
 
   const contratoColumns = await db.all('PRAGMA table_info(contratos)');
   const existingContratoColumns = contratoColumns.map(column => column.name);
@@ -4584,25 +4646,24 @@ app.post('/api/admin/whatsapp/disconnect', authRequired, requirePermission('what
 });
 
 app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('whatsapp'), async (req, res) => {
-  const visibleLeads = isMasterAdminUser(req.user)
-    ? await db.all('SELECT * FROM leads WHERE telefone IS NOT NULL AND telefone != ""')
-    : await db.all('SELECT * FROM leads WHERE assignedUserId = ? AND telefone IS NOT NULL AND telefone != ""', req.user.id);
-
-  for (const lead of visibleLeads) {
-    await upsertWhatsAppConversation({
-      leadId: lead.id,
-      nome: lead.nome,
-      telefone: lead.telefone,
-      assignedUserId: lead.assignedUserId,
-      assignedUserName: lead.assignedUserName,
-    });
-  }
+  const visibleWhere = `
+    status != 'Arquivada'
+    AND COALESCE(remoteJid, '') NOT LIKE '%@g.us'
+    AND COALESCE(remoteJid, '') != 'status@broadcast'
+    AND COALESCE(remoteJid, '') NOT LIKE '%@broadcast'
+    AND COALESCE(remoteJid, '') NOT LIKE '%@newsletter'
+  `;
 
   const conversations = isMasterAdminUser(req.user)
-    ? await db.all('SELECT * FROM whatsapp_conversations ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC')
+    ? await db.all(`
+      SELECT * FROM whatsapp_conversations
+      WHERE ${visibleWhere}
+      ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC
+    `)
     : await db.all(
       `SELECT * FROM whatsapp_conversations
-       WHERE assignedUserId = ? OR assignedUserId IS NULL OR status = 'Aguardando atendimento'
+       WHERE ${visibleWhere}
+         AND (assignedUserId = ? OR assignedUserId IS NULL OR status = 'Aguardando atendimento')
        ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC`,
       req.user.id
     );
