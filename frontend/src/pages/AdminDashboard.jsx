@@ -1038,6 +1038,11 @@ const AdminDashboard = () => {
         localStorage.removeItem('role');
         navigate('/sistema-drm');
       }
+      if (data.mustChangePassword) {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({ ...currentUser, mustChangePassword: true }));
+        navigate('/alterar-senha');
+      }
       if (data.requiresEmailVerification) {
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
         localStorage.setItem('user', JSON.stringify({ ...currentUser, requiresEmailVerification: true }));
@@ -1152,6 +1157,11 @@ const AdminDashboard = () => {
 
     if (!loggedInUser || !token) {
       navigate('/sistema-drm');
+      return;
+    }
+
+    if (loggedInUser.mustChangePassword) {
+      navigate('/alterar-senha');
       return;
     }
 

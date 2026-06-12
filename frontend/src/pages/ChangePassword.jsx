@@ -41,10 +41,18 @@ function ChangePassword() {
       }
       if (!response.ok) throw new Error(data?.message || 'Não foi possível alterar a senha.');
 
-      const user = JSON.parse(localStorage.getItem('user'));
-      localStorage.setItem('user', JSON.stringify({ ...user, mustChangePassword: false }));
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const nextUser = { ...user, mustChangePassword: false };
+      localStorage.setItem('user', JSON.stringify(nextUser));
       setMessage('Senha alterada com sucesso.');
-      setTimeout(() => navigate('/admin'), 700);
+      setTimeout(() => {
+        if (nextUser.requiresEmailVerification) {
+          navigate('/verificar-email');
+          return;
+        }
+        const isInternalUser = nextUser.userType === 'interno' || ['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(nextUser.role);
+        navigate(isInternalUser ? '/admin' : '/dashboard');
+      }, 700);
     } catch (err) {
       setError(err.message);
     }

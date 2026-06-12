@@ -64,14 +64,21 @@ const Login = ({ accessType: forcedAccessType = null }) => {
         throw new Error('Este acesso é exclusivo para clientes. Use o Sistema DRM.');
       }
 
-      if (data.user.requiresEmailVerification) {
-        navigate('/verificar-email');
-        return;
-      }
-
       if (isInternalUser) {
+        if (data.user.mustChangePassword) {
+          navigate('/alterar-senha');
+          return;
+        }
+        if (data.user.requiresEmailVerification) {
+          navigate('/verificar-email');
+          return;
+        }
         navigate('/admin');
       } else {
+        if (data.user.requiresEmailVerification) {
+          navigate('/verificar-email');
+          return;
+        }
         navigate('/dashboard');
       }
     } catch (err) {

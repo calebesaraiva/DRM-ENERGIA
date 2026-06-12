@@ -115,9 +115,17 @@ function Dashboard() {
   }, [request]);
 
   useEffect(() => {
+    if (!user || !localStorage.getItem('token')) {
+      navigate('/portal-cliente');
+      return undefined;
+    }
+    if (user.requiresEmailVerification) {
+      navigate('/verificar-email');
+      return undefined;
+    }
     const timer = window.setTimeout(loadPortal, 0);
     return () => window.clearTimeout(timer);
-  }, [loadPortal]);
+  }, [loadPortal, navigate, user]);
 
   useEffect(() => {
     const interval = window.setInterval(async () => {

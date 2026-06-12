@@ -1226,6 +1226,7 @@ const authRequired = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const isEmailVerificationRoute = req.path.startsWith('/api/email-verification');
+    const isPasswordChangeRoute = req.path === '/api/change-password';
 
     if (decoded.userType === 'interno') {
       const user = await db.get('SELECT * FROM usuarios WHERE id = ? AND active = 1', decoded.id);
@@ -1236,7 +1237,10 @@ const authRequired = async (req, res, next) => {
         userType: 'interno',
         permissions: parsePermissions(user.permissions),
       };
-      if (requiresEmailVerification(req.user) && !isEmailVerificationRoute) {
+      if (Boolean(req.user.mustChangePassword) && !isPasswordChangeRoute) {
+        return res.status(403).json({ message: 'Troque a senha temporária para liberar o painel.', mustChangePassword: true });
+      }
+      if (requiresEmailVerification(req.user) && !isEmailVerificationRoute && !isPasswordChangeRoute) {
         return res.status(403).json({ message: 'Confirme um e-mail válido para liberar o painel.', requiresEmailVerification: true });
       }
       return next();
@@ -1254,7 +1258,7 @@ const authRequired = async (req, res, next) => {
       userType: decoded.userType || 'cliente',
       permissions,
     };
-    if (requiresEmailVerification(req.user) && !isEmailVerificationRoute) {
+    if (requiresEmailVerification(req.user) && !isEmailVerificationRoute && !isPasswordChangeRoute) {
       return res.status(403).json({ message: 'Confirme um e-mail válido para liberar o painel.', requiresEmailVerification: true });
     }
     return next();
