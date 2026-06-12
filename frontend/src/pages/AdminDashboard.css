@@ -6301,6 +6301,37 @@
     #fff;
 }
 
+.manual-lead-backdrop {
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+.manual-lead-modal {
+  width: min(920px, 100%);
+  max-height: min(760px, calc(100vh - 2rem));
+  overflow: auto;
+  border-radius: 22px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #fff;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.34);
+}
+
+.manual-lead-modal .manual-lead-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 1.35rem 1.5rem 1rem;
+  border-bottom: 1px solid #e6eaf0;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.manual-lead-modal .manual-lead-form {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
 .manual-lead-header {
   display: flex;
   justify-content: space-between;
@@ -6312,6 +6343,7 @@
 .manual-lead-header h4 {
   margin: 0;
   color: #111827;
+  font-size: 1.25rem;
 }
 
 .manual-lead-header p {
@@ -6322,7 +6354,7 @@
 
 .manual-lead-form {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
   align-items: end;
 }
@@ -6332,18 +6364,23 @@
 }
 
 .manual-lead-notes textarea.rc-input {
-  height: 42px;
-  min-height: 42px;
+  height: 92px;
+  min-height: 92px;
   padding-top: 0.65rem;
   resize: vertical;
 }
 
 .manual-lead-actions {
-  grid-column: span 2;
+  grid-column: 1 / -1;
+  position: sticky;
+  bottom: 0;
   display: flex;
   justify-content: flex-end;
   gap: 0.65rem;
   flex-wrap: wrap;
+  padding-top: 1rem;
+  border-top: 1px solid #e6eaf0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.86), #fff 34%);
 }
 
 .lead-source-badge {

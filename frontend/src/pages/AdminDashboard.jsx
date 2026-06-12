@@ -635,7 +635,7 @@ const AdminDashboard = () => {
 
   const quickActions = [
     { id: 'qa-novo-orcamento', label: 'Novo orçamento', tab: 'orcamentos', action: 'newBudget', permission: 'orcamentos', badge: clientes.length },
-    { id: 'qa-leads', label: 'Atender lead', tab: 'leads', permission: 'leads', badge: leads.filter(item => item.status === 'Novo').length },
+    { id: 'qa-leads', label: 'Cadastrar lead', tab: 'leads', action: 'newLead', permission: 'leads', badge: leads.filter(item => item.status === 'Novo').length },
     { id: 'qa-contratos', label: 'Aprovar contrato', tab: 'contratos', permission: 'contratos', badge: contratos.filter(item => item.status === 'Pendente').length },
     { id: 'qa-homologacao', label: 'Homologação', tab: 'homologacao', permission: 'equipeTecnica', badge: projetos.filter(item => ['Pendência da concessionária', 'Reenviar projeto', 'Aguardando parecer de acesso', 'Vistoria reprovada'].includes(item.etapa)).length },
     { id: 'qa-os', label: 'O.S abertas', tab: 'ordensServico', permission: 'ordensServico', badge: ordensServico.filter(item => item.status === 'Aberta').length },
@@ -1014,6 +1014,15 @@ const AdminDashboard = () => {
   }, [selectedContrato]);
 
   useEffect(() => {
+    if (!showManualLeadForm || typeof document === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showManualLeadForm]);
+
+  useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
     const token = localStorage.getItem('token');
 
@@ -1117,6 +1126,11 @@ const AdminDashboard = () => {
       body: JSON.stringify({ status, ultimoContato: new Date().toISOString().split('T')[0] }),
     });
     setLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, status } : lead));
+  };
+
+  const closeManualLeadModal = () => {
+    setShowManualLeadForm(false);
+    setManualLeadForm(emptyManualLeadForm);
   };
 
   const cadastrarLeadManual = async (event) => {
@@ -1719,6 +1733,11 @@ const AdminDashboard = () => {
     setQuickModal(null);
     if (action.action === 'newBudget') {
       openBudgetFormForClient();
+      return;
+    }
+    if (action.action === 'newLead') {
+      setActiveTab('leads');
+      setShowManualLeadForm(true);
       return;
     }
     setActiveTab(action.tab);
@@ -2838,8 +2857,8 @@ const AdminDashboard = () => {
                     {hasPermission('verTodosLeads') && (
                       <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Ver todos os leads</button>
                     )}
-                    <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(prev => !prev)}>
-                      {showManualLeadForm ? 'Fechar cadastro' : '+ Cadastrar lead'}
+                    <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(true)}>
+                      + Cadastrar lead
                     </button>
                   </div>
                 </div>
@@ -2896,72 +2915,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
-
-              {showManualLeadForm && (
-                <div className="admin-card manual-lead-card">
-                  <div className="manual-lead-header">
-                    <div>
-                      <h4>Cadastrar lead manual</h4>
-                      <p>Use para indicações, ligações recebidas, visitas e contatos que não vieram pelo site.</p>
-                    </div>
-                    <span className="lead-source-badge lead-source-manual">Manual</span>
-                  </div>
-                  <form className="manual-lead-form" onSubmit={cadastrarLeadManual}>
-                    <div className="rc-field">
-                      <label className="rc-label">Nome completo</label>
-                      <input className="rc-input" value={manualLeadForm.nome} onChange={(event) => setManualLeadForm(prev => ({ ...prev, nome: event.target.value }))} placeholder="Nome do cliente" required />
-                    </div>
-                    <div className="rc-field">
-                      <label className="rc-label">WhatsApp</label>
-                      <input className="rc-input" value={manualLeadForm.telefone} onChange={(event) => setManualLeadForm(prev => ({ ...prev, telefone: event.target.value }))} placeholder="(99) 99999-9999" required />
-                    </div>
-                    <div className="rc-field">
-                      <label className="rc-label">Cidade / UF</label>
-                      <input className="rc-input" value={manualLeadForm.cidade} onChange={(event) => setManualLeadForm(prev => ({ ...prev, cidade: event.target.value }))} placeholder="Imperatriz - MA" />
-                    </div>
-                    <div className="rc-field">
-                      <label className="rc-label">E-mail</label>
-                      <input className="rc-input" type="email" value={manualLeadForm.email} onChange={(event) => setManualLeadForm(prev => ({ ...prev, email: event.target.value }))} placeholder="cliente@email.com" />
-                    </div>
-                    <div className="rc-field">
-                      <label className="rc-label">Origem</label>
-                      <select className="rc-input" value={manualLeadForm.origem} onChange={(event) => setManualLeadForm(prev => ({ ...prev, origem: event.target.value }))}>
-                        <option>Manual</option>
-                        <option>Indicação</option>
-                        <option>Ligação recebida</option>
-                        <option>WhatsApp direto</option>
-                        <option>Visita presencial</option>
-                        <option>Evento</option>
-                      </select>
-                    </div>
-                    <div className="rc-field">
-                      <label className="rc-label">Status</label>
-                      <select className="rc-input" value={manualLeadForm.status} onChange={(event) => setManualLeadForm(prev => ({ ...prev, status: event.target.value }))}>
-                        {LEAD_STATUS_PRESETS.map(status => <option key={status}>{status}</option>)}
-                      </select>
-                    </div>
-                    {hasPermission('verTodosLeads') && (
-                      <div className="rc-field">
-                        <label className="rc-label">Responsável</label>
-                        <select className="rc-input" value={manualLeadForm.assignedUserId} onChange={(event) => setManualLeadForm(prev => ({ ...prev, assignedUserId: event.target.value }))}>
-                          <option value="">Eu mesmo</option>
-                          {usuarios.filter(item => item.active !== 0 && item.permissions?.leads).map(item => (
-                            <option key={item.id} value={item.id}>{item.nome}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="rc-field manual-lead-notes">
-                      <label className="rc-label">Observação inicial</label>
-                      <textarea className="rc-input" value={manualLeadForm.observacoes} onChange={(event) => setManualLeadForm(prev => ({ ...prev, observacoes: event.target.value }))} placeholder="Ex: cliente pediu retorno no fim da tarde" />
-                    </div>
-                    <div className="manual-lead-actions">
-                      <button type="button" className="btn btn-outline" onClick={() => setShowManualLeadForm(false)}>Cancelar</button>
-                      <button type="submit" className="btn btn-primary">Salvar lead manual</button>
-                    </div>
-                  </form>
-                </div>
-              )}
 
               {/* ── 2. Distribuição por consultor ── */}
               {hasPermission('verTodosLeads') && leadSummary.porResponsavel.length > 0 && (
@@ -3082,6 +3035,7 @@ const AdminDashboard = () => {
                     <h4>Lista de atendimento</h4>
                     <p>{filteredLeads.length} lead{filteredLeads.length === 1 ? '' : 's'} na visão atual. Consultores veem apenas os próprios leads.</p>
                   </div>
+                  <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(true)}>+ Cadastrar lead</button>
                 </div>
                 <div className="table-container leads-table-container">
                   <table className="modern-table">
@@ -5222,6 +5176,75 @@ const AdminDashboard = () => {
           )}
         </div>
       </main>
+
+      {showManualLeadForm && (
+        <div className="contract-modal-backdrop manual-lead-backdrop">
+          <div className="manual-lead-modal" role="dialog" aria-modal="true" aria-labelledby="manual-lead-title">
+            <div className="manual-lead-header">
+              <div>
+                <span className="section-kicker">Cadastro rápido</span>
+                <h4 id="manual-lead-title">Cadastrar lead manual</h4>
+                <p>Indicação, ligação recebida, WhatsApp direto ou contato presencial entram separados dos leads do site.</p>
+              </div>
+              <button type="button" className="lead-modal-close" onClick={closeManualLeadModal} aria-label="Fechar">×</button>
+            </div>
+            <form className="manual-lead-form" onSubmit={cadastrarLeadManual}>
+              <div className="rc-field">
+                <label className="rc-label">Nome completo</label>
+                <input className="rc-input" value={manualLeadForm.nome} onChange={(event) => setManualLeadForm(prev => ({ ...prev, nome: event.target.value }))} placeholder="Nome do cliente" autoFocus required />
+              </div>
+              <div className="rc-field">
+                <label className="rc-label">WhatsApp</label>
+                <input className="rc-input" value={manualLeadForm.telefone} onChange={(event) => setManualLeadForm(prev => ({ ...prev, telefone: event.target.value }))} placeholder="(99) 99999-9999" required />
+              </div>
+              <div className="rc-field">
+                <label className="rc-label">Cidade / UF</label>
+                <input className="rc-input" value={manualLeadForm.cidade} onChange={(event) => setManualLeadForm(prev => ({ ...prev, cidade: event.target.value }))} placeholder="Imperatriz - MA" />
+              </div>
+              <div className="rc-field">
+                <label className="rc-label">E-mail</label>
+                <input className="rc-input" type="email" value={manualLeadForm.email} onChange={(event) => setManualLeadForm(prev => ({ ...prev, email: event.target.value }))} placeholder="cliente@email.com" />
+              </div>
+              <div className="rc-field">
+                <label className="rc-label">Origem</label>
+                <select className="rc-input" value={manualLeadForm.origem} onChange={(event) => setManualLeadForm(prev => ({ ...prev, origem: event.target.value }))}>
+                  <option>Manual</option>
+                  <option>Indicação</option>
+                  <option>Ligação recebida</option>
+                  <option>WhatsApp direto</option>
+                  <option>Visita presencial</option>
+                  <option>Evento</option>
+                </select>
+              </div>
+              <div className="rc-field">
+                <label className="rc-label">Status</label>
+                <select className="rc-input" value={manualLeadForm.status} onChange={(event) => setManualLeadForm(prev => ({ ...prev, status: event.target.value }))}>
+                  {LEAD_STATUS_PRESETS.map(status => <option key={status}>{status}</option>)}
+                </select>
+              </div>
+              {hasPermission('verTodosLeads') && (
+                <div className="rc-field">
+                  <label className="rc-label">Responsável</label>
+                  <select className="rc-input" value={manualLeadForm.assignedUserId} onChange={(event) => setManualLeadForm(prev => ({ ...prev, assignedUserId: event.target.value }))}>
+                    <option value="">Eu mesmo</option>
+                    {usuarios.filter(item => item.active !== 0 && item.permissions?.leads).map(item => (
+                      <option key={item.id} value={item.id}>{item.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="rc-field manual-lead-notes">
+                <label className="rc-label">Observação inicial</label>
+                <textarea className="rc-input" value={manualLeadForm.observacoes} onChange={(event) => setManualLeadForm(prev => ({ ...prev, observacoes: event.target.value }))} placeholder="Ex: cliente pediu retorno no fim da tarde" />
+              </div>
+              <div className="manual-lead-actions">
+                <button type="button" className="btn btn-outline" onClick={closeManualLeadModal}>Cancelar</button>
+                <button type="submit" className="btn btn-primary">Salvar lead manual</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {quickModal && (
         <div className="contract-modal-backdrop">
