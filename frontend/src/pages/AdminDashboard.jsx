@@ -2846,105 +2846,28 @@ const AdminDashboard = () => {
           {activeTab === 'leads' && (
             <div className="admin-section leads-screen">
 
-              {/* ── 1. Resumo geral ── */}
-              <div className="admin-card leads-resumo-card">
-                <div className="leads-resumo-header">
+              <div className="admin-card leads-command-card">
+                <div className="leads-command-head">
                   <div>
-                    <h3>Resumo geral</h3>
-                    <p>Leads do site e cadastros manuais ficam separados para a equipe enxergar a origem.</p>
+                    <h3>Atendimento de leads</h3>
+                    <p>{filteredLeads.length} na visão atual</p>
                   </div>
                   <div className="leads-header-actions">
                     {hasPermission('verTodosLeads') && (
-                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Ver todos os leads</button>
+                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Todos</button>
                     )}
-                    <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(true)}>
-                      + Cadastrar lead
-                    </button>
+                    <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(true)}>+ Cadastrar lead</button>
                   </div>
                 </div>
-                <div className="leads-stats-grid">
-                  <div className="lead-stat-item">
-                    <div className="lead-stat-icon lead-stat-icon-orange">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-3.2-6.4A5 5 0 0 1 15 9c0 .7-.1 1.4-.4 2H16Zm-8 0a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.7-6 3.8V19h12v-2.2C14 14.7 11.3 13 8 13Zm8 0c-.6 0-1.1.1-1.7.2 1.1.9 1.7 2.1 1.7 3.6V19h6v-2.2c0-2.1-2.7-3.8-6-3.8Z" /></svg>
-                    </div>
-                    <div>
-                      <p className="lead-stat-label">TOTAL CAPTADO</p>
-                      <strong className="lead-stat-num">{leadSummary.total}</strong>
-                      <p className="lead-stat-desc">Todos os leads da visão atual.</p>
-                    </div>
-                  </div>
-                  <button type="button" className={`lead-stat-item lead-stat-button ${leadSourceFilter === 'site' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('site')}>
-                    <div className="lead-stat-icon lead-stat-icon-blue">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3.1a15 15 0 0 0-1.1-5A8.1 8.1 0 0 1 18.9 11ZM12 4.1c.7 1 1.5 3.1 1.8 6.9h-3.6c.3-3.8 1.1-5.9 1.8-6.9ZM4.1 13h3.1c.1 1.8.5 3.5 1.1 5A8.1 8.1 0 0 1 4.1 13Zm3.1-2H4.1A8.1 8.1 0 0 1 8.3 6a15 15 0 0 0-1.1 5ZM12 19.9c-.7-1-1.5-3.1-1.8-6.9h3.6c-.3 3.8-1.1 5.9-1.8 6.9ZM15.7 18a15 15 0 0 0 1.1-5h3.1a8.1 8.1 0 0 1-4.2 5Z" /></svg>
-                    </div>
-                    <div>
-                      <p className="lead-stat-label">SITE</p>
-                      <strong className="lead-stat-num">{leadSummary.site}</strong>
-                      <p className="lead-stat-desc">Captados pela LP/simulação.</p>
-                    </div>
-                  </button>
-                  <button type="button" className={`lead-stat-item lead-stat-button ${leadSourceFilter === 'manual' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('manual')}>
-                    <div className="lead-stat-icon lead-stat-icon-orange">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4V4Zm9 1.5V11h5.5L13 5.5ZM7 14h10v2H7v-2Zm0 4h7v2H7v-2Z" /></svg>
-                    </div>
-                    <div>
-                      <p className="lead-stat-label">MANUAL</p>
-                      <strong className="lead-stat-num">{leadSummary.manual}</strong>
-                      <p className="lead-stat-desc">Cadastrados pela equipe.</p>
-                    </div>
-                  </button>
-                  <div className="lead-stat-item">
-                    <div className="lead-stat-icon lead-stat-icon-green">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-9 0a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4Zm9 0c-.3 0-.7 0-1 .1 1.2.8 2 2 2 3.9V20h6v-2c0-2.7-5.3-4-7-4Z" /></svg>
-                    </div>
-                    <div>
-                      <p className="lead-stat-label">NOVOS</p>
-                      <strong className="lead-stat-num">{leadSummary.novos}</strong>
-                      <p className="lead-stat-desc">Aguardando atendimento.</p>
-                    </div>
-                  </div>
-                  <div className="lead-stat-item">
-                    <div className="lead-stat-icon lead-stat-icon-purple">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9 9 0 0 0-9 9c0 2.4 1 4.7 2.6 6.3l-1.4 1.4A11 11 0 0 1 1 11 11 11 0 0 1 12 0a11 11 0 0 1 11 11 11 11 0 0 1-3.2 7.7l-1.4-1.4A9 9 0 0 0 21 11a9 9 0 0 0-9-9Zm0 4a5 5 0 0 0-5 5 5 5 0 0 0 5 5 5 5 0 0 0 5-5 5 5 0 0 0-5-5Zm0 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3Z" /></svg>
-                    </div>
-                    <div>
-                      <p className="lead-stat-label">EM ATENDIMENTO</p>
-                      <strong className="lead-stat-num">{leadSummary.emAtendimento}</strong>
-                      <p className="lead-stat-desc">Já assumidos pela equipe.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* ── 2. Distribuição por consultor ── */}
-              {hasPermission('verTodosLeads') && leadSummary.porResponsavel.length > 0 && (
-                <div className="admin-card">
-                  <div className="consultant-summary-header">
-                    <div>
-                      <h4>Distribuição por consultor</h4>
-                      <p>Clique em um consultor para ver somente os leads atribuídos a ele.</p>
-                    </div>
-                  </div>
-                  <div className="consultant-summary-grid">
-                    {leadSummary.porResponsavel.map(user => (
-                      <button
-                        type="button"
-                        key={user.id}
-                        className={`consultant-card ${String(leadOwnerFilter) === String(user.id) || String(leadOwnerFilter) === String(user.nome) ? 'active' : ''}`}
-                        onClick={() => setLeadOwnerFilter(user.id)}
-                      >
-                        <span>{user.role === 'EQUIPE_TECNICA_COMERCIAL' ? 'Equipe técnica/comercial' : 'Consultor'}</span>
-                        <strong>{user.nome}</strong>
-                        <p>{user.total} lead{user.total === 1 ? '' : 's'} recebido{user.total === 1 ? '' : 's'}</p>
-                      </button>
-                    ))}
-                  </div>
+                <div className="lead-metric-row">
+                  <button type="button" className={`lead-metric-pill ${leadSourceFilter === 'todos' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('todos')}><strong>{leadSummary.total}</strong><span>Total</span></button>
+                  <button type="button" className={`lead-metric-pill ${leadSourceFilter === 'site' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('site')}><strong>{leadSummary.site}</strong><span>Site</span></button>
+                  <button type="button" className={`lead-metric-pill ${leadSourceFilter === 'manual' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('manual')}><strong>{leadSummary.manual}</strong><span>Manual</span></button>
+                  <button type="button" className={`lead-metric-pill ${leadStatusFilter === 'Novo' ? 'active' : ''}`} onClick={() => setLeadStatusFilter('Novo')}><strong>{leadSummary.novos}</strong><span>Novos</span></button>
+                  <button type="button" className={`lead-metric-pill ${leadStatusFilter === 'Em atendimento' ? 'active' : ''}`} onClick={() => setLeadStatusFilter('Em atendimento')}><strong>{leadSummary.emAtendimento}</strong><span>Atendimento</span></button>
                 </div>
-              )}
 
-              {/* ── 3. Buscar leads ── */}
-              <div className="admin-card leads-search-card">
-                <h4 className="leads-search-title">Buscar leads</h4>
                 <div className="leads-search-row">
                   <div className="leads-search-input-wrap">
                     <svg className="leads-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12A6 6 0 0 1 10 4Z" /></svg>
@@ -2955,6 +2878,14 @@ const AdminDashboard = () => {
                       onChange={(event) => setLeadSearch(event.target.value)}
                     />
                   </div>
+                  {hasPermission('verTodosLeads') && leadSummary.porResponsavel.length > 0 && (
+                    <select className="lead-compact-select" value={leadOwnerFilter} onChange={(event) => setLeadOwnerFilter(event.target.value)} aria-label="Filtrar por responsável">
+                      <option value="todos">Todos responsáveis</option>
+                      {leadSummary.porResponsavel.map(user => (
+                        <option key={user.id} value={user.id}>{user.nome} ({user.total})</option>
+                      ))}
+                    </select>
+                  )}
                   <div className="leads-filter-group" aria-label="Filtros de status">
                     <button type="button" className={`leads-filter-btn ${leadStatusFilter === 'todos' ? 'active' : ''}`} onClick={() => setLeadStatusFilter('todos')}>
                       Todos
@@ -2965,18 +2896,14 @@ const AdminDashboard = () => {
                       </button>
                     ))}
                   </div>
-                  <div className="leads-filter-group" aria-label="Filtros de origem">
-                    <button type="button" className={`leads-filter-btn ${leadSourceFilter === 'todos' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('todos')}>Todas origens</button>
-                    <button type="button" className={`leads-filter-btn ${leadSourceFilter === 'site' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('site')}>Site</button>
-                    <button type="button" className={`leads-filter-btn ${leadSourceFilter === 'manual' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('manual')}>Manual</button>
-                  </div>
                 </div>
               </div>
 
-              {/* ── 4. Registrar contato ── */}
-              <div className="admin-card leads-rc-card">
-                <h4>Registrar contato</h4>
-                <p className="leads-rc-subtitle">Salve ligação, WhatsApp, visita e próximo retorno para não perder nenhum cliente.</p>
+              <details className="admin-card leads-rc-card leads-activity-drawer">
+                <summary>
+                  <span>Registrar contato</span>
+                  <small>Ligação, WhatsApp, visita ou retorno</small>
+                </summary>
                 <form className="rc-form" onSubmit={registrarAtividade}>
                   <div className="rc-form-grid">
                     <div className="rc-field">
@@ -3026,9 +2953,8 @@ const AdminDashboard = () => {
                     <button className="btn btn-primary rc-save-btn" type="submit">Salvar contato</button>
                   </div>
                 </form>
-              </div>
+              </details>
 
-              {/* ── 5. Lista de atendimento ── */}
               <div className="admin-card leads-list-card">
                 <div className="list-section-header">
                   <div>
@@ -3042,9 +2968,7 @@ const AdminDashboard = () => {
                     <thead>
                       <tr>
                         <th>ID</th>
-                        <th>NOME</th>
-                        <th>TELEFONE</th>
-                        <th>E-MAIL</th>
+                        <th>LEAD</th>
                         <th>CIDADE</th>
                         <th>ORIGEM</th>
                         <th>RESPONSÁVEL</th>
@@ -3057,9 +2981,12 @@ const AdminDashboard = () => {
                       {paginatedLeads.map(lead => (
                         <tr key={lead.id}>
                           <td data-label="ID">#{lead.id}</td>
-                          <td data-label="NOME" className="font-medium">{lead.nome}</td>
-                          <td data-label="TELEFONE">{lead.telefone}</td>
-                          <td data-label="E-MAIL">{lead.email}</td>
+                          <td data-label="LEAD">
+                            <div className="lead-person-cell">
+                              <strong>{lead.nome}</strong>
+                              <span>{lead.telefone || 'Sem telefone'}{lead.email ? ` • ${lead.email}` : ''}</span>
+                            </div>
+                          </td>
                           <td data-label="CIDADE">{lead.cidade}</td>
                           <td data-label="ORIGEM">
                             <div className="lead-origin-cell">
