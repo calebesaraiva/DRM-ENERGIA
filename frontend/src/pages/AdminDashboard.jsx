@@ -1210,6 +1210,11 @@ const AdminDashboard = () => {
       ));
     };
 
+    const handleWhatsappMessageStatus = ({ message, conversation }) => {
+      handleWhatsappConversation(conversation);
+      setWhatsappMessages(prev => prev.map(item => item.id === message.id ? message : item));
+    };
+
     const handleWhatsappRuntimeStatus = (status) => {
       setWhatsappStatus(prev => ({ ...(prev || {}), ...status }));
     };
@@ -1223,6 +1228,7 @@ const AdminDashboard = () => {
     socket.on('os_atualizada', handleOsAtualizada);
     socket.on('whatsapp_conversation_updated', handleWhatsappConversation);
     socket.on('whatsapp_message_created', handleWhatsappMessage);
+    socket.on('whatsapp_message_status_updated', handleWhatsappMessageStatus);
     socket.on('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
 
     return () => {
@@ -1235,6 +1241,7 @@ const AdminDashboard = () => {
       socket.off('os_atualizada', handleOsAtualizada);
       socket.off('whatsapp_conversation_updated', handleWhatsappConversation);
       socket.off('whatsapp_message_created', handleWhatsappMessage);
+      socket.off('whatsapp_message_status_updated', handleWhatsappMessageStatus);
       socket.off('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
     };
   }, [loadData, navigate, selectedWhatsappConversation?.id, showToast]);
@@ -2447,7 +2454,7 @@ const AdminDashboard = () => {
 
   const selectedWhatsappIsPending = selectedWhatsappConversation?.status === 'Aguardando atendimento' || !selectedWhatsappConversation?.assignedUserId;
   const selectedWhatsappIsMine = Number(selectedWhatsappConversation?.assignedUserId) === Number(adminUser.id);
-  const canReplyWhatsapp = Boolean(selectedWhatsappConversation) && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && !selectedWhatsappIsPending;
+  const canReplyWhatsapp = Boolean(selectedWhatsappConversation) && whatsappStatus?.connected && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && !selectedWhatsappIsPending;
 
   return (
     <div className={`admin-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
@@ -3274,7 +3281,12 @@ const AdminDashboard = () => {
                         {whatsappMessages.map(message => (
                           <div key={message.id} className={`whatsapp-message ${message.direction === 'outgoing' ? 'sent' : 'received'}`}>
                             <p>{message.text}</p>
-                            <span>{message.senderName || (message.direction === 'outgoing' ? 'DRM' : selectedWhatsappConversation.clienteNome)} • {message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : ''}</span>
+                            <span>
+                              {message.senderName || (message.direction === 'outgoing' ? 'DRM' : selectedWhatsappConversation.clienteNome)}
+                              {' • '}
+                              {message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : ''}
+                              {message.direction === 'outgoing' && ` • ${message.status || 'pendente'}`}
+                            </span>
                           </div>
                         ))}
                         {!whatsappLoading && whatsappMessages.length === 0 && (
@@ -3289,7 +3301,7 @@ const AdminDashboard = () => {
                         <textarea
                           value={whatsappReply}
                           onChange={(event) => setWhatsappReply(event.target.value)}
-                          placeholder={canReplyWhatsapp ? 'Digite a resposta para o cliente...' : 'Inicie o atendimento para responder pelo sistema'}
+                          placeholder={canReplyWhatsapp ? 'Digite a resposta para o cliente...' : whatsappStatus?.connected ? 'Inicie o atendimento para responder pelo sistema' : 'Conecte o WhatsApp por QR Code para responder'}
                           rows={3}
                           disabled={!canReplyWhatsapp}
                         />

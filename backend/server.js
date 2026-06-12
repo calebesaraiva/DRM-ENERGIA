@@ -245,6 +245,25 @@ const normalizeWhatsAppPhone = (value) => {
   return digits;
 };
 
+const normalizeWhatsAppRemoteJid = (value) => {
+  const jid = String(value || '').trim();
+  if (!jid) return '';
+  if (jid.includes('@')) return jid;
+  return `${normalizeWhatsAppPhone(jid)}@s.whatsapp.net`;
+};
+
+const getPhoneFromWhatsAppJid = (jid) => normalizeWhatsAppPhone(String(jid || '').split('@')[0].split(':')[0]);
+
+const mapBaileysMessageStatus = (status) => {
+  const code = Number(status);
+  if (code >= 4) return 'lida';
+  if (code === 3) return 'entregue';
+  if (code === 2) return 'enviada';
+  if (code === 1) return 'pendente';
+  if (code === 0) return 'erro';
+  return 'enviada';
+};
+
 const buildWhatsAppLink = (phone, text) => {
   const normalizedPhone = normalizeWhatsAppPhone(phone) || DEFAULT_WHATSAPP_PHONE;
   const encoded = encodeURIComponent(text || 'Ola, vim do site e quero uma proposta de energia solar.');
@@ -274,7 +293,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     const remoteJid = message.key?.remoteJid || '';
     if (!remoteJid || remoteJid.endsWith('@g.us') || message.key?.fromMe) return;
 
-    const phone = normalizeWhatsAppPhone(remoteJid.split('@')[0]);
+    const phone = getPhoneFromWhatsAppJid(remoteJid);
     if (!phone) return;
 
     const content = message.message || {};
@@ -316,6 +335,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       leadId: lead.id,
       nome: lead.nome || message.pushName || phone,
       telefone: phone,
+      remoteJid,
       assignedUserId: null,
       assignedUserName: '',
       status: 'Aguardando atendimento',
@@ -417,6 +437,24 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
         await handleIncomingWhatsAppWebMessage(message);
       }
     });
+
+    socket.ev.on('messages.update', async (updates = []) => {
+      for (const update of updates) {
+        const providerMessageId = update.key?.id || '';
+        if (!providerMessageId || update.update?.status === undefined) continue;
+        try {
+          const status = mapBaileysMessageStatus(update.update.status);
+          await db.run('UPDATE whatsapp_messages SET status = ? WHERE providerMessageId = ?', status, providerMessageId);
+          const message = await db.get('SELECT * FROM whatsapp_messages WHERE providerMessageId = ?', providerMessageId);
+          if (message) {
+            const conversation = await getWhatsAppConversationById(message.conversationId);
+            io.emit('whatsapp_message_status_updated', { message, conversation });
+          }
+        } catch (error) {
+          console.error('Erro ao atualizar status da mensagem WhatsApp:', error);
+        }
+      }
+    });
   } catch (error) {
     console.error('Erro ao iniciar WhatsApp QR:', error);
     whatsappRuntime.connected = false;
@@ -495,6 +533,7 @@ const upsertWhatsAppConversation = async ({
   leadId = null,
   nome = '',
   telefone = '',
+  remoteJid = '',
   assignedUserId = null,
   assignedUserName = '',
   status = 'Aguardando atendimento',
@@ -512,10 +551,11 @@ const upsertWhatsAppConversation = async ({
     const nextStatus = shouldReopen ? 'Aguardando atendimento' : (conversation.status || status);
     await db.run(
       `UPDATE whatsapp_conversations
-       SET leadId = ?, clienteNome = ?, assignedUserId = ?, assignedUserName = ?, status = ?, updatedAt = ?
+       SET leadId = ?, clienteNome = ?, remoteJid = COALESCE(NULLIF(?, ''), remoteJid), assignedUserId = ?, assignedUserName = ?, status = ?, updatedAt = ?
        WHERE id = ?`,
       nextLeadId,
       conversation.clienteNome || nome || phone,
+      normalizeWhatsAppRemoteJid(remoteJid),
       nextOwnerId,
       nextOwnerName,
       nextStatus,
@@ -527,11 +567,12 @@ const upsertWhatsAppConversation = async ({
 
   const result = await db.run(
     `INSERT INTO whatsapp_conversations
-      (leadId, clienteNome, clienteTelefone, assignedUserId, assignedUserName, status, lastMessage, lastMessageAt, unreadCount, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, '', ?, 0, ?, ?)`,
+      (leadId, clienteNome, clienteTelefone, remoteJid, assignedUserId, assignedUserName, status, lastMessage, lastMessageAt, unreadCount, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, 0, ?, ?)`,
     leadId,
     nome || phone,
     phone,
+    normalizeWhatsAppRemoteJid(remoteJid || phone),
     assignedUserId,
     assignedUserName,
     status,
@@ -582,9 +623,13 @@ const createWhatsAppMessage = async ({
   return db.get('SELECT * FROM whatsapp_messages WHERE id = ?', result.lastID);
 };
 
-const sendWhatsAppTextMessage = async (to, text) => {
+const sendWhatsAppTextMessage = async (to, text, options = {}) => {
   if (whatsappRuntime.connected && whatsappRuntime.socket) {
-    const result = await whatsappRuntime.socket.sendMessage(getWhatsAppJid(to), { text });
+    const jid = normalizeWhatsAppRemoteJid(options.remoteJid || to);
+    if (!jid) {
+      throw new Error('Contato do WhatsApp inválido para envio.');
+    }
+    const result = await whatsappRuntime.socket.sendMessage(jid, { text });
     return {
       configured: true,
       mode: 'qrcode',
@@ -597,7 +642,9 @@ const sendWhatsAppTextMessage = async (to, text) => {
   const token = process.env.WHATSAPP_CLOUD_TOKEN || process.env.META_WHATSAPP_TOKEN || '';
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '';
   if (!token || !phoneNumberId) {
-    return { configured: false, mode: 'qrcode', status: 'aguardando_qrcode', providerMessageId: '' };
+    const error = new Error('WhatsApp não conectado. Abra o modal de conexão e escaneie o QR Code antes de enviar.');
+    error.statusCode = 409;
+    throw error;
   }
 
   const response = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
@@ -2885,6 +2932,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       leadId INTEGER,
       clienteNome TEXT,
       clienteTelefone TEXT NOT NULL,
+      remoteJid TEXT,
       assignedUserId INTEGER,
       assignedUserName TEXT,
       status TEXT DEFAULT 'Aberta',
@@ -3135,6 +3183,17 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingLeadColumns.includes('criadoPorNome')) {
     await db.exec('ALTER TABLE leads ADD COLUMN criadoPorNome TEXT');
   }
+
+  const whatsappConversationColumns = await db.all('PRAGMA table_info(whatsapp_conversations)');
+  const existingWhatsappConversationColumns = whatsappConversationColumns.map(column => column.name);
+  if (!existingWhatsappConversationColumns.includes('remoteJid')) {
+    await db.exec('ALTER TABLE whatsapp_conversations ADD COLUMN remoteJid TEXT');
+  }
+  await db.exec(`
+    UPDATE whatsapp_conversations
+    SET remoteJid = clienteTelefone || '@s.whatsapp.net'
+    WHERE (remoteJid IS NULL OR remoteJid = '') AND clienteTelefone IS NOT NULL AND clienteTelefone != ''
+  `);
 
   const contratoColumns = await db.all('PRAGMA table_info(contratos)');
   const existingContratoColumns = contratoColumns.map(column => column.name);
@@ -4617,7 +4676,9 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
   }
 
   try {
-    const providerResult = await sendWhatsAppTextMessage(activeConversation.clienteTelefone, text);
+    const providerResult = await sendWhatsAppTextMessage(activeConversation.clienteTelefone, text, {
+      remoteJid: activeConversation.remoteJid,
+    });
     const message = await createWhatsAppMessage({
       conversationId: activeConversation.id,
       direction: 'outgoing',
@@ -4634,7 +4695,7 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
     res.status(201).json({ message, conversation: updatedConversation, provider: providerResult });
   } catch (error) {
     console.error('Erro ao enviar WhatsApp:', error);
-    res.status(502).json({ message: error.message || 'Não foi possível enviar pelo WhatsApp agora.' });
+    res.status(error.statusCode || 502).json({ message: error.message || 'Não foi possível enviar pelo WhatsApp agora.' });
   }
 });
 
@@ -4698,6 +4759,7 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
             leadId: lead.id,
             nome: lead.nome || name,
             telefone: phone,
+            remoteJid: `${phone}@s.whatsapp.net`,
             assignedUserId: owner?.id || lead.assignedUserId,
             assignedUserName: owner?.nome || lead.assignedUserName,
           });
