@@ -264,6 +264,21 @@ const mapBaileysMessageStatus = (status) => {
   return 'enviada';
 };
 
+const getConsultantDisplayName = (user = {}) => String(user.nome || user.username || 'Consultor DRM').trim();
+
+const formatWhatsAppPanelMessage = (text, consultantName) => [
+  '*DRM ENERGIA SOLAR*',
+  `Consultor: ${consultantName}`,
+  '',
+  text,
+].join('\n');
+
+const buildWhatsAppClaimNotice = (consultantName) => [
+  '*DRM ENERGIA SOLAR*',
+  '',
+  `${consultantName} começou o seu atendimento.`,
+].join('\n');
+
 const buildWhatsAppLink = (phone, text) => {
   const normalizedPhone = normalizeWhatsAppPhone(phone) || DEFAULT_WHATSAPP_PHONE;
   const encoded = encodeURIComponent(text || 'Ola, vim do site e quero uma proposta de energia solar.');
@@ -621,6 +636,28 @@ const createWhatsAppMessage = async ({
     conversationId
   );
   return db.get('SELECT * FROM whatsapp_messages WHERE id = ?', result.lastID);
+};
+
+const sendAndStoreWhatsAppMessage = async ({ conversation, text, user, system = false }) => {
+  const consultantName = getConsultantDisplayName(user);
+  const outboundText = system ? text : formatWhatsAppPanelMessage(text, consultantName);
+  const providerResult = await sendWhatsAppTextMessage(conversation.clienteTelefone, outboundText, {
+    remoteJid: conversation.remoteJid,
+  });
+  const message = await createWhatsAppMessage({
+    conversationId: conversation.id,
+    direction: 'outgoing',
+    text: outboundText,
+    providerMessageId: providerResult.providerMessageId,
+    status: providerResult.status,
+    senderId: user?.id || null,
+    senderName: system ? 'DRM Energia Solar' : consultantName,
+    rawPayload: providerResult.payload || providerResult,
+  });
+  const updatedConversation = await getWhatsAppConversationById(conversation.id);
+  io.emit('whatsapp_message_created', { message, conversation: updatedConversation });
+  io.emit('whatsapp_conversation_updated', updatedConversation);
+  return { message, conversation: updatedConversation, provider: providerResult };
 };
 
 const sendWhatsAppTextMessage = async (to, text, options = {}) => {
@@ -4608,8 +4645,19 @@ app.post('/api/admin/whatsapp/conversations/:id/claim', authRequired, requirePer
     const current = await getWhatsAppConversationById(conversation.id);
     return res.status(409).json({ message: `Essa conversa já está em atendimento com ${current?.assignedUserName || 'outro consultor'}.` });
   }
-  const updated = await getWhatsAppConversationById(conversation.id);
-  io.emit('whatsapp_conversation_updated', updated);
+  let updated = await getWhatsAppConversationById(conversation.id);
+  try {
+    const noticeResult = await sendAndStoreWhatsAppMessage({
+      conversation: updated,
+      text: buildWhatsAppClaimNotice(getConsultantDisplayName(req.user)),
+      user: req.user,
+      system: true,
+    });
+    updated = noticeResult.conversation;
+  } catch (error) {
+    console.error('Erro ao enviar aviso de início de atendimento:', error);
+    io.emit('whatsapp_conversation_updated', updated);
+  }
   res.json(updated);
 });
 
@@ -4656,6 +4704,7 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
   }
 
   let activeConversation = conversation;
+  let autoClaimedConversation = false;
   if (conversation.status === 'Aguardando atendimento' || !conversation.assignedUserId) {
     const claimResult = await db.run(
       `UPDATE whatsapp_conversations
@@ -4673,26 +4722,25 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
       return res.status(409).json({ message: `Essa conversa já está em atendimento com ${current?.assignedUserName || 'outro consultor'}.` });
     }
     activeConversation = await getWhatsAppConversationById(conversation.id);
+    autoClaimedConversation = true;
   }
 
   try {
-    const providerResult = await sendWhatsAppTextMessage(activeConversation.clienteTelefone, text, {
-      remoteJid: activeConversation.remoteJid,
-    });
-    const message = await createWhatsAppMessage({
-      conversationId: activeConversation.id,
-      direction: 'outgoing',
+    if (autoClaimedConversation) {
+      const noticeResult = await sendAndStoreWhatsAppMessage({
+        conversation: activeConversation,
+        text: buildWhatsAppClaimNotice(getConsultantDisplayName(req.user)),
+        user: req.user,
+        system: true,
+      });
+      activeConversation = noticeResult.conversation;
+    }
+    const result = await sendAndStoreWhatsAppMessage({
+      conversation: activeConversation,
       text,
-      providerMessageId: providerResult.providerMessageId,
-      status: providerResult.status,
-      senderId: req.user.id,
-      senderName: req.user.nome || req.user.username,
-      rawPayload: providerResult.payload || providerResult,
+      user: req.user,
     });
-    const updatedConversation = await getWhatsAppConversationById(activeConversation.id);
-    io.emit('whatsapp_message_created', { message, conversation: updatedConversation });
-    io.emit('whatsapp_conversation_updated', updatedConversation);
-    res.status(201).json({ message, conversation: updatedConversation, provider: providerResult });
+    res.status(201).json(result);
   } catch (error) {
     console.error('Erro ao enviar WhatsApp:', error);
     res.status(error.statusCode || 502).json({ message: error.message || 'Não foi possível enviar pelo WhatsApp agora.' });
