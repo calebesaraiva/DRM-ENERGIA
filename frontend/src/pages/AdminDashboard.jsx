@@ -3226,11 +3226,14 @@ const AdminDashboard = () => {
 
                   {pendingWhatsappConversations.length > 0 && (
                     <div className="whatsapp-pending-alert" role="status">
+                      <span className="wa-alert-dot" aria-hidden="true"></span>
                       <div>
-                        <strong>{pendingWhatsappConversations.length} conversa{pendingWhatsappConversations.length === 1 ? '' : 's'} aguardando</strong>
-                        <span>Selecione e inicie o atendimento para tirar da fila.</span>
+                        <strong>{pendingWhatsappConversations.length} aguardando atendimento</strong>
+                        <span>Abra uma conversa e clique em iniciar para remover da fila.</span>
                       </div>
-                      <button type="button" onClick={() => setWhatsappFilter('aguardando')}>Ver fila</button>
+                      {whatsappFilter !== 'aguardando' && (
+                        <button type="button" onClick={() => setWhatsappFilter('aguardando')}>Ver fila</button>
+                      )}
                     </div>
                   )}
 
