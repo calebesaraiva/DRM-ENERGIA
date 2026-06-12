@@ -211,6 +211,7 @@ const parsePermissions = (value) => {
 };
 
 const can = (user, permission) => user?.permissions?.[permission] === true;
+const isMasterAdminUser = (user) => user?.role === 'ADM' && String(user?.username || '').toLowerCase() === 'deivson';
 
 const normalizeWhatsAppPhone = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
@@ -3952,7 +3953,7 @@ app.delete('/api/admin/projetos/:id/documentos/:docId', authRequired, requirePer
 });
 
 app.get('/api/admin/leads', authRequired, requirePermission('leads'), async (req, res) => {
-  const leads = can(req.user, 'verTodosLeads')
+  const leads = isMasterAdminUser(req.user)
     ? await db.all('SELECT * FROM leads ORDER BY id DESC')
     : await db.all('SELECT * FROM leads WHERE assignedUserId = ? ORDER BY id DESC', req.user.id);
   res.json(leads);
@@ -3973,7 +3974,7 @@ app.post('/api/admin/leads', authRequired, requirePermission('leads'), async (re
   }
 
   let owner = { id: req.user.id, nome: req.user.nome };
-  if (can(req.user, 'verTodosLeads') && requestedOwnerId) {
+  if (isMasterAdminUser(req.user) && requestedOwnerId) {
     const requestedOwner = await db.get('SELECT id, nome FROM usuarios WHERE id = ? AND active = 1', requestedOwnerId);
     if (requestedOwner) owner = requestedOwner;
   }
@@ -4773,7 +4774,7 @@ app.post('/api/admin/usuarios/:id/reset-password', authRequired, requirePermissi
 app.put('/api/admin/leads/:id', authRequired, requirePermission('leads'), async (req, res) => {
   const lead = await db.get('SELECT * FROM leads WHERE id = ?', req.params.id);
   if (!lead) return res.status(404).json({ message: 'Lead não encontrado.' });
-  if (!can(req.user, 'verTodosLeads') && lead.assignedUserId !== req.user.id) {
+  if (!isMasterAdminUser(req.user) && lead.assignedUserId !== req.user.id) {
     return res.status(403).json({ message: 'Este lead pertence a outro usuário.' });
   }
 
@@ -4795,7 +4796,7 @@ app.put('/api/admin/leads/:id', authRequired, requirePermission('leads'), async 
 app.post('/api/admin/leads/:id/atividades', authRequired, requirePermission('leads'), async (req, res) => {
   const lead = await db.get('SELECT * FROM leads WHERE id = ?', req.params.id);
   if (!lead) return res.status(404).json({ message: 'Lead não encontrado.' });
-  if (!can(req.user, 'verTodosLeads') && lead.assignedUserId !== req.user.id) {
+  if (!isMasterAdminUser(req.user) && lead.assignedUserId !== req.user.id) {
     return res.status(403).json({ message: 'Este lead pertence a outro usuário.' });
   }
 
@@ -4835,7 +4836,7 @@ app.post('/api/admin/leads/:id/atividades', authRequired, requirePermission('lea
 });
 
 app.get('/api/admin/atividades', authRequired, requirePermission('leads'), async (req, res) => {
-  const atividades = can(req.user, 'verTodosLeads')
+  const atividades = isMasterAdminUser(req.user)
     ? await db.all('SELECT * FROM atividades ORDER BY id DESC LIMIT 120')
     : await db.all('SELECT * FROM atividades WHERE criadoPorId = ? ORDER BY id DESC LIMIT 120', req.user.id);
   res.json(atividades);
@@ -5245,7 +5246,7 @@ app.put('/api/admin/ordens-servico/:id', authRequired, requirePermission('ordens
 });
 
 app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async (req, res) => {
-  const canSeeAll = can(req.user, 'verTodosLeads');
+  const canSeeAll = isMasterAdminUser(req.user);
   const [leads, orcamentos, contratos, projetos, atividades, siteEvents, clientesResumo, usuariosResumo, ordensServico] = await Promise.all([
     canSeeAll ? db.all('SELECT * FROM leads') : db.all('SELECT * FROM leads WHERE assignedUserId = ?', req.user.id),
     canSeeAll ? db.all('SELECT * FROM orcamentos') : db.all('SELECT * FROM orcamentos WHERE assignedUserId = ?', req.user.id),

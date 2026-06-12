@@ -690,7 +690,7 @@ const AdminDashboard = () => {
 
   const filteredLeads = useMemo(() => {
     const search = leadSearch.trim().toLowerCase();
-    const canSeeAllLeads = hasPermission('verTodosLeads');
+    const canSeeAllLeads = isMasterAdmin;
 
     return leads.filter(lead => {
       if (canSeeAllLeads && leadOwnerFilter !== 'todos' && String(lead.assignedUserId || lead.assignedUserName || '') !== String(leadOwnerFilter)) {
@@ -711,7 +711,7 @@ const AdminDashboard = () => {
       return [lead.nome, lead.telefone, lead.email, lead.cidade, lead.assignedUserName, lead.status, lead.origem]
         .some(value => String(value || '').toLowerCase().includes(search));
     });
-  }, [leadOwnerFilter, leadSearch, leadStatusFilter, leadSourceFilter, leads, hasPermission]);
+  }, [leadOwnerFilter, leadSearch, leadStatusFilter, leadSourceFilter, leads, isMasterAdmin]);
 
   const paginatedLeads = useMemo(() => {
     const start = (leadsPage - 1) * LEADS_PER_PAGE;
@@ -1042,12 +1042,12 @@ const AdminDashboard = () => {
     });
 
     const handleNewOrcamento = (novoOrcamento) => {
-      const canSee = loggedInUser.permissions?.verTodosLeads || novoOrcamento.assignedUserId === loggedInUser.id;
+      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson') || novoOrcamento.assignedUserId === loggedInUser.id;
       if (canSee) setOrcamentos(prev => [novoOrcamento, ...prev]);
     };
 
     const handleNewLead = (novoLead) => {
-      const canSee = loggedInUser.role === 'ADM' || loggedInUser.permissions?.verTodosLeads || novoLead.assignedUserId === loggedInUser.id;
+      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson') || novoLead.assignedUserId === loggedInUser.id;
       if (canSee) setLeads(prev => [novoLead, ...prev.filter(lead => lead.id !== novoLead.id)]);
     };
 
@@ -2853,7 +2853,7 @@ const AdminDashboard = () => {
                     <p>{filteredLeads.length} na visão atual</p>
                   </div>
                   <div className="leads-header-actions">
-                    {hasPermission('verTodosLeads') && (
+                    {isMasterAdmin && (
                       <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Todos</button>
                     )}
                     <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(true)}>+ Cadastrar lead</button>
@@ -2878,7 +2878,7 @@ const AdminDashboard = () => {
                       onChange={(event) => setLeadSearch(event.target.value)}
                     />
                   </div>
-                  {hasPermission('verTodosLeads') && leadSummary.porResponsavel.length > 0 && (
+                  {isMasterAdmin && leadSummary.porResponsavel.length > 0 && (
                     <select className="lead-compact-select" value={leadOwnerFilter} onChange={(event) => setLeadOwnerFilter(event.target.value)} aria-label="Filtrar por responsável">
                       <option value="todos">Todos responsáveis</option>
                       {leadSummary.porResponsavel.map(user => (
@@ -2933,6 +2933,7 @@ const AdminDashboard = () => {
                         <option>E-mail</option>
                         <option>Presencial</option>
                         <option>Indicação</option>
+                        <option>Tráfego pago</option>
                         <option>Site</option>
                       </select>
                     </div>
@@ -5137,6 +5138,7 @@ const AdminDashboard = () => {
                 <select className="rc-input" value={manualLeadForm.origem} onChange={(event) => setManualLeadForm(prev => ({ ...prev, origem: event.target.value }))}>
                   <option>Manual</option>
                   <option>Indicação</option>
+                  <option>Tráfego pago</option>
                   <option>Ligação recebida</option>
                   <option>WhatsApp direto</option>
                   <option>Visita presencial</option>
@@ -5149,7 +5151,7 @@ const AdminDashboard = () => {
                   {LEAD_STATUS_PRESETS.map(status => <option key={status}>{status}</option>)}
                 </select>
               </div>
-              {hasPermission('verTodosLeads') && (
+              {isMasterAdmin && (
                 <div className="rc-field">
                   <label className="rc-label">Responsável</label>
                   <select className="rc-input" value={manualLeadForm.assignedUserId} onChange={(event) => setManualLeadForm(prev => ({ ...prev, assignedUserId: event.target.value }))}>
