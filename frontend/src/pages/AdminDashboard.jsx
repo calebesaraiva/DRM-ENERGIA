@@ -118,6 +118,18 @@ const SidebarIcon = ({ name }) => {
 
 const LEADS_PER_PAGE = 8;
 
+const LEAD_STATUS_PRESETS = ['Novo', 'Em atendimento', 'Em negociação', 'Fechando', 'Proposta enviada', 'Convertido', 'Perdido'];
+const emptyManualLeadForm = {
+  nome: '',
+  telefone: '',
+  email: '',
+  cidade: '',
+  origem: 'Manual',
+  status: 'Novo',
+  assignedUserId: '',
+  observacoes: '',
+};
+
 const getOrcStatusClass = (status) => {
   switch (String(status || '')) {
     case 'Em atendimento': return 'orc-status-atendimento';
@@ -133,9 +145,12 @@ const getLeadStatusClass = (status) => {
   switch (String(status || '')) {
     case 'Novo': return 'lead-status-novo';
     case 'Em atendimento': return 'lead-status-atendimento';
+    case 'Em negociação': return 'lead-status-negociacao';
+    case 'Fechando': return 'lead-status-fechando';
     case 'Proposta enviada': return 'lead-status-proposta';
     case 'Sem retorno': return 'lead-status-sem-retorno';
     case 'Convertido': return 'lead-status-convertido';
+    case 'Perdido': return 'lead-status-perdido';
     default: return 'lead-status-default';
   }
 };
@@ -475,6 +490,9 @@ const AdminDashboard = () => {
   const [leadSearch, setLeadSearch] = useState('');
   const [leadOwnerFilter, setLeadOwnerFilter] = useState('todos');
   const [leadStatusFilter, setLeadStatusFilter] = useState('todos');
+  const [leadSourceFilter, setLeadSourceFilter] = useState('todos');
+  const [showManualLeadForm, setShowManualLeadForm] = useState(false);
+  const [manualLeadForm, setManualLeadForm] = useState(emptyManualLeadForm);
   const [orcamentoSearch, setOrcamentoSearch] = useState('');
   const [orcClientSearch, setOrcClientSearch] = useState('');
   const [orcClientPage, setOrcClientPage] = useState(1);
@@ -635,6 +653,8 @@ const AdminDashboard = () => {
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {});
+    const manual = leads.filter(lead => lead.tipoCadastro === 'manual').length;
+    const site = leads.length - manual;
 
     const leadUsers = usuarios
       .filter(user => user.role !== 'ADM' && user.permissions?.leads)
@@ -655,13 +675,17 @@ const AdminDashboard = () => {
       total: leads.length,
       novos: statusCounts.Novo || 0,
       emAtendimento: statusCounts['Em atendimento'] || 0,
+      emNegociacao: statusCounts['Em negociação'] || 0,
+      fechando: statusCounts.Fechando || 0,
+      site,
+      manual,
       porResponsavel: leadUsers,
     };
   }, [leads, usuarios]);
 
   const leadStatusOptions = useMemo(() => {
-    const statuses = Array.from(new Set(leads.map(lead => lead.status || 'Sem status')));
-    return statuses.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const statuses = Array.from(new Set([...LEAD_STATUS_PRESETS, ...leads.map(lead => lead.status || 'Sem status')]));
+    return statuses.filter(Boolean);
   }, [leads]);
 
   const filteredLeads = useMemo(() => {
@@ -677,12 +701,17 @@ const AdminDashboard = () => {
         return false;
       }
 
+      if (leadSourceFilter !== 'todos') {
+        const source = lead.tipoCadastro === 'manual' ? 'manual' : 'site';
+        if (source !== leadSourceFilter) return false;
+      }
+
       if (!search) return true;
 
-      return [lead.nome, lead.telefone, lead.email, lead.cidade, lead.assignedUserName, lead.status]
+      return [lead.nome, lead.telefone, lead.email, lead.cidade, lead.assignedUserName, lead.status, lead.origem]
         .some(value => String(value || '').toLowerCase().includes(search));
     });
-  }, [leadOwnerFilter, leadSearch, leadStatusFilter, leads, hasPermission]);
+  }, [leadOwnerFilter, leadSearch, leadStatusFilter, leadSourceFilter, leads, hasPermission]);
 
   const paginatedLeads = useMemo(() => {
     const start = (leadsPage - 1) * LEADS_PER_PAGE;
@@ -966,7 +995,7 @@ const AdminDashboard = () => {
     if (failed) throw failed.reason;
   }, [request]);
 
-  useEffect(() => { setLeadsPage(1); }, [leadSearch, leadStatusFilter, leadOwnerFilter]);
+  useEffect(() => { setLeadsPage(1); }, [leadSearch, leadStatusFilter, leadOwnerFilter, leadSourceFilter]);
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
   useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
   useEffect(() => {
@@ -1009,8 +1038,8 @@ const AdminDashboard = () => {
     };
 
     const handleNewLead = (novoLead) => {
-      const canSee = loggedInUser.permissions?.verTodosLeads || novoLead.assignedUserId === loggedInUser.id;
-      if (canSee) setLeads(prev => [novoLead, ...prev]);
+      const canSee = loggedInUser.role === 'ADM' || loggedInUser.permissions?.verTodosLeads || novoLead.assignedUserId === loggedInUser.id;
+      if (canSee) setLeads(prev => [novoLead, ...prev.filter(lead => lead.id !== novoLead.id)]);
     };
 
     const handleContratoAtualizado = (contrato) => {
@@ -1088,6 +1117,24 @@ const AdminDashboard = () => {
       body: JSON.stringify({ status, ultimoContato: new Date().toISOString().split('T')[0] }),
     });
     setLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, status } : lead));
+  };
+
+  const cadastrarLeadManual = async (event) => {
+    event.preventDefault();
+    try {
+      const lead = await request('/api/admin/leads', {
+        method: 'POST',
+        body: JSON.stringify(manualLeadForm),
+      });
+      setLeads(prev => [lead, ...prev.filter(item => item.id !== lead.id)]);
+      setManualLeadForm(emptyManualLeadForm);
+      setShowManualLeadForm(false);
+      setLeadSourceFilter('manual');
+      request('/api/admin/resumo').then(setResumo).catch(() => {});
+      showToast(`Lead manual #${lead.id} cadastrado com sucesso.`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const registrarAtividade = async (event) => {
@@ -2783,10 +2830,18 @@ const AdminDashboard = () => {
               {/* ── 1. Resumo geral ── */}
               <div className="admin-card leads-resumo-card">
                 <div className="leads-resumo-header">
-                  <h3>Resumo geral</h3>
-                  {hasPermission('verTodosLeads') && (
-                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Ver todos os leads</button>
-                  )}
+                  <div>
+                    <h3>Resumo geral</h3>
+                    <p>Leads do site e cadastros manuais ficam separados para a equipe enxergar a origem.</p>
+                  </div>
+                  <div className="leads-header-actions">
+                    {hasPermission('verTodosLeads') && (
+                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Ver todos os leads</button>
+                    )}
+                    <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(prev => !prev)}>
+                      {showManualLeadForm ? 'Fechar cadastro' : '+ Cadastrar lead'}
+                    </button>
+                  </div>
                 </div>
                 <div className="leads-stats-grid">
                   <div className="lead-stat-item">
@@ -2796,9 +2851,29 @@ const AdminDashboard = () => {
                     <div>
                       <p className="lead-stat-label">TOTAL CAPTADO</p>
                       <strong className="lead-stat-num">{leadSummary.total}</strong>
-                      <p className="lead-stat-desc">Leads recebidos pelo site.</p>
+                      <p className="lead-stat-desc">Todos os leads da visão atual.</p>
                     </div>
                   </div>
+                  <button type="button" className={`lead-stat-item lead-stat-button ${leadSourceFilter === 'site' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('site')}>
+                    <div className="lead-stat-icon lead-stat-icon-blue">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3.1a15 15 0 0 0-1.1-5A8.1 8.1 0 0 1 18.9 11ZM12 4.1c.7 1 1.5 3.1 1.8 6.9h-3.6c.3-3.8 1.1-5.9 1.8-6.9ZM4.1 13h3.1c.1 1.8.5 3.5 1.1 5A8.1 8.1 0 0 1 4.1 13Zm3.1-2H4.1A8.1 8.1 0 0 1 8.3 6a15 15 0 0 0-1.1 5ZM12 19.9c-.7-1-1.5-3.1-1.8-6.9h3.6c-.3 3.8-1.1 5.9-1.8 6.9ZM15.7 18a15 15 0 0 0 1.1-5h3.1a8.1 8.1 0 0 1-4.2 5Z" /></svg>
+                    </div>
+                    <div>
+                      <p className="lead-stat-label">SITE</p>
+                      <strong className="lead-stat-num">{leadSummary.site}</strong>
+                      <p className="lead-stat-desc">Captados pela LP/simulação.</p>
+                    </div>
+                  </button>
+                  <button type="button" className={`lead-stat-item lead-stat-button ${leadSourceFilter === 'manual' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('manual')}>
+                    <div className="lead-stat-icon lead-stat-icon-orange">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4V4Zm9 1.5V11h5.5L13 5.5ZM7 14h10v2H7v-2Zm0 4h7v2H7v-2Z" /></svg>
+                    </div>
+                    <div>
+                      <p className="lead-stat-label">MANUAL</p>
+                      <strong className="lead-stat-num">{leadSummary.manual}</strong>
+                      <p className="lead-stat-desc">Cadastrados pela equipe.</p>
+                    </div>
+                  </button>
                   <div className="lead-stat-item">
                     <div className="lead-stat-icon lead-stat-icon-green">
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-9 0a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4Zm9 0c-.3 0-.7 0-1 .1 1.2.8 2 2 2 3.9V20h6v-2c0-2.7-5.3-4-7-4Z" /></svg>
@@ -2810,7 +2885,7 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                   <div className="lead-stat-item">
-                    <div className="lead-stat-icon lead-stat-icon-blue">
+                    <div className="lead-stat-icon lead-stat-icon-purple">
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9 9 0 0 0-9 9c0 2.4 1 4.7 2.6 6.3l-1.4 1.4A11 11 0 0 1 1 11 11 11 0 0 1 12 0a11 11 0 0 1 11 11 11 11 0 0 1-3.2 7.7l-1.4-1.4A9 9 0 0 0 21 11a9 9 0 0 0-9-9Zm0 4a5 5 0 0 0-5 5 5 5 0 0 0 5 5 5 5 0 0 0 5-5 5 5 0 0 0-5-5Zm0 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3Z" /></svg>
                     </div>
                     <div>
@@ -2821,6 +2896,72 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
+
+              {showManualLeadForm && (
+                <div className="admin-card manual-lead-card">
+                  <div className="manual-lead-header">
+                    <div>
+                      <h4>Cadastrar lead manual</h4>
+                      <p>Use para indicações, ligações recebidas, visitas e contatos que não vieram pelo site.</p>
+                    </div>
+                    <span className="lead-source-badge lead-source-manual">Manual</span>
+                  </div>
+                  <form className="manual-lead-form" onSubmit={cadastrarLeadManual}>
+                    <div className="rc-field">
+                      <label className="rc-label">Nome completo</label>
+                      <input className="rc-input" value={manualLeadForm.nome} onChange={(event) => setManualLeadForm(prev => ({ ...prev, nome: event.target.value }))} placeholder="Nome do cliente" required />
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">WhatsApp</label>
+                      <input className="rc-input" value={manualLeadForm.telefone} onChange={(event) => setManualLeadForm(prev => ({ ...prev, telefone: event.target.value }))} placeholder="(99) 99999-9999" required />
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">Cidade / UF</label>
+                      <input className="rc-input" value={manualLeadForm.cidade} onChange={(event) => setManualLeadForm(prev => ({ ...prev, cidade: event.target.value }))} placeholder="Imperatriz - MA" />
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">E-mail</label>
+                      <input className="rc-input" type="email" value={manualLeadForm.email} onChange={(event) => setManualLeadForm(prev => ({ ...prev, email: event.target.value }))} placeholder="cliente@email.com" />
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">Origem</label>
+                      <select className="rc-input" value={manualLeadForm.origem} onChange={(event) => setManualLeadForm(prev => ({ ...prev, origem: event.target.value }))}>
+                        <option>Manual</option>
+                        <option>Indicação</option>
+                        <option>Ligação recebida</option>
+                        <option>WhatsApp direto</option>
+                        <option>Visita presencial</option>
+                        <option>Evento</option>
+                      </select>
+                    </div>
+                    <div className="rc-field">
+                      <label className="rc-label">Status</label>
+                      <select className="rc-input" value={manualLeadForm.status} onChange={(event) => setManualLeadForm(prev => ({ ...prev, status: event.target.value }))}>
+                        {LEAD_STATUS_PRESETS.map(status => <option key={status}>{status}</option>)}
+                      </select>
+                    </div>
+                    {hasPermission('verTodosLeads') && (
+                      <div className="rc-field">
+                        <label className="rc-label">Responsável</label>
+                        <select className="rc-input" value={manualLeadForm.assignedUserId} onChange={(event) => setManualLeadForm(prev => ({ ...prev, assignedUserId: event.target.value }))}>
+                          <option value="">Eu mesmo</option>
+                          {usuarios.filter(item => item.active !== 0 && item.permissions?.leads).map(item => (
+                            <option key={item.id} value={item.id}>{item.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="rc-field manual-lead-notes">
+                      <label className="rc-label">Observação inicial</label>
+                      <textarea className="rc-input" value={manualLeadForm.observacoes} onChange={(event) => setManualLeadForm(prev => ({ ...prev, observacoes: event.target.value }))} placeholder="Ex: cliente pediu retorno no fim da tarde" />
+                    </div>
+                    <div className="manual-lead-actions">
+                      <button type="button" className="btn btn-outline" onClick={() => setShowManualLeadForm(false)}>Cancelar</button>
+                      <button type="submit" className="btn btn-primary">Salvar lead manual</button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {/* ── 2. Distribuição por consultor ── */}
               {hasPermission('verTodosLeads') && leadSummary.porResponsavel.length > 0 && (
@@ -2870,6 +3011,11 @@ const AdminDashboard = () => {
                         {status}
                       </button>
                     ))}
+                  </div>
+                  <div className="leads-filter-group" aria-label="Filtros de origem">
+                    <button type="button" className={`leads-filter-btn ${leadSourceFilter === 'todos' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('todos')}>Todas origens</button>
+                    <button type="button" className={`leads-filter-btn ${leadSourceFilter === 'site' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('site')}>Site</button>
+                    <button type="button" className={`leads-filter-btn ${leadSourceFilter === 'manual' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('manual')}>Manual</button>
                   </div>
                 </div>
               </div>
@@ -2946,6 +3092,7 @@ const AdminDashboard = () => {
                         <th>TELEFONE</th>
                         <th>E-MAIL</th>
                         <th>CIDADE</th>
+                        <th>ORIGEM</th>
                         <th>RESPONSÁVEL</th>
                         <th>STATUS</th>
                         <th>RETORNO</th>
@@ -2960,6 +3107,14 @@ const AdminDashboard = () => {
                           <td data-label="TELEFONE">{lead.telefone}</td>
                           <td data-label="E-MAIL">{lead.email}</td>
                           <td data-label="CIDADE">{lead.cidade}</td>
+                          <td data-label="ORIGEM">
+                            <div className="lead-origin-cell">
+                              <span className={`lead-source-badge ${lead.tipoCadastro === 'manual' ? 'lead-source-manual' : 'lead-source-site'}`}>
+                                {lead.tipoCadastro === 'manual' ? 'Manual' : 'Site'}
+                              </span>
+                              <small>{lead.origem || (lead.tipoCadastro === 'manual' ? 'Manual' : 'Site')}</small>
+                            </div>
+                          </td>
                           <td data-label="RESPONSÁVEL">{getResponsibleName(lead.assignedUserName)}</td>
                           <td data-label="STATUS">
                             <span className={`lead-status-badge ${getLeadStatusClass(lead.status)}`}>{lead.status || 'Novo'}</span>
@@ -2967,8 +3122,14 @@ const AdminDashboard = () => {
                           <td data-label="RETORNO">{lead.proximoRetorno ? dateBr(lead.proximoRetorno) : 'Sem retorno'}</td>
                           <td data-label="AÇÕES">
                             <div className="table-actions">
-                              <button type="button" className="btn btn-outline btn-sm-admin" title="Marcar como 'Em atendimento'" onClick={() => updateLeadStatus(lead.id, 'Em atendimento')}>Em atendimento</button>
-                              <button type="button" className="btn btn-outline btn-sm-admin" title="Marcar como 'Proposta enviada'" onClick={() => updateLeadStatus(lead.id, 'Proposta enviada')}>Proposta enviada</button>
+                              <select
+                                className="lead-status-select"
+                                value={lead.status || 'Novo'}
+                                onChange={(event) => updateLeadStatus(lead.id, event.target.value)}
+                                title="Alterar filtro/status do lead"
+                              >
+                                {LEAD_STATUS_PRESETS.map(status => <option key={status}>{status}</option>)}
+                              </select>
                               <a
                                 className="leads-wa-btn"
                                 href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`}

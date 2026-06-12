@@ -6099,9 +6099,23 @@
   font-weight: 700;
 }
 
+.leads-resumo-header p {
+  margin: 0.2rem 0 0;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.leads-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .leads-stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -6113,6 +6127,21 @@
   border: 1px solid #e6eaf0;
   border-radius: 14px;
   background: #f8fafc;
+}
+
+.lead-stat-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.lead-stat-button:hover,
+.lead-stat-button.active {
+  border-color: #f97316;
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.14);
+  transform: translateY(-1px);
 }
 
 .lead-stat-icon {
@@ -6144,6 +6173,11 @@
 .lead-stat-icon-blue {
   background: #eff6ff;
   color: #3b82f6;
+}
+
+.lead-stat-icon-purple {
+  background: #f5f3ff;
+  color: #7c3aed;
 }
 
 .lead-stat-label {
@@ -6259,6 +6293,86 @@
 
 .leads-filter-arrow { display: none; }
 
+/* ── Cadastro manual ── */
+.manual-lead-card {
+  border-color: rgba(249, 115, 22, 0.28);
+  background:
+    linear-gradient(135deg, rgba(255, 247, 237, 0.88), rgba(255, 255, 255, 0.94) 44%),
+    #fff;
+}
+
+.manual-lead-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.manual-lead-header h4 {
+  margin: 0;
+  color: #111827;
+}
+
+.manual-lead-header p {
+  margin: 0.2rem 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.manual-lead-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+  align-items: end;
+}
+
+.manual-lead-notes {
+  grid-column: span 2;
+}
+
+.manual-lead-notes textarea.rc-input {
+  height: 42px;
+  min-height: 42px;
+  padding-top: 0.65rem;
+  resize: vertical;
+}
+
+.manual-lead-actions {
+  grid-column: span 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.lead-source-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 0.18rem 0.58rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.lead-source-site {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+}
+
+.lead-source-manual {
+  color: #c2410c;
+  background: #ffedd5;
+  border: 1px solid #fed7aa;
+}
+
 /* ── Registrar contato ── */
 .leads-rc-card {}
 
@@ -6357,6 +6471,16 @@
   color: #c2410c;
 }
 
+.lead-status-negociacao {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.lead-status-fechando {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .lead-status-sem-retorno {
   background: #fee2e2;
   color: #b91c1c;
@@ -6367,9 +6491,48 @@
   color: #1d4ed8;
 }
 
+.lead-status-perdido {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .lead-status-default {
   background: #f1f5f9;
   color: #64748b;
+}
+
+.lead-origin-cell {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.lead-origin-cell small {
+  color: #64748b;
+  font-weight: 600;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-status-select {
+  height: 34px;
+  min-width: 146px;
+  border: 1px solid #dce2ea;
+  border-radius: 9px;
+  background: #fff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0 0.55rem;
+  cursor: pointer;
+}
+
+.lead-status-select:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
 }
 
 /* ── WhatsApp icon button ── */
@@ -6450,13 +6613,45 @@
 }
 
 /* ── Responsive ── */
+@media (max-width: 1240px) {
+  .leads-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .manual-lead-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
+  .leads-resumo-header,
+  .manual-lead-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .leads-header-actions,
+  .manual-lead-actions {
+    justify-content: stretch;
+  }
+
+  .leads-header-actions .btn,
+  .manual-lead-actions .btn {
+    flex: 1 1 180px;
+  }
+
   .leads-stats-grid {
     grid-template-columns: 1fr;
   }
 
   .rc-form-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .manual-lead-form,
+  .manual-lead-notes,
+  .manual-lead-actions {
+    grid-column: auto;
   }
 }
 
@@ -6474,6 +6669,14 @@
 
   .rc-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .manual-lead-form {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-lead-notes textarea.rc-input {
+    height: 86px;
   }
 
   .leads-pagination {

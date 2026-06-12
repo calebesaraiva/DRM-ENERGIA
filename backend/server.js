@@ -2688,6 +2688,15 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingLeadColumns.includes('motivoPerda')) {
     await db.exec('ALTER TABLE leads ADD COLUMN motivoPerda TEXT');
   }
+  if (!existingLeadColumns.includes('tipoCadastro')) {
+    await db.exec("ALTER TABLE leads ADD COLUMN tipoCadastro TEXT DEFAULT 'site'");
+  }
+  if (!existingLeadColumns.includes('criadoPorId')) {
+    await db.exec('ALTER TABLE leads ADD COLUMN criadoPorId INTEGER');
+  }
+  if (!existingLeadColumns.includes('criadoPorNome')) {
+    await db.exec('ALTER TABLE leads ADD COLUMN criadoPorNome TEXT');
+  }
 
   const contratoColumns = await db.all('PRAGMA table_info(contratos)');
   const existingContratoColumns = contratoColumns.map(column => column.name);
@@ -2992,8 +3001,8 @@ app.post('/api/simulacao-publica', async (req, res) => {
 
     const leadResult = await db.run(
       `INSERT INTO leads
-        (nome, telefone, email, cidade, origem, status, dataCadastro, assignedUserId, assignedUserName)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (nome, telefone, email, cidade, origem, status, dataCadastro, assignedUserId, assignedUserName, tipoCadastro)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       leadData.nome,
       leadData.telefone,
       leadData.email,
@@ -3002,7 +3011,8 @@ app.post('/api/simulacao-publica', async (req, res) => {
       'Novo',
       dataCadastro,
       owner?.id || null,
-      owner?.nome || null
+      owner?.nome || null,
+      'site'
     );
 
     const orcamentoResult = await db.run(
@@ -3047,7 +3057,8 @@ app.post('/api/simulacao-publica', async (req, res) => {
       status: 'Novo',
       dataCadastro,
       assignedUserId: owner?.id || null,
-      assignedUserName: owner?.nome || null
+      assignedUserName: owner?.nome || null,
+      tipoCadastro: 'site'
     });
 
     res.status(201).json({
@@ -3945,6 +3956,51 @@ app.get('/api/admin/leads', authRequired, requirePermission('leads'), async (req
     ? await db.all('SELECT * FROM leads ORDER BY id DESC')
     : await db.all('SELECT * FROM leads WHERE assignedUserId = ? ORDER BY id DESC', req.user.id);
   res.json(leads);
+});
+
+app.post('/api/admin/leads', authRequired, requirePermission('leads'), async (req, res) => {
+  const nome = String(req.body.nome || '').trim();
+  const telefone = String(req.body.telefone || '').trim();
+  const email = String(req.body.email || '').trim();
+  const cidade = String(req.body.cidade || '').trim();
+  const observacoes = String(req.body.observacoes || '').trim();
+  const status = String(req.body.status || 'Novo').trim() || 'Novo';
+  const origem = String(req.body.origem || 'Manual').trim() || 'Manual';
+  const requestedOwnerId = req.body.assignedUserId ? Number(req.body.assignedUserId) : null;
+
+  if (!nome || !telefone) {
+    return res.status(400).json({ message: 'Preencha nome e telefone para cadastrar o lead.' });
+  }
+
+  let owner = { id: req.user.id, nome: req.user.nome };
+  if (can(req.user, 'verTodosLeads') && requestedOwnerId) {
+    const requestedOwner = await db.get('SELECT id, nome FROM usuarios WHERE id = ? AND active = 1', requestedOwnerId);
+    if (requestedOwner) owner = requestedOwner;
+  }
+
+  const dataCadastro = new Date().toISOString().split('T')[0];
+  const result = await db.run(
+    `INSERT INTO leads
+      (nome, telefone, email, cidade, origem, status, dataCadastro, assignedUserId, assignedUserName, observacoes, tipoCadastro, criadoPorId, criadoPorNome)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    nome,
+    telefone,
+    email,
+    cidade,
+    origem,
+    status,
+    dataCadastro,
+    owner.id || null,
+    owner.nome || null,
+    observacoes,
+    'manual',
+    req.user.id,
+    req.user.nome
+  );
+
+  const lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
+  io.emit('novo_lead', lead);
+  res.status(201).json(lead);
 });
 
 app.get('/api/admin/round-robin-leads', authRequired, requirePermission('dashboard'), async (req, res) => {
