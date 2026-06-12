@@ -695,6 +695,11 @@ const AdminDashboard = () => {
     return { aguardando, emAtendimento, minhas, naoLidas, total: whatsappConversations.length };
   }, [adminUser.id, whatsappConversations]);
 
+  const pendingWhatsappConversations = useMemo(
+    () => whatsappConversations.filter(item => item.status === 'Aguardando atendimento'),
+    [whatsappConversations]
+  );
+
   const filteredWhatsappConversations = useMemo(() => {
     if (whatsappFilter === 'aguardando') {
       return whatsappConversations.filter(item => item.status === 'Aguardando atendimento');
@@ -3219,12 +3224,22 @@ const AdminDashboard = () => {
                     <button type="button" className={whatsappFilter === 'finalizadas' ? 'active' : ''} onClick={() => setWhatsappFilter('finalizadas')}>Finalizadas</button>
                   </div>
 
+                  {pendingWhatsappConversations.length > 0 && (
+                    <div className="whatsapp-pending-alert" role="status">
+                      <div>
+                        <strong>{pendingWhatsappConversations.length} conversa{pendingWhatsappConversations.length === 1 ? '' : 's'} aguardando</strong>
+                        <span>Selecione e inicie o atendimento para tirar da fila.</span>
+                      </div>
+                      <button type="button" onClick={() => setWhatsappFilter('aguardando')}>Ver fila</button>
+                    </div>
+                  )}
+
                   <div className="whatsapp-conversation-list">
                     {filteredWhatsappConversations.map(conversation => (
                       <button
                         key={conversation.id}
                         type="button"
-                        className={`whatsapp-conversation ${selectedWhatsappConversation?.id === conversation.id ? 'active' : ''}`}
+                        className={`whatsapp-conversation ${conversation.status === 'Aguardando atendimento' ? 'pending' : ''} ${selectedWhatsappConversation?.id === conversation.id ? 'active' : ''}`}
                         onClick={() => openWhatsappConversation(conversation)}
                       >
                         <span className="wa-avatar">{String(conversation.clienteNome || 'W').charAt(0)}</span>
@@ -3233,6 +3248,7 @@ const AdminDashboard = () => {
                           <small>{conversation.lastMessage || 'Sem mensagens no histórico'}</small>
                           <em>{conversation.assignedUserName || 'Fila compartilhada'} • {conversation.clienteTelefone}</em>
                           <i className={`wa-status-chip wa-status-${String(conversation.status || 'aguardando').toLowerCase().replace(/\s+/g, '-')}`}>{conversation.status || 'Aguardando atendimento'}</i>
+                          {conversation.status === 'Aguardando atendimento' && <b className="wa-start-hint">Começar atendimento</b>}
                         </span>
                         {Number(conversation.unreadCount || 0) > 0 && <span className="wa-unread">{conversation.unreadCount}</span>}
                       </button>

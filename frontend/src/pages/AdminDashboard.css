@@ -2945,6 +2945,50 @@
   font-size: 0.74rem;
 }
 
+.whatsapp-pending-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin: 0.65rem 0.7rem 0;
+  padding: 0.72rem;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff7ed 0%, #fff 100%);
+  box-shadow: 0 10px 22px rgba(249, 115, 22, 0.08);
+}
+
+.whatsapp-pending-alert div {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.whatsapp-pending-alert strong {
+  color: #9a3412;
+  font-size: 0.88rem;
+}
+
+.whatsapp-pending-alert span {
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.whatsapp-pending-alert button {
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 0.42rem 0.65rem;
+  border: 1px solid #fb923c;
+  border-radius: 999px;
+  background: #f97316;
+  color: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .whatsapp-conversation {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
@@ -2965,6 +3009,12 @@
   border-color: #fb923c;
   background: #fffaf5;
   box-shadow: 0 8px 20px rgba(249, 115, 22, 0.1);
+}
+
+.whatsapp-conversation.pending {
+  border-color: #fed7aa;
+  border-left: 4px solid #f97316;
+  background: #fffaf5;
 }
 
 .wa-avatar {
@@ -3003,6 +3053,18 @@
   color: #64748b;
   font-size: 0.82rem;
   font-style: normal;
+}
+
+.wa-start-hint {
+  width: max-content;
+  margin-top: 0.2rem;
+  padding: 0.26rem 0.5rem;
+  border-radius: 999px;
+  background: #f97316;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 1000;
+  text-transform: uppercase;
 }
 
 .wa-status-chip {
