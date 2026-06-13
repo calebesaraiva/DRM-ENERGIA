@@ -507,6 +507,8 @@ const AdminDashboard = () => {
   const [whatsappReply, setWhatsappReply] = useState('');
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [whatsappFilter, setWhatsappFilter] = useState('aguardando');
+  const [whatsappSearch, setWhatsappSearch] = useState('');
+  const [whatsappMobileChatOpen, setWhatsappMobileChatOpen] = useState(false);
   const [whatsappConnectOpen, setWhatsappConnectOpen] = useState(false);
   const [whatsappConnectLoading, setWhatsappConnectLoading] = useState(false);
   const [orcamentoSearch, setOrcamentoSearch] = useState('');
@@ -559,6 +561,7 @@ const AdminDashboard = () => {
   const [editingEquipamentoId, setEditingEquipamentoId] = useState(null);
   const [produtoSearch, setProdutoSearch] = useState('');
   const equipamentoNomeRef = useRef(null);
+  const whatsappMessagesEndRef = useRef(null);
   const [selectedEquipamentos, setSelectedEquipamentos] = useState({});
   const [contractModal, setContractModal] = useState({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
   const [contractConfig, setContractConfig] = useState(defaultContractConfig);
@@ -727,20 +730,24 @@ const AdminDashboard = () => {
   );
 
   const filteredWhatsappConversations = useMemo(() => {
-    if (whatsappFilter === 'aguardando') {
-      return whatsappConversations.filter(item => item.status === 'Aguardando atendimento');
-    }
-    if (whatsappFilter === 'atendimento') {
-      return whatsappConversations.filter(item => item.status === 'Em atendimento');
-    }
-    if (whatsappFilter === 'minhas') {
-      return whatsappConversations.filter(item => Number(item.assignedUserId) === Number(adminUser.id));
-    }
-    if (whatsappFilter === 'finalizadas') {
-      return whatsappConversations.filter(item => item.status === 'Finalizada');
-    }
-    return whatsappConversations;
-  }, [adminUser.id, whatsappConversations, whatsappFilter]);
+    const search = whatsappSearch.trim().toLowerCase();
+    const byFilter = whatsappConversations.filter(item => {
+      if (whatsappFilter === 'aguardando') return item.status === 'Aguardando atendimento';
+      if (whatsappFilter === 'atendimento') return item.status === 'Em atendimento';
+      if (whatsappFilter === 'minhas') return Number(item.assignedUserId) === Number(adminUser.id);
+      if (whatsappFilter === 'finalizadas') return item.status === 'Finalizada';
+      return true;
+    });
+
+    if (!search) return byFilter;
+    return byFilter.filter(item => [
+      item.clienteNome,
+      item.clienteTelefone,
+      item.assignedUserName,
+      item.status,
+      item.lastMessage,
+    ].some(value => String(value || '').toLowerCase().includes(search)));
+  }, [adminUser.id, whatsappConversations, whatsappFilter, whatsappSearch]);
 
   const leadSummary = useMemo(() => {
     const countsByOwner = leads.reduce((acc, lead) => {
@@ -1152,6 +1159,11 @@ const AdminDashboard = () => {
   }, [hasPermission, request, whatsappConnectOpen]);
 
   useEffect(() => {
+    if (!selectedWhatsappConversation) return;
+    whatsappMessagesEndRef.current?.scrollIntoView({ block: 'end' });
+  }, [selectedWhatsappConversation, whatsappMessages.length]);
+
+  useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
     const token = localStorage.getItem('token');
 
@@ -1304,6 +1316,7 @@ const AdminDashboard = () => {
 
   const openWhatsappConversation = async (conversation) => {
     setSelectedWhatsappConversation(conversation);
+    setWhatsappMobileChatOpen(true);
     setWhatsappLoading(true);
     try {
       const messages = await request(`/api/admin/whatsapp/conversations/${conversation.id}/messages`);
@@ -3221,50 +3234,44 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'whatsapp' && (
-            <div className="admin-section whatsapp-screen">
-              <div className={`whatsapp-status-card ${whatsappStatus?.connected ? 'connected' : 'pending'}`}>
-                <div>
-                  <span className="section-kicker">Atendimento WhatsApp</span>
-                  <h3>{whatsappStatus?.connected ? 'WhatsApp conectado ao painel' : 'Conectar WhatsApp por QR Code'}</h3>
-                  <p>
-                    {whatsappStatus?.connected
-                      ? 'Todos os vendedores atendem pelo sistema usando o mesmo número conectado.'
-                      : 'Escaneie o QR Code uma vez com o WhatsApp oficial da DRM para liberar o chatbox.'}
-                  </p>
-                </div>
-                <div className="whatsapp-status-badges">
-                  <span>{whatsappStatus?.visibility === 'todos' ? 'Visão master' : 'Meus leads'}</span>
-                  <span>{whatsappStatus?.connected ? 'Online' : whatsappStatus?.status || 'Desconectado'}</span>
-                  {whatsappStatus?.phone && <span>{whatsappStatus.phone}</span>}
-                </div>
-                <button type="button" className="btn btn-primary btn-sm-admin" onClick={openWhatsappConnectModal}>
-                  {whatsappStatus?.connected ? 'Ver conexão' : 'Conectar WhatsApp'}
-                </button>
-              </div>
-
-              {!whatsappStatus?.connected && (
-                <div className="admin-card whatsapp-config-card">
-                  <strong>O chatbox ainda não está enviando mensagens pelo WhatsApp</strong>
-                  <p>Clique em conectar, escaneie o QR Code com o celular do número oficial e mantenha o atendimento todo pelo sistema.</p>
-                  <button type="button" className="btn btn-outline btn-sm-admin" onClick={openWhatsappConnectModal}>Abrir QR Code</button>
-                </div>
-              )}
-
+            <div className={`admin-section whatsapp-screen wa-redesign ${whatsappMobileChatOpen ? 'mobile-chat-open' : ''}`}>
               <div className="whatsapp-layout">
-                <aside className="whatsapp-inbox">
+                <aside className="whatsapp-inbox" aria-label="Lista de conversas do WhatsApp">
                   <div className="whatsapp-inbox-head">
                     <div>
-                      <h4>Conversas</h4>
+                      <span className="section-kicker">Atendimento</span>
+                      <h4>WhatsApp</h4>
                       <p>{whatsappSummary.aguardando} aguardando • {whatsappSummary.emAtendimento} em atendimento</p>
                     </div>
-                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => loadData(adminUser).catch(err => showToast(err.message, 'error'))}>Atualizar</button>
+                    <button type="button" className="wa-icon-button" title="Atualizar conversas" aria-label="Atualizar conversas" onClick={() => loadData(adminUser).catch(err => showToast(err.message, 'error'))}>
+                      ↻
+                    </button>
                   </div>
 
+                  <div className={`wa-connection-strip ${whatsappStatus?.connected ? 'online' : 'offline'}`}>
+                    <span className="wa-connection-dot" aria-hidden="true"></span>
+                    <div>
+                      <strong>{whatsappStatus?.connected ? 'Online' : whatsappStatus?.status || 'Desconectado'}</strong>
+                      <small>{whatsappStatus?.phone || 'Número não conectado'}</small>
+                    </div>
+                    <button type="button" onClick={openWhatsappConnectModal}>{whatsappStatus?.connected ? 'Ver conexão' : 'Conectar'}</button>
+                  </div>
+
+                  <label className="wa-search">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                      type="search"
+                      value={whatsappSearch}
+                      onChange={(event) => setWhatsappSearch(event.target.value)}
+                      placeholder="Buscar conversa, nome ou telefone"
+                    />
+                  </label>
+
                   <div className="whatsapp-queue-tabs" aria-label="Filtros do chatbox">
+                    <button type="button" className={whatsappFilter === 'todas' ? 'active' : ''} onClick={() => setWhatsappFilter('todas')}>Todas <span>{whatsappSummary.total}</span></button>
                     <button type="button" className={whatsappFilter === 'aguardando' ? 'active' : ''} onClick={() => setWhatsappFilter('aguardando')}>Aguardando <span>{whatsappSummary.aguardando}</span></button>
                     <button type="button" className={whatsappFilter === 'atendimento' ? 'active' : ''} onClick={() => setWhatsappFilter('atendimento')}>Em atendimento <span>{whatsappSummary.emAtendimento}</span></button>
                     <button type="button" className={whatsappFilter === 'minhas' ? 'active' : ''} onClick={() => setWhatsappFilter('minhas')}>Minhas <span>{whatsappSummary.minhas}</span></button>
-                    {isMasterAdmin && <button type="button" className={whatsappFilter === 'todas' ? 'active' : ''} onClick={() => setWhatsappFilter('todas')}>Todas <span>{whatsappSummary.total}</span></button>}
                     <button type="button" className={whatsappFilter === 'finalizadas' ? 'active' : ''} onClick={() => setWhatsappFilter('finalizadas')}>Finalizadas</button>
                   </div>
 
@@ -3273,7 +3280,7 @@ const AdminDashboard = () => {
                       <span className="wa-alert-dot" aria-hidden="true"></span>
                       <div>
                         <strong>{pendingWhatsappConversations.length} aguardando atendimento</strong>
-                        <span>Abra uma conversa e clique em iniciar para remover da fila.</span>
+                        <span>Fila nova para alguém assumir agora.</span>
                       </div>
                       {whatsappFilter !== 'aguardando' && (
                         <button type="button" onClick={() => setWhatsappFilter('aguardando')}>Ver fila</button>
@@ -3282,52 +3289,71 @@ const AdminDashboard = () => {
                   )}
 
                   <div className="whatsapp-conversation-list">
-                    {filteredWhatsappConversations.map(conversation => (
-                      <button
-                        key={conversation.id}
-                        type="button"
-                        className={`whatsapp-conversation ${conversation.status === 'Aguardando atendimento' ? 'pending' : ''} ${selectedWhatsappConversation?.id === conversation.id ? 'active' : ''}`}
-                        onClick={() => openWhatsappConversation(conversation)}
-                      >
-                        <span className="wa-avatar">{String(conversation.clienteNome || 'W').charAt(0)}</span>
-                        <span className="wa-conversation-main">
-                          <strong>{conversation.clienteNome || conversation.clienteTelefone}</strong>
-                          <small>{conversation.lastMessage || 'Sem mensagens no histórico'}</small>
-                          <em>{conversation.assignedUserName || 'Fila compartilhada'} • {conversation.clienteTelefone}</em>
-                          <i className={`wa-status-chip wa-status-${String(conversation.status || 'aguardando').toLowerCase().replace(/\s+/g, '-')}`}>{conversation.status || 'Aguardando atendimento'}</i>
-                          {conversation.status === 'Aguardando atendimento' && <b className="wa-start-hint">Começar atendimento</b>}
-                        </span>
-                        {Number(conversation.unreadCount || 0) > 0 && <span className="wa-unread">{conversation.unreadCount}</span>}
-                      </button>
-                    ))}
-                    {filteredWhatsappConversations.length === 0 && (
+                    {whatsappLoading && !selectedWhatsappConversation && filteredWhatsappConversations.length === 0 && (
+                      Array.from({ length: 5 }).map((_, index) => (
+                        <div className="wa-skeleton-card" key={index}><span></span><div><b></b><i></i><i></i></div></div>
+                      ))
+                    )}
+                    {filteredWhatsappConversations.map(conversation => {
+                      const lastDate = conversation.lastMessageAt || conversation.updatedAt || conversation.createdAt;
+                      return (
+                        <button
+                          key={conversation.id}
+                          type="button"
+                          className={`whatsapp-conversation ${conversation.status === 'Aguardando atendimento' ? 'pending' : ''} ${selectedWhatsappConversation?.id === conversation.id ? 'active' : ''}`}
+                          onClick={() => openWhatsappConversation(conversation)}
+                        >
+                          <span className="wa-avatar">{String(conversation.clienteNome || conversation.clienteTelefone || 'W').charAt(0)}</span>
+                          <span className="wa-conversation-main">
+                            <span className="wa-conversation-title">
+                              <strong>{conversation.clienteNome || conversation.clienteTelefone}</strong>
+                              <time>{lastDate ? new Date(lastDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</time>
+                            </span>
+                            <small>{conversation.lastMessage || 'Sem mensagens no histórico'}</small>
+                            <em>{conversation.assignedUserName || 'Fila compartilhada'} • {conversation.clienteTelefone}</em>
+                            <i className={`wa-status-chip wa-status-${String(conversation.status || 'aguardando').toLowerCase().replace(/\s+/g, '-')}`}>{conversation.status || 'Aguardando atendimento'}</i>
+                          </span>
+                          {Number(conversation.unreadCount || 0) > 0 && <span className="wa-unread">{conversation.unreadCount}</span>}
+                        </button>
+                      );
+                    })}
+                    {filteredWhatsappConversations.length === 0 && !whatsappLoading && (
                       <div className="whatsapp-empty">
+                        <span className="wa-empty-icon">✦</span>
                         <strong>Nenhuma conversa nessa fila</strong>
-                        <p>Quando chegar um lead novo pelo WhatsApp, ele entra como aguardando atendimento.</p>
+                        <p>Quando chegar um lead novo individual pelo WhatsApp, ele aparece aqui para atendimento.</p>
                       </div>
                     )}
                   </div>
                 </aside>
 
-                <section className="whatsapp-chat">
+                <section className="whatsapp-chat" aria-label="Janela de conversa">
                   {selectedWhatsappConversation ? (
                     <>
                       <div className="whatsapp-chat-head">
-                        <div>
+                        <button type="button" className="wa-back-button" onClick={() => setWhatsappMobileChatOpen(false)} aria-label="Voltar para conversas">‹</button>
+                        <span className="wa-avatar large">{String(selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone || 'W').charAt(0)}</span>
+                        <div className="wa-chat-title">
                           <h4>{selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone}</h4>
                           <p>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Fila compartilhada'} • {selectedWhatsappConversation.status || 'Aguardando atendimento'}</p>
                         </div>
                         <div className="whatsapp-chat-actions">
                           {selectedWhatsappIsPending && (
                             <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => claimWhatsappConversation()} disabled={whatsappLoading}>
-                              Iniciar atendimento
+                              Assumir
                             </button>
                           )}
+                          <button type="button" className="btn btn-outline btn-sm-admin" disabled title="Transferência será liberada quando houver troca de responsável no backend.">
+                            Transferir
+                          </button>
                           {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
                             <button type="button" className="btn btn-outline btn-sm-admin" onClick={closeWhatsappConversation} disabled={whatsappLoading}>
                               Finalizar
                             </button>
                           )}
+                          <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setActiveTab('orcamentos')}>
+                            Orçamento
+                          </button>
                           <a
                             className="btn btn-outline btn-sm-admin"
                             href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`}
@@ -3347,27 +3373,43 @@ const AdminDashboard = () => {
                       )}
 
                       <div className="whatsapp-messages">
-                        {whatsappLoading && whatsappMessages.length === 0 && <p className="muted-text">Carregando mensagens...</p>}
-                        {whatsappMessages.map(message => (
-                          <div key={message.id} className={`whatsapp-message ${message.direction === 'outgoing' ? 'sent' : 'received'}`}>
-                            <p>{message.text}</p>
-                            <span>
-                              {message.senderName || (message.direction === 'outgoing' ? 'DRM' : selectedWhatsappConversation.clienteNome)}
-                              {' • '}
-                              {message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : ''}
-                              {message.direction === 'outgoing' && ` • ${message.status || 'pendente'}`}
-                            </span>
+                        {whatsappLoading && whatsappMessages.length === 0 && (
+                          <div className="wa-chat-loading">
+                            <span></span><span></span><span></span>
                           </div>
-                        ))}
+                        )}
+                        {whatsappMessages.map((message, index) => {
+                          const currentDate = message.createdAt ? new Date(message.createdAt).toLocaleDateString('pt-BR') : '';
+                          const previousDate = whatsappMessages[index - 1]?.createdAt ? new Date(whatsappMessages[index - 1].createdAt).toLocaleDateString('pt-BR') : '';
+                          const isSystem = String(message.senderName || '').toLowerCase().includes('drm energia solar') || String(message.text || '').includes('*DRM ENERGIA SOLAR*');
+                          return (
+                            <div key={message.id} className="wa-message-group">
+                              {currentDate && currentDate !== previousDate && <div className="wa-date-separator">{currentDate}</div>}
+                              <div className={`whatsapp-message ${message.direction === 'outgoing' ? 'sent' : 'received'} ${isSystem ? 'system' : ''}`}>
+                                <p>{message.text}</p>
+                                <span>
+                                  {message.senderName || (message.direction === 'outgoing' ? 'DRM' : selectedWhatsappConversation.clienteNome)}
+                                  {' • '}
+                                  {message.createdAt ? new Date(message.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                  {message.direction === 'outgoing' && ` • ${message.status || 'pendente'}`}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div ref={whatsappMessagesEndRef}></div>
                         {!whatsappLoading && whatsappMessages.length === 0 && (
                           <div className="whatsapp-empty chat-empty">
+                            <span className="wa-empty-icon">☀</span>
                             <strong>Conversa pronta para iniciar</strong>
-                            <p>Envie a primeira mensagem quando a API oficial estiver conectada.</p>
+                            <p>Assuma o atendimento para responder pelo sistema usando o número oficial da DRM.</p>
                           </div>
                         )}
                       </div>
 
                       <form className="whatsapp-compose" onSubmit={sendWhatsappReply}>
+                        <button type="button" className="wa-compose-tool" title="Anexo" aria-label="Anexo" disabled>＋</button>
+                        <button type="button" className="wa-compose-tool" title="Modelos rápidos" aria-label="Modelos rápidos" disabled>☰</button>
                         <textarea
                           value={whatsappReply}
                           onChange={(event) => setWhatsappReply(event.target.value)}
@@ -3377,7 +3419,7 @@ const AdminDashboard = () => {
                           disabled={!canReplyWhatsapp}
                         />
                         <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp}>
-                          Enviar mensagem
+                          Enviar
                         </button>
                       </form>
                     </>
@@ -3385,7 +3427,7 @@ const AdminDashboard = () => {
                     <div className="whatsapp-no-chat">
                       <span className="wa-avatar large">W</span>
                       <h4>Selecione uma conversa</h4>
-                      <p>Atenda os leads pelo painel e mantenha o histórico centralizado por responsável.</p>
+                      <p>Atenda leads pelo painel com histórico centralizado, sem misturar grupos ou conversas antigas.</p>
                     </div>
                   )}
                 </section>
