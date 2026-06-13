@@ -2920,6 +2920,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       leadId INTEGER,
       clienteNome TEXT,
       tipo TEXT,
+      origem TEXT,
       descricao TEXT,
       resultado TEXT,
       proximoRetorno TEXT,
@@ -3401,6 +3402,12 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     if (!existingProjetoColumns.includes(field)) {
       await db.exec(`ALTER TABLE projetos ADD COLUMN ${field} ${definition}`);
     }
+  }
+
+  const atividadeColumns = await db.all('PRAGMA table_info(atividades)');
+  const existingAtividadeColumns = atividadeColumns.map(column => column.name);
+  if (!existingAtividadeColumns.includes('origem')) {
+    await db.exec('ALTER TABLE atividades ADD COLUMN origem TEXT');
   }
 
   const usuarioColumns = await db.all('PRAGMA table_info(usuarios)');
@@ -5328,6 +5335,9 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   const existing = await db.get('SELECT * FROM contratos WHERE orcamentoId = ?', orcamentoId);
   if (existing) return res.json(parseContrato(existing));
 
+  const cliente = orcamento.clienteId
+    ? await db.get('SELECT * FROM clientes WHERE id = ?', orcamento.clienteId)
+    : null;
   const dimensionamento = parseJsonField(orcamento.dimensionamento);
   const financeiro = parseJsonField(orcamento.financeiro);
   const equipamento = equipamentoId
@@ -5354,6 +5364,13 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   const manualFinal = mergeManualWithEquipamento({ ...manualFromOrcamento, ...manualOverrides }, equipamento);
   const now = new Date().toISOString();
   const dados = {
+    cliente: cliente ? publicClient(cliente) : {
+      id: orcamento.clienteId || null,
+      nome: orcamento.clienteNome,
+      whatsapp: orcamento.clienteTelefone,
+      email: orcamento.clienteEmail,
+      cidade: orcamento.clienteCidade,
+    },
     dimensionamento,
     financeiro,
     manual: manualFinal,

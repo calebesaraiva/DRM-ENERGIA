@@ -2528,7 +2528,7 @@ const AdminDashboard = () => {
       {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
       <aside className="admin-sidebar">
         <div className="sidebar-header">
-          <Link to="/">
+          <Link to="/" aria-label="Voltar para a página inicial da DRM">
             <img src="/assets/logo.png" alt="DRM Admin" className="sidebar-logo-img" />
           </Link>
           <span className="sidebar-badge">{adminUser.role}</span>
@@ -2569,7 +2569,7 @@ const AdminDashboard = () => {
 
       <main className={`admin-main-content ${activeTab === 'whatsapp' ? 'whatsapp-active' : ''}`}>
         <header className="admin-topbar">
-          <button className="mobile-menu-toggle" onClick={() => setIsSidebarOpen(true)}>
+          <button className="mobile-menu-toggle" onClick={() => setIsSidebarOpen(true)} aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
           <div className="topbar-main">
@@ -3158,7 +3158,7 @@ const AdminDashboard = () => {
                                 <td className="col-wp">
                                   {c.whatsapp ? (
                                     <a href={whatsappHref || '#'} target="_blank" rel="noopener noreferrer" className="wp-cell-link" title="Abrir WhatsApp">
-                                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#25d366" flexShrink="0"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
+                                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#25d366" style={{ flexShrink: 0 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
                                       {c.whatsapp}
                                     </a>
                                   ) : <span className="text-muted">—</span>}
