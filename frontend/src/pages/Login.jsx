@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import './Login.css';
 import { withApiBase } from '../utils/apiBase';
@@ -12,6 +12,36 @@ const Login = ({ accessType: forcedAccessType = null }) => {
   const [searchParams] = useSearchParams();
   const accessType = forcedAccessType || (searchParams.get('tipo') === 'equipe' ? 'equipe' : 'cliente');
   const isTeamAccess = accessType === 'equipe';
+
+  // Se já existe uma sessão válida salva, não força login de novo:
+  // ao apertar "voltar" ou recarregar, manda direto para a área do usuário.
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      if (!token || !user) return;
+
+      const part = token.split('.')[1];
+      if (part) {
+        const payload = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload?.exp && payload.exp * 1000 <= Date.now()) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('role');
+          return;
+        }
+      }
+
+      if (user.mustChangePassword) { navigate('/alterar-senha', { replace: true }); return; }
+      if (user.requiresEmailVerification) { navigate('/verificar-email', { replace: true }); return; }
+
+      const isInternalUser = user.userType === 'interno'
+        || ['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(user.role);
+      navigate(isInternalUser ? '/admin' : '/dashboard', { replace: true });
+    } catch {
+      /* token malformado — deixa na tela de login */
+    }
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
