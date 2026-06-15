@@ -11749,18 +11749,23 @@
   }
 
   .admin-main-content.whatsapp-active .wa-redesign .whatsapp-inbox,
-  .admin-main-content.whatsapp-active .wa-redesign .whatsapp-chat {
+  .admin-main-content.whatsapp-active .wa-redesign .whatsapp-chat,
+  .admin-main-content.whatsapp-active .wa-redesign .wi2,
+  .admin-main-content.whatsapp-active .wa-redesign .wc2 {
     width: 100%;
     height: 100%;
     max-height: none;
   }
 
-  .admin-main-content.whatsapp-active .wa-redesign.mobile-chat-open .whatsapp-inbox {
-    display: none;
+  /* No mobile, mostra UMA tela de cada vez: lista OU conversa */
+  .admin-main-content.whatsapp-active .wa-redesign.mobile-chat-open .whatsapp-inbox,
+  .admin-main-content.whatsapp-active .wa-redesign.mobile-chat-open .wi2 {
+    display: none !important;
   }
 
-  .admin-main-content.whatsapp-active .wa-redesign:not(.mobile-chat-open) .whatsapp-chat {
-    display: none;
+  .admin-main-content.whatsapp-active .wa-redesign:not(.mobile-chat-open) .whatsapp-chat,
+  .admin-main-content.whatsapp-active .wa-redesign:not(.mobile-chat-open) .wc2 {
+    display: none !important;
   }
 
   .admin-main-content.whatsapp-active .wa-redesign .whatsapp-inbox {
