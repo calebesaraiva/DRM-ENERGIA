@@ -5144,6 +5144,26 @@ app.post('/api/admin/whatsapp/conversations/:id/close', authRequired, requirePer
   res.json(updated);
 });
 
+// Arquiva uma conversa que não é lead (pós-venda, manutenção, instalação etc.).
+// Não envia nada ao cliente — apenas some da lista de atendimento para todos.
+app.post('/api/admin/whatsapp/conversations/:id/archive', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const conversation = await getWhatsAppConversationById(req.params.id);
+  if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+  if (!canAccessWhatsAppConversation(req.user, conversation)) {
+    return res.status(403).json({ message: 'Você não tem acesso a esta conversa.' });
+  }
+
+  await db.run(
+    `UPDATE whatsapp_conversations SET status = 'Arquivada', unreadCount = 0, updatedAt = ? WHERE id = ?`,
+    new Date().toISOString(),
+    conversation.id
+  );
+  const updated = await getWhatsAppConversationById(conversation.id);
+  io.emit('whatsapp_conversation_updated', updated);
+  io.emit('whatsapp_conversation_archived', { id: conversation.id });
+  res.json(updated);
+});
+
 app.get('/api/admin/whatsapp/conversations/:id/messages', authRequired, requirePermission('whatsapp'), async (req, res) => {
   const conversation = await getWhatsAppConversationById(req.params.id);
   if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });

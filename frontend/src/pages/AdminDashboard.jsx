@@ -1474,6 +1474,24 @@ const AdminDashboard = () => {
     }
   };
 
+  const archiveWhatsappConversation = async () => {
+    if (!selectedWhatsappConversation) return;
+    if (!window.confirm('Marcar esta conversa como "Não é lead"? Ela será removida da lista de atendimento para todos.')) return;
+    const archivedId = selectedWhatsappConversation.id;
+    setWhatsappLoading(true);
+    try {
+      await request(`/api/admin/whatsapp/conversations/${archivedId}/archive`, { method: 'POST' });
+      setWhatsappConversations(prev => prev.filter(item => item.id !== archivedId));
+      setSelectedWhatsappConversation(null);
+      setWhatsappMobileChatOpen(false);
+      showToast('Conversa arquivada (não é lead).', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
   const openWhatsappConnectModal = async () => {
     setWhatsappConnectOpen(true);
     setWhatsappConnectLoading(true);
@@ -3515,6 +3533,7 @@ const AdminDashboard = () => {
                               )}
                               <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
                               <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
+                              <button type="button" className="wa-more-danger" onClick={() => { archiveWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Não é lead (arquivar)</button>
                             </div>
                           )}
                         </div>
