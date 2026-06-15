@@ -1328,6 +1328,12 @@ const AdminDashboard = () => {
     };
 
     const handleWhatsappConversation = (conversation) => {
+      // Conversa arquivada (não é lead) some da lista para todos em tempo real.
+      if (conversation.status === 'Arquivada') {
+        setWhatsappConversations(prev => prev.filter(item => item.id !== conversation.id));
+        setSelectedWhatsappConversation(prev => prev?.id === conversation.id ? null : prev);
+        return;
+      }
       const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson')
         || Number(conversation.assignedUserId) === Number(loggedInUser.id)
         || !conversation.assignedUserId
