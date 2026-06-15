@@ -718,7 +718,9 @@ const upsertWhatsAppConversation = async ({
   const now = new Date().toISOString();
   if (conversation) {
     const nextLeadId = conversation.leadId || leadId || null;
-    const shouldReopen = ['Finalizada', 'Arquivada'].includes(conversation.status) && status === 'Aguardando atendimento';
+    // 'Arquivada' = "não é lead": permanece oculta mesmo que o contato mande
+    // novas mensagens. Apenas 'Finalizada' (atendimento concluído) pode reabrir.
+    const shouldReopen = conversation.status === 'Finalizada' && status === 'Aguardando atendimento';
     const nextOwnerId = shouldReopen ? null : (conversation.assignedUserId || assignedUserId || null);
     const nextOwnerName = shouldReopen ? null : (conversation.assignedUserName || assignedUserName || null);
     const nextStatus = shouldReopen ? 'Aguardando atendimento' : (conversation.status || status);
