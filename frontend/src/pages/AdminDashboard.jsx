@@ -628,6 +628,7 @@ const AdminDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(initialUser, location.pathname));
+  const [panelHistory, setPanelHistory] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
   const [leads, setLeads] = useState([]);
@@ -744,6 +745,104 @@ const AdminDashboard = () => {
   const [homoDocUpload, setHomoDocUpload] = useState({ tipo: 'cliente', nome: '', descricao: '', arquivo: null });
   const [homoDocUploadLoading, setHomoDocUploadLoading] = useState(false);
   const [projetoDocumentPreview, setProjetoDocumentPreview] = useState(null);
+
+  const getPanelSnapshot = useCallback(() => ({
+    activeTab,
+    clientView,
+    homoView,
+    homoDetalheTab,
+    selectedProjetoId: selectedProjeto?.id || null,
+    selectedOrcClientId: selectedOrcClient?.id || null,
+    selectedOrcamentoId: selectedOrcamento?.id || null,
+    selectedContratoId: selectedContrato?.id || null,
+    isBudgetFormOpen,
+    leadTabFilter,
+    whatsappFilter,
+  }), [
+    activeTab,
+    clientView,
+    homoDetalheTab,
+    homoView,
+    isBudgetFormOpen,
+    leadTabFilter,
+    selectedContrato?.id,
+    selectedOrcClient?.id,
+    selectedOrcamento?.id,
+    selectedProjeto?.id,
+    whatsappFilter,
+  ]);
+
+  const restorePanelSnapshot = useCallback((snapshot = {}) => {
+    setActiveTab(snapshot.activeTab || 'dashboard');
+    setClientView(snapshot.clientView || 'list');
+    setHomoView(snapshot.homoView || 'fila');
+    setHomoDetalheTab(snapshot.homoDetalheTab || 'cliente');
+    setLeadTabFilter(snapshot.leadTabFilter || 'todos');
+    setWhatsappFilter(snapshot.whatsappFilter || 'aguardando');
+    setSelectedProjeto(snapshot.selectedProjetoId ? projetos.find(item => Number(item.id) === Number(snapshot.selectedProjetoId)) || null : null);
+    setSelectedOrcClient(snapshot.selectedOrcClientId ? clientes.find(item => Number(item.id) === Number(snapshot.selectedOrcClientId)) || null : null);
+    setSelectedOrcamento(snapshot.selectedOrcamentoId ? orcamentos.find(item => Number(item.id) === Number(snapshot.selectedOrcamentoId)) || null : null);
+    setSelectedContrato(snapshot.selectedContratoId ? contratos.find(item => Number(item.id) === Number(snapshot.selectedContratoId)) || null : null);
+    setIsBudgetFormOpen(Boolean(snapshot.isBudgetFormOpen));
+    setQuickModal(null);
+    setShowManualLeadForm(false);
+    setWhatsappTransferOpen(false);
+    setWaChatActionsOpen(false);
+    setIsSidebarOpen(false);
+  }, [clientes, contratos, orcamentos, projetos]);
+
+  const rememberPanelStep = useCallback(() => {
+    const current = getPanelSnapshot();
+    setPanelHistory(prev => {
+      const last = prev[prev.length - 1];
+      if (last && JSON.stringify(last) === JSON.stringify(current)) return prev;
+      return [...prev.slice(-24), current];
+    });
+  }, [getPanelSnapshot]);
+
+  const navigatePanel = useCallback((changes = {}) => {
+    rememberPanelStep();
+    restorePanelSnapshot({ ...getPanelSnapshot(), ...changes });
+  }, [getPanelSnapshot, rememberPanelStep, restorePanelSnapshot]);
+
+  const handlePanelBack = useCallback(() => {
+    const last = panelHistory[panelHistory.length - 1];
+    if (last) {
+      restorePanelSnapshot(last);
+      setPanelHistory(prev => prev.slice(0, -1));
+      return;
+    }
+
+    if (activeTab === 'homologacao' && (homoView !== 'fila' || selectedProjeto)) {
+      setHomoView('fila');
+      setSelectedProjeto(null);
+      return;
+    }
+    if (activeTab === 'projetos' && selectedProjeto) {
+      setSelectedProjeto(null);
+      return;
+    }
+    if (activeTab === 'clientes' && clientView !== 'list') {
+      setClientView('list');
+      setNovoCliente(emptyClientForm);
+      return;
+    }
+    if (activeTab === 'orcamentos' && (isBudgetFormOpen || selectedOrcamento || selectedOrcClient)) {
+      setIsBudgetFormOpen(false);
+      setSelectedOrcamento(null);
+      setSelectedOrcClient(null);
+      return;
+    }
+    if (activeTab !== 'dashboard') setActiveTab('dashboard');
+  }, [activeTab, clientView, homoView, isBudgetFormOpen, panelHistory, restorePanelSnapshot, selectedOrcClient, selectedOrcamento, selectedProjeto]);
+
+  const canPanelGoBack = panelHistory.length > 0
+    || activeTab !== 'dashboard'
+    || clientView !== 'list'
+    || Boolean(selectedProjeto)
+    || Boolean(selectedOrcClient)
+    || Boolean(selectedOrcamento)
+    || isBudgetFormOpen;
 
   const headers = useMemo(() => ({
     'Content-Type': 'application/json',
@@ -1574,12 +1673,12 @@ const AdminDashboard = () => {
       return cp === phone || cp === phone.replace(/^55/, '') || ('55' + cp) === phone;
     });
     if (existing) {
-      setActiveTab('whatsapp');
+      navigatePanel({ activeTab: 'whatsapp' });
       await openWhatsappConversation(existing);
     } else {
       setWhatsappSearch(lead.telefone || '');
       setWhatsappFilter('todas');
-      setActiveTab('whatsapp');
+      navigatePanel({ activeTab: 'whatsapp', whatsappFilter: 'todas' });
       showToast(`Nenhuma conversa encontrada para ${lead.nome}. Aguarde o lead entrar em contato ou inicie pelo WhatsApp.`, 'info');
     }
   };
@@ -2411,6 +2510,7 @@ const AdminDashboard = () => {
   };
 
   const openBudgetFormForClient = (cliente = null) => {
+    rememberPanelStep();
     setBudgetStatus('');
     setBudgetForm({
       ...emptyBudgetForm,
@@ -2500,11 +2600,11 @@ const AdminDashboard = () => {
       return;
     }
     if (action.action === 'newLead') {
-      setActiveTab('leads');
+      navigatePanel({ activeTab: 'leads' });
       setShowManualLeadForm(true);
       return;
     }
-    setActiveTab(action.tab);
+    navigatePanel({ activeTab: action.tab });
   };
 
   const openQuickActionEditor = () => {
@@ -2594,7 +2694,7 @@ const AdminDashboard = () => {
   const openClientContractModal = (cliente) => {
     const existingContract = getClientContract(cliente);
     if (existingContract) {
-      setActiveTab('contratos');
+      navigatePanel({ activeTab: 'contratos', selectedContratoId: existingContract.id });
       abrirRevisaoContrato(existingContract);
       showToast(`Abrindo contrato ${contractNumber(existingContract)} - ${existingContract.status}.`, 'info');
       return;
@@ -2627,7 +2727,7 @@ const AdminDashboard = () => {
     }
     const existing = procuracoes.find(item => Number(item.contratoId) === Number(contrato.id));
     if (existing) {
-      setActiveTab('procuracoes');
+      navigatePanel({ activeTab: 'procuracoes' });
       showToast(`Este contrato já possui a procuração PR-${String(existing.id).padStart(4, '0')} (${existing.status}).`, 'info');
       return;
     }
@@ -2665,7 +2765,7 @@ const AdminDashboard = () => {
       });
       setProcuracoes(prev => prev.some(item => item.id === procuracao.id) ? prev.map(item => item.id === procuracao.id ? procuracao : item) : [procuracao, ...prev]);
       setHomologacaoModal(null);
-      setActiveTab('procuracoes');
+      navigatePanel({ activeTab: 'procuracoes' });
       showToast(
         procuracao.status === 'Pendente'
           ? `Homologação iniciada. A procuração foi vinculada ao ${contractNumber(contrato)} e enviada para aprovação.`
@@ -2712,7 +2812,7 @@ const AdminDashboard = () => {
     });
     setSelectedContrato(null);
     setContractModal({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
-    setActiveTab('contratos');
+    navigatePanel({ activeTab: 'contratos' });
     showToast(`Contrato ${contractNumber(contrato)} gerado com os dados do orçamento.`, 'success');
   };
 
@@ -3026,7 +3126,7 @@ const AdminDashboard = () => {
                   key={tab.id}
                   className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
                   onClick={() => {
-                    setActiveTab(tab.id);
+                    navigatePanel({ activeTab: tab.id });
                     setIsSidebarOpen(false);
                   }}
                 >
@@ -3055,7 +3155,19 @@ const AdminDashboard = () => {
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
           <div className="topbar-main">
-            <h2>{tabs.find(tab => tab.id === activeTab)?.label || 'Painel'}</h2>
+            <div className="panel-title-row">
+              <button
+                type="button"
+                className="panel-back-button"
+                onClick={handlePanelBack}
+                disabled={!canPanelGoBack}
+                aria-label="Voltar para a tela anterior do painel"
+                title="Voltar"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L9.8 13H21v-2H9.8l5.6-5.6Z" fill="currentColor"/></svg>
+              </button>
+              <h2>{tabs.find(tab => tab.id === activeTab)?.label || 'Painel'}</h2>
+            </div>
             <div className="quick-action-row">
               <div className="quick-action-bar" aria-label="Ações rápidas">
                 {quickActions.map(action => (
@@ -3121,32 +3233,32 @@ const AdminDashboard = () => {
               </div>
 
               <div className="dashboard-action-strip">
-                <button type="button" className="dashboard-action-card urgent" onClick={() => setActiveTab('leads')}>
+                <button type="button" className="dashboard-action-card urgent" onClick={() => navigatePanel({ activeTab: 'leads' })}>
                   <span>Atender agora</span>
                   <strong>{resumo.kpis?.novos || 0}</strong>
                   <small>lead{(resumo.kpis?.novos || 0) === 1 ? '' : 's'} novo{(resumo.kpis?.novos || 0) === 1 ? '' : 's'}</small>
                 </button>
-                <button type="button" className="dashboard-action-card" onClick={() => setActiveTab('leads')}>
+                <button type="button" className="dashboard-action-card" onClick={() => navigatePanel({ activeTab: 'leads' })}>
                   <span>Retornos</span>
                   <strong>{resumo.proximosRetornos?.length || 0}</strong>
                   <small>agendado{(resumo.proximosRetornos?.length || 0) === 1 ? '' : 's'}</small>
                 </button>
-                <button type="button" className="dashboard-action-card warning" onClick={() => setActiveTab('contratos')}>
+                <button type="button" className="dashboard-action-card warning" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
                   <span>Aprovar contratos</span>
                   <strong>{resumo.kpis?.contratosPendentes || 0}</strong>
                   <small>pendente{(resumo.kpis?.contratosPendentes || 0) === 1 ? '' : 's'}</small>
                 </button>
-                <button type="button" className="dashboard-action-card" onClick={() => setActiveTab('projetos')}>
+                <button type="button" className="dashboard-action-card" onClick={() => navigatePanel({ activeTab: 'projetos' })}>
                   <span>Projetos críticos</span>
                   <strong>{resumo.projetosCriticos?.length || 0}</strong>
                   <small>com atenção</small>
                 </button>
-                <button type="button" className="dashboard-action-card warning" onClick={() => setActiveTab('ordensServico')}>
+                <button type="button" className="dashboard-action-card warning" onClick={() => navigatePanel({ activeTab: 'ordensServico' })}>
                   <span>O.S abertas</span>
                   <strong>{resumo.kpis?.osAbertas || 0}</strong>
                   <small>{resumo.kpis?.osEmAtendimento || 0} em atendimento</small>
                 </button>
-                <button type="button" className="dashboard-action-card urgent" onClick={() => setActiveTab('usuarios')}>
+                <button type="button" className="dashboard-action-card urgent" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
                   <span>Acessos sem e-mail</span>
                   <strong>{resumo.kpis?.acessosSemRecuperacao || 0}</strong>
                   <small>usuário{(resumo.kpis?.acessosSemRecuperacao || 0) !== 1 ? 's' : ''} sem e-mail cadastrado</small>
@@ -3154,29 +3266,29 @@ const AdminDashboard = () => {
               </div>
 
               <div className="crm-kpi-grid">
-                <button type="button" className="crm-kpi-card primary" onClick={() => setActiveTab('leads')}><span>Leads captados</span><strong>{resumo.kpis?.leads || 0}</strong><p>{resumo.kpis?.novos || 0} aguardando primeiro atendimento.</p></button>
-                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('orcamentos')}><span>Orçamentos</span><strong>{resumo.kpis?.orcamentos || 0}</strong><p>Simulações registradas no sistema.</p></button>
-                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('contratos')}><span>Contratos</span><strong>{resumo.kpis?.contratos || 0}</strong><p>{resumo.kpis?.contratosPendentes || 0} pendentes, {resumo.kpis?.contratosAprovados || 0} aprovados.</p></button>
-                <button type="button" className="crm-kpi-card" onClick={() => setActiveTab('contratos')}><span>Valor pendente</span><strong>{money(resumo.kpis?.valorPendenteContratos)}</strong><p>Em contratos aguardando aprovação.</p></button>
+                <button type="button" className="crm-kpi-card primary" onClick={() => navigatePanel({ activeTab: 'leads' })}><span>Leads captados</span><strong>{resumo.kpis?.leads || 0}</strong><p>{resumo.kpis?.novos || 0} aguardando primeiro atendimento.</p></button>
+                <button type="button" className="crm-kpi-card" onClick={() => navigatePanel({ activeTab: 'orcamentos' })}><span>Orçamentos</span><strong>{resumo.kpis?.orcamentos || 0}</strong><p>Simulações registradas no sistema.</p></button>
+                <button type="button" className="crm-kpi-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}><span>Contratos</span><strong>{resumo.kpis?.contratos || 0}</strong><p>{resumo.kpis?.contratosPendentes || 0} pendentes, {resumo.kpis?.contratosAprovados || 0} aprovados.</p></button>
+                <button type="button" className="crm-kpi-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}><span>Valor pendente</span><strong>{money(resumo.kpis?.valorPendenteContratos)}</strong><p>Em contratos aguardando aprovação.</p></button>
               </div>
 
               <div className="ops-insight-grid">
-                <button type="button" className="ops-insight-card" onClick={() => setActiveTab('contratos')}>
+                <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
                   <span>Contratos por status</span>
                   <strong>{resumo.operacao?.contratosTotal || 0} totais</strong>
                   <p>{resumo.operacao?.contratosPendentes || 0} pendentes • {resumo.operacao?.contratosAprovados || 0} aprovados • {resumo.operacao?.contratosRecusados || 0} recusados</p>
                 </button>
-                <button type="button" className="ops-insight-card" onClick={() => setActiveTab('ordensServico')}>
+                <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'ordensServico' })}>
                   <span>Pendências técnicas</span>
                   <strong>{resumo.operacao?.ordensServicoAbertas || 0} O.S abertas</strong>
                   <p>{resumo.operacao?.ordensServicoEmAtendimento || 0} já em atendimento pela equipe.</p>
                 </button>
-                <button type="button" className="ops-insight-card" onClick={() => setActiveTab('usuarios')}>
+                <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
                   <span>Usuários com e-mail</span>
                   <strong>{resumo.operacao?.acessosComRecuperacao || 0} ativos</strong>
                   <p>{resumo.operacao?.acessosSemRecuperacao || 0} usuário{(resumo.operacao?.acessosSemRecuperacao || 0) !== 1 ? 's' : ''} ainda precisam cadastrar e-mail de recuperação.</p>
                 </button>
-                <button type="button" className="ops-insight-card" onClick={() => setActiveTab('usuarios')}>
+                <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
                   <span>Aguardando primeiro acesso</span>
                   <strong>{resumo.operacao?.senhasTemporarias || 0}</strong>
                   <p>Usuários que ainda não trocaram a senha temporária.</p>
@@ -3287,7 +3399,7 @@ const AdminDashboard = () => {
                     <h3>{adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM' ? 'Origem dos cliques' : 'Projetos por etapa'}</h3>
                     {adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM'
                       ? <span className="status-badge success">30 dias</span>
-                      : <button className="btn btn-outline btn-sm-admin" onClick={() => setActiveTab('projetos')}>Abrir projetos</button>}
+                      : <button className="btn btn-outline btn-sm-admin" onClick={() => navigatePanel({ activeTab: 'projetos' })}>Abrir projetos</button>}
                   </div>
                   <div className="pipeline-list">
                     {(adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM'
@@ -3321,7 +3433,7 @@ const AdminDashboard = () => {
                       </div>
                     ))}
                     {(resumo.proximosRetornos || []).length === 0 && <p className="muted-text">Nenhum retorno agendado.</p>}
-                    {(resumo.proximosRetornos || []).length > 5 && <button type="button" className="btn btn-outline btn-sm-admin dashboard-list-action" onClick={() => setActiveTab('leads')}>Ver todos os retornos</button>}
+                    {(resumo.proximosRetornos || []).length > 5 && <button type="button" className="btn btn-outline btn-sm-admin dashboard-list-action" onClick={() => navigatePanel({ activeTab: 'leads' })}>Ver todos os retornos</button>}
                   </div>
                 </div>
 
@@ -3338,7 +3450,7 @@ const AdminDashboard = () => {
                       </div>
                     ))}
                     {(resumo.projetosCriticos || []).length === 0 && <p className="muted-text">Nenhum projeto crítico.</p>}
-                    {(resumo.projetosCriticos || []).length > 5 && <button type="button" className="btn btn-outline btn-sm-admin dashboard-list-action" onClick={() => setActiveTab('projetos')}>Ver todos os projetos</button>}
+                    {(resumo.projetosCriticos || []).length > 5 && <button type="button" className="btn btn-outline btn-sm-admin dashboard-list-action" onClick={() => navigatePanel({ activeTab: 'projetos' })}>Ver todos os projetos</button>}
                   </div>
                 </div>
               </div>
@@ -3425,7 +3537,7 @@ const AdminDashboard = () => {
                       <h3>{novoCliente.id ? 'Editar Cliente' : 'Cadastrar Cliente'} <span className="cc-badge">{novoCliente.id ? '(Dados do cliente)' : '(Cadastro Básico)'}</span></h3>
                     </div>
                     <nav className="cc-breadcrumb" aria-label="Navegação">
-                      <button type="button" className="cc-breadcrumb-link" onClick={() => { setClientView('list'); setNovoCliente(emptyClientForm); }}>Clientes</button>
+                      <button type="button" className="cc-breadcrumb-link" onClick={() => { handlePanelBack(); setNovoCliente(emptyClientForm); }}>Clientes</button>
                       <span className="cc-breadcrumb-sep">&gt;</span>
                       <span>{novoCliente.id ? 'Editar Cliente' : 'Cadastrar Cliente'}</span>
                     </nav>
@@ -3496,7 +3608,7 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                       <div className="cc-footer">
-                        <button type="button" className="cc-btn-cancel" onClick={() => { setClientView('list'); setNovoCliente(emptyClientForm); }}>
+                        <button type="button" className="cc-btn-cancel" onClick={() => { handlePanelBack(); setNovoCliente(emptyClientForm); }}>
                           <span aria-hidden="true">✕</span> Cancelar
                         </button>
                         <button type="submit" className="cc-btn-save">
@@ -3605,7 +3717,7 @@ const AdminDashboard = () => {
                       <div className="clients-toolbar-right">
                         <span className="clients-count">{clientSummary.filtered.length} cliente{clientSummary.filtered.length !== 1 ? 's' : ''}</span>
                         {hasPermission('gerenciarClientes') && (
-                          <button type="button" className="btn btn-primary" onClick={() => { setNovoCliente(emptyClientForm); setClientView('new'); }}>
+                          <button type="button" className="btn btn-primary" onClick={() => { rememberPanelStep(); setNovoCliente(emptyClientForm); setClientView('new'); }}>
                             + Cadastrar
                           </button>
                         )}
@@ -3675,7 +3787,7 @@ const AdminDashboard = () => {
                                       <button type="button" className="ca-btn ca-outline" onClick={() => openHomologacaoModal(c)}>Procuração</button>
                                     )}
                                     {hasPermission('gerenciarClientes') && (
-                                      <button type="button" className="ca-btn ca-ghost" title="Editar dados do cliente" onClick={() => { setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>
+                                      <button type="button" className="ca-btn ca-ghost" title="Editar dados do cliente" onClick={() => { rememberPanelStep(); setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                         Editar
                                       </button>
@@ -3865,7 +3977,7 @@ const AdminDashboard = () => {
                               {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
                                 <button type="button" onClick={() => { closeWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Finalizar atendimento</button>
                               )}
-                              <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
+                              <button type="button" onClick={() => { navigatePanel({ activeTab: 'orcamentos' }); setWaChatActionsOpen(false); }}>Criar orçamento</button>
                               <a href={getPanelWhatsAppUrl(selectedWhatsappConversation.clienteTelefone)} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
                               {canArchiveWhatsappNotLead && (
                                 <button
@@ -4428,7 +4540,12 @@ const AdminDashboard = () => {
                         key={c.id}
                         type="button"
                         className={`orc-client-row ${selectedOrcClient?.id === c.id ? 'active' : ''}`}
-                        onClick={() => { setSelectedOrcClient(c); setIsBudgetFormOpen(false); setSelectedOrcamento(null); }}
+                        onClick={() => {
+                          if (selectedOrcClient?.id !== c.id) rememberPanelStep();
+                          setSelectedOrcClient(c);
+                          setIsBudgetFormOpen(false);
+                          setSelectedOrcamento(null);
+                        }}
                       >
                         <span>{c.nome}</span>
                         <em>{totalOrcamentosCliente}</em>
@@ -4658,7 +4775,14 @@ const AdminDashboard = () => {
                                   <tr
                                     key={orc.id}
                                     className={selectedOrcamento?.id === orc.id ? 'orc-row-selected' : ''}
-                                    onClick={() => setSelectedOrcamento(prev => prev?.id === orc.id ? null : orc)}
+                                    onClick={() => {
+                                      if (selectedOrcamento?.id === orc.id) {
+                                        setSelectedOrcamento(null);
+                                        return;
+                                      }
+                                      rememberPanelStep();
+                                      setSelectedOrcamento(orc);
+                                    }}
                                   >
                                     <td className="orc-td-id">#{orc.id}</td>
                                     <td>{orc.data}</td>
@@ -5143,7 +5267,7 @@ const AdminDashboard = () => {
                         <h3>Produtos e pacotes</h3>
                         <p className="muted-text">Gerencie kits e equipamentos no menu lateral.</p>
                       </div>
-                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setActiveTab('produtosPacotes')}>Abrir catálogo →</button>
+                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => navigatePanel({ activeTab: 'produtosPacotes' })}>Abrir catálogo →</button>
                     </div>
                     <div className="catalog-shortcut-chips">
                       <span className="catalog-chip"><strong>{activeProdutosTotal}</strong> ativos</span>
@@ -5215,7 +5339,7 @@ const AdminDashboard = () => {
                   <p>Acompanhe e gerencie todo o processo de homologação junto à concessionária.</p>
                 </div>
                 {selectedProjeto && homoView === 'detalhes' && (
-                  <button type="button" className="btn btn-outline" onClick={() => { setHomoView('fila'); setSelectedProjeto(null); }}>
+                  <button type="button" className="btn btn-outline" onClick={handlePanelBack}>
                     ← Voltar para fila
                   </button>
                 )}
@@ -5299,7 +5423,7 @@ const AdminDashboard = () => {
                               const etapaClass = projeto.etapa === 'Projeto concluído' ? 'homo-etapa-concluido' : openPend > 0 ? 'homo-etapa-pendente' : 'homo-etapa-andamento';
                               const nextAction = openPend > 0 ? 'Corrigir pendência' : projeto.etapa === 'Projeto para envio' ? 'Protocolar envio' : projeto.etapa === 'Aguardando parecer de acesso' ? 'Aguardar parecer' : projeto.etapa === 'Projeto concluído' ? 'Finalizado' : 'Ver detalhes';
                               return (
-                                <tr key={projeto.id} className="homo-row-clickable" onClick={() => { setSelectedProjeto(projeto); setHomoView('detalhes'); setHomoDetalheTab('cliente'); }}>
+                                <tr key={projeto.id} className="homo-row-clickable" onClick={() => { rememberPanelStep(); setSelectedProjeto(projeto); setHomoView('detalhes'); setHomoDetalheTab('cliente'); }}>
                                   <td className="homo-protocolo">SP-{String(projeto.contratoId || projeto.id).padStart(4,'0')}</td>
                                   <td className="font-medium homo-nome">{projeto.clienteNome}</td>
                                   <td>{projeto.clienteCidade || '—'}</td>
@@ -5309,7 +5433,7 @@ const AdminDashboard = () => {
                                   <td className="homo-date">{projeto.updatedAt ? new Date(projeto.updatedAt).toLocaleDateString('pt-BR') : '—'}</td>
                                   <td className="homo-next-action">{nextAction}</td>
                                   <td>
-                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={e => { e.stopPropagation(); setSelectedProjeto(projeto); setHomoView('detalhes'); setHomoDetalheTab('cliente'); }}>
+                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={e => { e.stopPropagation(); rememberPanelStep(); setSelectedProjeto(projeto); setHomoView('detalhes'); setHomoDetalheTab('cliente'); }}>
                                       Ver processo
                                     </button>
                                   </td>
@@ -5829,7 +5953,7 @@ const AdminDashboard = () => {
                           <span>{filteredProjetos.filter(column.matches).length}</span>
                         </div>
                         {filteredProjetos.filter(column.matches).map(projeto => (
-                          <button className="project-card" key={projeto.id} onClick={() => setSelectedProjeto(projeto)}>
+                          <button className="project-card" key={projeto.id} onClick={() => { rememberPanelStep(); setSelectedProjeto(projeto); }}>
                             <div className="project-card-top">
                               <strong>{projeto.clienteNome}</strong>
                               <span>{projeto.prioridade || 'Normal'}</span>
@@ -5855,7 +5979,7 @@ const AdminDashboard = () => {
               {selectedProjeto && (
                 <div className="project-detail-page">
                   <div className="project-detail-toolbar">
-                    <button type="button" className="btn btn-outline" onClick={() => setSelectedProjeto(null)}>
+                    <button type="button" className="btn btn-outline" onClick={handlePanelBack}>
                       Voltar para instalações
                     </button>
                     <div>
@@ -6864,7 +6988,7 @@ const AdminDashboard = () => {
                       <span>{money(contrato.valorProjeto)} • criado por {contrato.criadoPorNome}</span>
                     </div>
                     <div className="table-actions">
-                      <button className="btn btn-primary btn-sm-admin" onClick={() => { abrirRevisaoContrato(contrato); setQuickModal(null); setActiveTab('contratos'); }}>Revisar</button>
+                      <button className="btn btn-primary btn-sm-admin" onClick={() => { navigatePanel({ activeTab: 'contratos', selectedContratoId: contrato.id }); abrirRevisaoContrato(contrato); setQuickModal(null); }}>Revisar</button>
                     </div>
                   </div>
                 ))}
@@ -6881,7 +7005,7 @@ const AdminDashboard = () => {
                       <strong>{projeto.clienteNome}</strong>
                       <span>Contrato #{projeto.contratoId} • {projeto.etapa} • {projectPhotos[projeto.id]?.length || 0} fotos</span>
                       </div>
-                      <button className="btn btn-outline btn-sm-admin" onClick={() => { setSelectedProjeto(projeto); setQuickModal(null); }}>Detalhes</button>
+                      <button className="btn btn-outline btn-sm-admin" onClick={() => { navigatePanel({ activeTab: 'projetos', selectedProjetoId: projeto.id }); setSelectedProjeto(projeto); setQuickModal(null); }}>Detalhes</button>
                     </div>
                     <div className="quick-project-actions">
                       <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Análise inicial', checklist: { ...(projeto.checklist || {}), vistoriaRealizada: true } })}>Vistoria feita</button>

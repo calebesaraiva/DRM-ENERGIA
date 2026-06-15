@@ -625,6 +625,47 @@
   line-height: 1.15;
 }
 
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.panel-back-button {
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  border: 1px solid #d8e1ee;
+  background: #ffffff;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+}
+
+.panel-back-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.panel-back-button:not(:disabled):hover {
+  transform: translateX(-1px);
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.panel-back-button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .topbar-main {
   min-width: 0;
   display: grid;
@@ -5618,6 +5659,20 @@
     text-overflow: ellipsis;
   }
 
+  .panel-title-row {
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  .admin-topbar .panel-title-row h2 {
+    margin-left: 0;
+  }
+
+  .panel-back-button {
+    width: 2.15rem;
+    height: 2.15rem;
+  }
+
   .topbar-main {
     gap: 0.48rem;
   }
@@ -6158,6 +6213,15 @@
   .admin-topbar h2 {
     font-size: 1rem;
     margin-left: 0.25rem;
+  }
+
+  .admin-topbar .panel-title-row h2 {
+    margin-left: 0;
+  }
+
+  .panel-back-button {
+    width: 2rem;
+    height: 2rem;
   }
 
   .topbar-main {
