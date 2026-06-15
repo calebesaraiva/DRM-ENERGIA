@@ -541,6 +541,7 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
         whatsappRuntime.socket.ws?.close?.();
       } catch {}
       whatsappRuntime.socket = null;
+      whatsappRuntime.connected = false; // evita estado fantasma (connected sem socket)
     }
 
     fs.mkdirSync(WHATSAPP_AUTH_DIR, { recursive: true });
@@ -665,10 +666,12 @@ const getWhatsAppProviderStatus = () => {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '';
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || process.env.META_WHATSAPP_VERIFY_TOKEN || '';
   const businessPhone = normalizeWhatsAppPhone(process.env.WHATSAPP_BUSINESS_PHONE || process.env.META_WHATSAPP_BUSINESS_PHONE || '');
+  // Só está realmente conectado se houver socket ativo (evita estado fantasma).
+  const reallyConnected = Boolean(whatsappRuntime.connected && whatsappRuntime.socket);
   return {
     mode: 'qrcode',
-    connected: whatsappRuntime.connected,
-    qrConnected: whatsappRuntime.connected,
+    connected: reallyConnected,
+    qrConnected: reallyConnected,
     qr: whatsappRuntime.qrDataUrl,
     rawQr: whatsappRuntime.qr,
     status: whatsappRuntime.status,
@@ -846,6 +849,17 @@ const resolveWhatsAppJid = async (socket, rawJid) => {
 };
 
 const sendWhatsAppTextMessage = async (to, text, options = {}) => {
+  // Auto-recuperação: se a sessão caiu no estado fantasma (sem socket), tenta
+  // reconectar uma vez antes de desistir.
+  if (!whatsappRuntime.socket && !whatsappRuntime.starting) {
+    try {
+      await startWhatsAppQrSession({ force: true });
+      await new Promise(resolve => setTimeout(resolve, 4000));
+    } catch (error) {
+      console.error('Falha ao reconectar WhatsApp automaticamente:', error?.message || error);
+    }
+  }
+
   if (whatsappRuntime.connected && whatsappRuntime.socket) {
     const rawJid = normalizeWhatsAppRemoteJid(options.remoteJid || to);
     if (!rawJid) {
