@@ -199,6 +199,24 @@ const emptyManualLeadForm = {
   observacoes: '',
 };
 
+const getPanelWhatsAppUrl = (phone, message = '') => {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  let normalized = digits.startsWith('55') ? digits : `55${digits}`;
+  if (normalized.length === 14 && normalized.charAt(4) === '9') {
+    normalized = normalized.slice(0, 4) + normalized.slice(5);
+  }
+  return `https://wa.me/${normalized}${message ? `?text=${encodeURIComponent(message)}` : ''}`;
+};
+
+const MAX_PROJECT_DOCUMENT_BYTES = 15 * 1024 * 1024;
+const PROJECT_DOCUMENT_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const isValidProjectDocumentFile = (file) => (
+  Boolean(file)
+  && PROJECT_DOCUMENT_TYPES.has(String(file.type || '').toLowerCase())
+  && file.size <= MAX_PROJECT_DOCUMENT_BYTES
+);
+
 const getOrcStatusClass = (status) => {
   switch (String(status || '')) {
     case 'Orçamento aprovado': return 'orc-status-venda';
@@ -323,10 +341,10 @@ const contractNumber = (contrato = {}) => (
   `CT-${String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(contrato.id || '').padStart(4, '0')}`
 );
 const currencyToNumber = currencyInputToNumber;
-const whatsappLeadMessage = (lead = {}) => encodeURIComponent(
+const whatsappLeadMessage = (lead = {}) => (
   `Olá ${lead.nome || ''}! Sou da DRM Energia Solar. Vi sua simulação no nosso site e quero te passar as melhores condições para você economizar na conta de energia. Podemos conversar agora?`
 );
-const whatsappClientMessage = (cliente = {}) => encodeURIComponent(
+const whatsappClientMessage = (cliente = {}) => (
   `Olá ${cliente.nome || ''}! Sou da DRM Energia Solar. Quero falar com você sobre sua proposta de energia solar e te ajudar com as próximas etapas.`
 );
 
@@ -642,7 +660,6 @@ const AdminDashboard = () => {
   const [whatsappSetupNumber, setWhatsappSetupNumber] = useState('');
   const [whatsappSetupLoading, setWhatsappSetupLoading] = useState(false);
   const [whatsappSetupError, setWhatsappSetupError] = useState('');
-  const [orcamentoSearch, setOrcamentoSearch] = useState('');
   const [orcClientSearch, setOrcClientSearch] = useState('');
   const [orcClientPage, setOrcClientPage] = useState(1);
   const [selectedOrcClient, setSelectedOrcClient] = useState(null);
@@ -663,7 +680,6 @@ const AdminDashboard = () => {
   const [selectedProjeto, setSelectedProjeto] = useState(null);
   const [pendenciaForm, setPendenciaForm] = useState(emptyPendenciaForm);
   const [envioHomologacaoForm, setEnvioHomologacaoForm] = useState(emptyEnvioHomologacaoForm);
-  const [atividades, setAtividades] = useState([]);
   const [novoCliente, setNovoCliente] = useState(emptyClientForm);
   const [clientView, setClientView] = useState('list');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -737,7 +753,6 @@ const AdminDashboard = () => {
   const hasPermission = useCallback((permission) => (
     adminUser.role === 'ADM'
     || adminUser.permissions?.[permission]
-    || (permission === 'whatsapp' && adminUser.permissions?.leads)
     || (permission === 'gerenciarClientes' && adminUser.permissions?.clientes)
   ), [adminUser.permissions, adminUser.role]);
 
@@ -907,19 +922,6 @@ const AdminDashboard = () => {
     return acc;
   }, {});
 
-  const whatsappSummary = useMemo(() => {
-    const aguardando = whatsappConversations.filter(item => item.status === 'Aguardando atendimento').length;
-    const emAtendimento = whatsappConversations.filter(item => item.status === 'Em atendimento').length;
-    const minhas = whatsappConversations.filter(item => Number(item.assignedUserId) === Number(adminUser.id)).length;
-    const naoLidas = whatsappConversations.reduce((total, item) => total + Number(item.unreadCount || 0), 0);
-    return { aguardando, emAtendimento, minhas, naoLidas, total: whatsappConversations.length };
-  }, [adminUser.id, whatsappConversations]);
-
-  const pendingWhatsappConversations = useMemo(
-    () => whatsappConversations.filter(item => item.status === 'Aguardando atendimento'),
-    [whatsappConversations]
-  );
-
   const filteredWhatsappConversations = useMemo(() => {
     const search = whatsappSearch.trim().toLowerCase();
     const byFilter = whatsappConversations.filter(item => {
@@ -986,11 +988,6 @@ const AdminDashboard = () => {
       antigos: leads.filter(l => !['Convertido', 'Perdido'].includes(l.status) && (daysSinceContact(l.ultimoContato) ?? 0) >= 7).length,
     };
   }, [leads, usuarios]);
-
-  const leadStatusOptions = useMemo(() => {
-    const statuses = Array.from(new Set([...LEAD_STATUS_PRESETS, ...leads.map(lead => lead.status || 'Sem status')]));
-    return statuses.filter(Boolean);
-  }, [leads]);
 
   const filteredLeads = useMemo(() => {
     const search = leadSearch.trim().toLowerCase();
@@ -1063,20 +1060,6 @@ const AdminDashboard = () => {
     aprovados: contratos.filter(contrato => contrato.status === 'Aprovado').length,
     recusados: contratos.filter(contrato => contrato.status === 'Recusado').length,
   }), [contratos]);
-
-  const filteredOrcamentos = useMemo(() => {
-    const search = orcamentoSearch.trim().toLowerCase();
-    if (!search) return orcamentos;
-
-    return orcamentos.filter(orcamento => [
-      orcamento.clienteNome,
-      orcamento.clienteTelefone,
-      orcamento.clienteEmail,
-      orcamento.clienteCidade,
-      orcamento.assignedUserName,
-      orcamento.id,
-    ].some(value => String(value || '').toLowerCase().includes(search)));
-  }, [orcamentoSearch, orcamentos]);
 
   const ORC_CLIENTS_PER_PAGE = 10;
 
@@ -1276,10 +1259,9 @@ const AdminDashboard = () => {
     }
     if (user.role === 'ADM' || user.permissions?.leads) {
       calls.push(request('/api/admin/leads').then(setLeads));
-      calls.push(request('/api/admin/atividades').then(setAtividades));
       calls.push(request('/api/admin/lead-owners').then(setLeadOwners));
     }
-    if (user.role === 'ADM' || user.permissions?.whatsapp || user.permissions?.leads) {
+    if (user.role === 'ADM' || user.permissions?.whatsapp) {
       calls.push(request('/api/admin/whatsapp/status').then(setWhatsappStatus));
       calls.push(request('/api/admin/whatsapp/conversations').then(setWhatsappConversations));
     }
@@ -1322,6 +1304,8 @@ const AdminDashboard = () => {
     if (failed) throw failed.reason;
   }, [request]);
 
+  // Reset pagination whenever a filter changes so the result cannot land on an empty page.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setLeadsPage(1); }, [leadSearch, leadTabFilter, leadOwnerFilter]);
   useEffect(() => {
     if (!openLeadMenu) return;
@@ -1338,7 +1322,9 @@ const AdminDashboard = () => {
     document.addEventListener('pointerdown', closeOnOutsidePointer, true);
     return () => document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
   }, [waChatActionsOpen]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
   useEffect(() => {
     if (!isBudgetFormOpen) return;
@@ -1404,6 +1390,7 @@ const AdminDashboard = () => {
     }
 
     if (loggedInUser.needsWhatsappSetup) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWhatsappSetupNumber(loggedInUser.whatsapp || '');
       setWhatsappSetupOpen(true);
     }
@@ -1446,11 +1433,6 @@ const AdminDashboard = () => {
         return exists ? prev.map(item => item.id === projeto.id ? projeto : item) : [projeto, ...prev];
       });
       setSelectedProjeto(prev => prev?.id === projeto.id ? projeto : prev);
-    };
-
-    const handleAtividadeCriada = (atividade) => {
-      const canSee = loggedInUser.role === 'ADM' || loggedInUser.permissions?.verTodosLeads || atividade.criadoPorId === loggedInUser.id;
-      if (canSee) setAtividades(prev => [atividade, ...prev].slice(0, 120));
     };
 
     const handleProjetoFotoCriada = (foto) => {
@@ -1523,7 +1505,6 @@ const AdminDashboard = () => {
     socket.on('novo_lead', handleNewLead);
     socket.on('contrato_atualizado', handleContratoAtualizado);
     socket.on('projeto_atualizado', handleProjetoAtualizado);
-    socket.on('atividade_criada', handleAtividadeCriada);
     socket.on('projeto_foto_criada', handleProjetoFotoCriada);
     socket.on('os_atualizada', handleOsAtualizada);
     socket.on('whatsapp_conversation_updated', handleWhatsappConversation);
@@ -1544,7 +1525,6 @@ const AdminDashboard = () => {
       socket.off('novo_lead', handleNewLead);
       socket.off('contrato_atualizado', handleContratoAtualizado);
       socket.off('projeto_atualizado', handleProjetoAtualizado);
-      socket.off('atividade_criada', handleAtividadeCriada);
       socket.off('projeto_foto_criada', handleProjetoFotoCriada);
       socket.off('os_atualizada', handleOsAtualizada);
       socket.off('whatsapp_conversation_updated', handleWhatsappConversation);
@@ -1581,12 +1561,12 @@ const AdminDashboard = () => {
   const openLeadInWhatsapp = async (lead) => {
     const phone = String(lead.telefone || '').replace(/\D/g, '');
     if (!phone) {
-      window.open(`https://wa.me/55${phone}?text=${whatsappLeadMessage(lead)}`, '_blank');
+      showToast('Este lead não possui um WhatsApp válido cadastrado.', 'error');
       return;
     }
-    const canUseInternal = adminUser.role === 'ADM' || adminUser.permissions?.whatsapp || adminUser.permissions?.leads;
+    const canUseInternal = adminUser.role === 'ADM' || adminUser.permissions?.whatsapp;
     if (!canUseInternal) {
-      window.open(`https://wa.me/55${phone}?text=${whatsappLeadMessage(lead)}`, '_blank');
+      window.open(getPanelWhatsAppUrl(phone, whatsappLeadMessage(lead)), '_blank');
       return;
     }
     const existing = whatsappConversations.find(c => {
@@ -1933,11 +1913,10 @@ const AdminDashboard = () => {
     event.preventDefault();
     if (!activityForm.leadId) return;
     try {
-      const atividade = await request(`/api/admin/leads/${activityForm.leadId}/atividades`, {
+      await request(`/api/admin/leads/${activityForm.leadId}/atividades`, {
         method: 'POST',
         body: JSON.stringify(activityForm),
       });
-      setAtividades(prev => [atividade, ...prev].slice(0, 120));
       setLeads(prev => prev.map(lead => (
         lead.id === Number(activityForm.leadId)
           ? { ...lead, ultimoContato: new Date().toISOString().split('T')[0], proximoRetorno: activityForm.proximoRetorno || lead.proximoRetorno, observacoes: activityForm.resultado || lead.observacoes }
@@ -2384,6 +2363,12 @@ const AdminDashboard = () => {
     } finally {
       setHomoDocUploadLoading(false);
     }
+  };
+
+  const validateProjetoDocumentFile = (file) => {
+    if (isValidProjectDocumentFile(file)) return true;
+    showToast('Envie um arquivo PDF, JPG ou PNG com no máximo 15 MB.', 'error');
+    return false;
   };
 
   const updateProjetoDocumento = async (projetoId, docId, tipo, data) => {
@@ -3584,7 +3569,7 @@ const AdminDashboard = () => {
                                   </div>
                                   <div className="venda-suspensa-acoes">
                                     {cs.whatsapp && (
-                                      <a className="btn btn-primary btn-sm-admin" href={`https://wa.me/55${String(cs.whatsapp).replace(/\D/g,'').startsWith('55') ? String(cs.whatsapp).replace(/\D/g,'').slice(2) : String(cs.whatsapp).replace(/\D/g,'')}?text=${whatsappClientMessage(cs)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                                      <a className="btn btn-primary btn-sm-admin" href={getPanelWhatsAppUrl(cs.whatsapp, whatsappClientMessage(cs))} target="_blank" rel="noopener noreferrer">WhatsApp</a>
                                     )}
                                     <button type="button" className="btn btn-outline btn-sm-admin" style={{color:'#16a34a',borderColor:'#16a34a'}} onClick={() => updateClienteEtapa(cs.id, 'Em negociação', {})}>Retomar</button>
                                   </div>
@@ -3641,8 +3626,7 @@ const AdminDashboard = () => {
                         </thead>
                         <tbody>
                           {clientSummary.filtered.map(c => {
-                            const whatsappDigits = String(c.whatsapp || '').replace(/\D/g, '');
-                            const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits.startsWith('55') ? whatsappDigits.slice(2) : whatsappDigits}?text=${whatsappClientMessage(c)}` : '';
+                            const whatsappHref = getPanelWhatsAppUrl(c.whatsapp, whatsappClientMessage(c));
                             const etapa = c.etapaComercial || 'Em negociação';
                             const existingContract = getClientContract(c);
                             const dataFormatada = c.dataCadastro ? c.dataCadastro.slice(0,10).split('-').reverse().join('/') : '—';
@@ -3882,7 +3866,7 @@ const AdminDashboard = () => {
                                 <button type="button" onClick={() => { closeWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Finalizar atendimento</button>
                               )}
                               <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
-                              <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
+                              <a href={getPanelWhatsAppUrl(selectedWhatsappConversation.clienteTelefone)} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
                               {canArchiveWhatsappNotLead && (
                                 <button
                                   type="button"
@@ -4713,7 +4697,7 @@ const AdminDashboard = () => {
                                         </a>
                                         <a
                                           className="orc-action-btn orc-action-wa"
-                                          href={`https://wa.me/55${String(selectedOrcClient.whatsapp || '').replace(/\D/g, '')}`}
+                                          href={getPanelWhatsAppUrl(selectedOrcClient.whatsapp)}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           title="Enviar via WhatsApp"
@@ -4759,7 +4743,7 @@ const AdminDashboard = () => {
                           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-18v12l-5-5-1.4 1.4L12 17l6.4-6.6L17 9l-5 5V2h-2Z" fill="currentColor"/></svg>
                           Baixar Orçamento (PDF)
                         </a>
-                        <a className="orc-bar-btn orc-bar-btn-wa" href={`https://wa.me/55${String(selectedOrcClient.whatsapp || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
+                        <a className="orc-bar-btn orc-bar-btn-wa" href={getPanelWhatsAppUrl(selectedOrcClient.whatsapp)} target="_blank" rel="noopener noreferrer">
                           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" fill="currentColor"/></svg>
                           Enviar via WhatsApp
                         </a>
@@ -5468,6 +5452,10 @@ const AdminDashboard = () => {
                                               <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => {
                                                 const file = e.target.files[0];
                                                 if (!file) return;
+                                                if (!validateProjetoDocumentFile(file)) {
+                                                  e.target.value = '';
+                                                  return;
+                                                }
                                                 const reader = new FileReader();
                                                 reader.onload = ev => updateProjetoDocumento(selectedProjeto.id, doc.id, tipo, { dataUrl: ev.target.result, arquivo: file.name, status: 'Concluído' });
                                                 reader.readAsDataURL(file);
@@ -5490,7 +5478,14 @@ const AdminDashboard = () => {
                                   <input className="cc-input" placeholder="Descrição (opcional)" value={homoDocUpload.descricao} onChange={e => setHomoDocUpload(prev => ({ ...prev, descricao: e.target.value }))} />
                                   <label className="homo-file-upload-btn">
                                     {homoDocUpload.arquivo ? homoDocUpload.arquivo.name : 'Selecionar arquivo'}
-                                    <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => setHomoDocUpload(prev => ({ ...prev, arquivo: e.target.files[0] || null }))} />
+                                    <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => {
+                                      const file = e.target.files[0] || null;
+                                      if (file && !validateProjetoDocumentFile(file)) {
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      setHomoDocUpload(prev => ({ ...prev, arquivo: file }));
+                                    }} />
                                   </label>
                                   <button type="button" className="btn btn-primary" disabled={!homoDocUpload.nome.trim() || homoDocUploadLoading}
                                     onClick={() => {
@@ -5545,6 +5540,10 @@ const AdminDashboard = () => {
                                           <label className="btn btn-outline btn-sm-admin">Subir
                                             <input type="file" style={{display:'none'}} onChange={e => {
                                               const file = e.target.files[0]; if (!file) return;
+                                              if (!validateProjetoDocumentFile(file)) {
+                                                e.target.value = '';
+                                                return;
+                                              }
                                               const reader = new FileReader();
                                               reader.onload = ev => updateProjetoDocumento(selectedProjeto.id, doc.id, 'concessionaria', { dataUrl: ev.target.result, arquivo: file.name, status: 'Concluído' });
                                               reader.readAsDataURL(file); e.target.value = '';
@@ -5563,7 +5562,14 @@ const AdminDashboard = () => {
                                   <input className="cc-input" placeholder="Ex: Parecer de acesso, Protocolo..." value={homoDocUpload.tipo === 'concessionaria' ? homoDocUpload.nome : ''} onChange={e => setHomoDocUpload({ tipo: 'concessionaria', nome: e.target.value, descricao: '', arquivo: null })} />
                                   <label className="homo-file-upload-btn">
                                     {homoDocUpload.tipo === 'concessionaria' && homoDocUpload.arquivo ? homoDocUpload.arquivo.name : 'Selecionar arquivo'}
-                                    <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => setHomoDocUpload(prev => ({ ...prev, tipo: 'concessionaria', arquivo: e.target.files[0] || null }))} />
+                                    <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => {
+                                      const file = e.target.files[0] || null;
+                                      if (file && !validateProjetoDocumentFile(file)) {
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      setHomoDocUpload(prev => ({ ...prev, tipo: 'concessionaria', arquivo: file }));
+                                    }} />
                                   </label>
                                   <button type="button" className="btn btn-primary" disabled={!(homoDocUpload.tipo === 'concessionaria' && homoDocUpload.nome.trim())}
                                     onClick={() => {
@@ -5950,9 +5956,14 @@ const AdminDashboard = () => {
                       </div>
                       <div className="vistoria-photo-grid modal-photo-grid">
                         {selectedProjectPhotos.map(foto => (
-                          <a key={foto.id} href={foto.dataUrl} target="_blank" rel="noopener noreferrer" className="vistoria-photo">
+                          <button
+                            key={foto.id}
+                            type="button"
+                            className="vistoria-photo"
+                            onClick={() => openProjetoDocumento({ dataUrl: foto.dataUrl, arquivo: foto.descricao || 'Foto da vistoria' })}
+                          >
                             <img src={foto.dataUrl} alt={foto.descricao || 'Foto da vistoria'} />
-                          </a>
+                          </button>
                         ))}
                         {selectedProjectPhotos.length === 0 && (
                           <p>Nenhuma foto registrada ainda.</p>
@@ -6290,7 +6301,7 @@ const AdminDashboard = () => {
                         />
                         <div className="table-actions">
                           {os.clienteTelefone && (
-                            <a className="btn btn-outline btn-sm-admin" href={`https://wa.me/55${String(os.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Sou da DRM Energia Solar. Estamos acompanhando sua O.S #${os.id} e vou te atualizar sobre o atendimento.`)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                            <a className="btn btn-outline btn-sm-admin" href={getPanelWhatsAppUrl(os.clienteTelefone, `Olá! Sou da DRM Energia Solar. Estamos acompanhando sua O.S #${os.id} e vou te atualizar sobre o atendimento.`)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
                           )}
                           <button className="btn btn-primary btn-sm-admin" onClick={() => updateOrdemServico(os.id, { status: 'Resolvida' })}>Resolver</button>
                         </div>
@@ -6802,7 +6813,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="table-actions">
                       <button className="btn btn-outline btn-sm-admin" onClick={() => updateLeadStatus(lead.id, 'Em atendimento')}>Atender</button>
-                      {lead.telefone && <a className="btn btn-primary btn-sm-admin" href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                      {lead.telefone && <a className="btn btn-primary btn-sm-admin" href={getPanelWhatsAppUrl(lead.telefone, whatsappLeadMessage(lead))} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
                     </div>
                   </div>
                 ))}
@@ -6853,8 +6864,7 @@ const AdminDashboard = () => {
                       <span>{money(contrato.valorProjeto)} • criado por {contrato.criadoPorNome}</span>
                     </div>
                     <div className="table-actions">
-                      <button className="btn btn-primary btn-sm-admin" onClick={() => revisarContrato(contrato.id, 'Aprovado')}>Aprovar</button>
-                      <button className="btn btn-outline btn-sm-admin" onClick={() => { setSelectedContrato(contrato); setQuickModal(null); setActiveTab('contratos'); }}>Ver detalhes</button>
+                      <button className="btn btn-primary btn-sm-admin" onClick={() => { abrirRevisaoContrato(contrato); setQuickModal(null); setActiveTab('contratos'); }}>Revisar</button>
                     </div>
                   </div>
                 ))}
@@ -6915,7 +6925,7 @@ const AdminDashboard = () => {
                           <strong>O.S #{os.id} • {os.clienteNome}</strong>
                           <span>{os.status} • {os.prioridade} • {os.problema}</span>
                         </div>
-                        {os.clienteTelefone && <a className="btn btn-outline btn-sm-admin" href={`https://wa.me/55${String(os.clienteTelefone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Sou da DRM Energia Solar. Estou entrando em contato sobre sua O.S #${os.id} para dar continuidade ao atendimento.`)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                        {os.clienteTelefone && <a className="btn btn-outline btn-sm-admin" href={getPanelWhatsAppUrl(os.clienteTelefone, `Olá! Sou da DRM Energia Solar. Estou entrando em contato sobre sua O.S #${os.id} para dar continuidade ao atendimento.`)} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
                       </div>
                       <div className="quick-project-actions">
                         <button type="button" onClick={() => updateOrdemServico(os.id, { status: 'Em atendimento' })}>Atender</button>

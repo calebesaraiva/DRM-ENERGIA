@@ -52,7 +52,9 @@ const io = new Server(server, {
 });
 
 // Middlewares
-app.set('trust proxy', true);
+// Produção fica atrás de um único Nginx. Confiar em qualquer proxy permite
+// falsificar o IP e contornar o rate limit do login.
+app.set('trust proxy', 1);
 const allowedOrigins = [
   'http://localhost:5173',
   'https://drmenergiasolar.com.br',
@@ -2056,6 +2058,18 @@ const parseJsonField = (value, fallback = {}) => {
   } catch {
     return fallback;
   }
+};
+
+const validateProjectDocumentDataUrl = (dataUrl) => {
+  if (!dataUrl) return { valid: true, dataUrl: null };
+  const value = String(dataUrl);
+  const match = value.match(/^data:(application\/pdf|image\/jpeg|image\/png);base64,([A-Za-z0-9+/=\r\n]+)$/i);
+  if (!match) return { valid: false, message: 'Envie um arquivo PDF, JPG ou PNG válido.' };
+  const estimatedBytes = Math.floor(match[2].replace(/\s/g, '').length * 0.75);
+  if (estimatedBytes > 15 * 1024 * 1024) {
+    return { valid: false, message: 'O documento deve ter no máximo 15 MB.' };
+  }
+  return { valid: true, dataUrl: value };
 };
 
 const parseContrato = (contrato) => ({
@@ -5085,7 +5099,7 @@ app.put('/api/admin/clientes/:id/etapa-comercial', authRequired, requirePermissi
   const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', req.params.id);
   if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
 
-  const historicoAtual = JSON.parse(cliente.historicoSuspensao || '[]');
+  const historicoAtual = parseJsonField(cliente.historicoSuspensao, []);
   const novoHistorico = etapaComercial === 'Venda suspensa'
     ? [{ id: `${Date.now()}`, data: new Date().toISOString(), etapa: etapaComercial, motivo: motivoSuspensao, responsavel: req.user.nome || req.user.username }, ...historicoAtual.slice(0, 19)]
     : etapaComercial !== cliente.etapaComercial
@@ -5130,6 +5144,8 @@ app.post('/api/admin/projetos/:id/documentos', authRequired, requirePermission('
   const { tipo, nome, descricao, dataUrl, arquivo, categoria } = req.body;
   const tiposValidos = ['cliente', 'projetista', 'concessionaria'];
   if (!tiposValidos.includes(tipo)) return res.status(400).json({ message: 'Tipo de documento inválido.' });
+  const validatedDocument = validateProjectDocumentDataUrl(dataUrl);
+  if (!validatedDocument.valid) return res.status(400).json({ message: validatedDocument.message });
 
   const field = tipo === 'cliente' ? 'documentosCliente' : tipo === 'projetista' ? 'documentosProjetista' : 'documentosConcessionaria';
   const docs = parseJsonField(projeto[field], []);
@@ -5138,7 +5154,7 @@ app.post('/api/admin/projetos/:id/documentos', authRequired, requirePermission('
     nome: nome || 'Documento',
     descricao: descricao || '',
     arquivo: arquivo || '',
-    dataUrl: dataUrl || null,
+    dataUrl: validatedDocument.dataUrl,
     categoria: categoria || tipo,
     status: dataUrl ? 'Concluído' : 'Pendente',
     responsavel: req.user.nome || req.user.username,
@@ -5157,13 +5173,15 @@ app.put('/api/admin/projetos/:id/documentos/:docId', authRequired, requirePermis
   const { tipo, status, dataUrl, arquivo } = req.body;
   const tiposValidos = ['cliente', 'projetista', 'concessionaria'];
   if (!tiposValidos.includes(tipo)) return res.status(400).json({ message: 'Tipo de documento inválido.' });
+  const validatedDocument = dataUrl === undefined ? null : validateProjectDocumentDataUrl(dataUrl);
+  if (validatedDocument && !validatedDocument.valid) return res.status(400).json({ message: validatedDocument.message });
 
   const field = tipo === 'cliente' ? 'documentosCliente' : tipo === 'projetista' ? 'documentosProjetista' : 'documentosConcessionaria';
   const docs = parseJsonField(projeto[field], []);
   const idx = docs.findIndex(d => d.id === req.params.docId);
   if (idx === -1) return res.status(404).json({ message: 'Documento não encontrado.' });
 
-  docs[idx] = { ...docs[idx], status: status || docs[idx].status, dataUrl: dataUrl !== undefined ? dataUrl : docs[idx].dataUrl, arquivo: arquivo || docs[idx].arquivo, responsavel: req.user.nome || req.user.username, data: new Date().toISOString().split('T')[0] };
+  docs[idx] = { ...docs[idx], status: status || docs[idx].status, dataUrl: validatedDocument ? validatedDocument.dataUrl : docs[idx].dataUrl, arquivo: arquivo || docs[idx].arquivo, responsavel: req.user.nome || req.user.username, data: new Date().toISOString().split('T')[0] };
   await db.run(`UPDATE projetos SET ${field} = ?, updatedAt = ? WHERE id = ?`, JSON.stringify(docs), new Date().toISOString(), req.params.id);
   res.json(parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id)));
 });

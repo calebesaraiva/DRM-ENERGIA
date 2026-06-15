@@ -177,7 +177,7 @@ function LeadSimulationModal({ isOpen, onClose }) {
         if (data?.whatsapp?.url) setAssignedWhatsAppUrl(data.whatsapp.url);
         if (data?.assignedOwner?.nome) setAssignedOwnerName(data.assignedOwner.nome);
       }
-    } catch (_) {
+    } catch {
       // Silencioso — WhatsApp já aberto
     } finally {
       setIsLoading(false);
