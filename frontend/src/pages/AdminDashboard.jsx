@@ -665,6 +665,7 @@ const AdminDashboard = () => {
   ), [adminUser.permissions, adminUser.role]);
 
   const isMasterAdmin = adminUser.role === 'ADM' && String(adminUser.username || '').toLowerCase() === 'deivson';
+  const canArchiveWhatsappNotLead = isMasterAdmin || String(adminUser.username || '').toLowerCase() === 'renejr';
 
   const showToast = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
@@ -3560,7 +3561,7 @@ const AdminDashboard = () => {
                               )}
                               <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
                               <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
-                              {isMasterAdmin && (
+                              {canArchiveWhatsappNotLead && (
                                 <button
                                   type="button"
                                   className="wa-more-danger"

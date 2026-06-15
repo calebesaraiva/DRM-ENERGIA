@@ -5172,9 +5172,10 @@ app.post('/api/admin/whatsapp/conversations/:id/close', authRequired, requirePer
 // Arquiva uma conversa que não é lead (pós-venda, manutenção, instalação etc.).
 // Não envia nada ao cliente — apenas some da lista de atendimento para todos.
 app.post('/api/admin/whatsapp/conversations/:id/archive', authRequired, requirePermission('whatsapp'), async (req, res) => {
-  // Apenas o Deivson (ADM master) pode arquivar conversas como "não é lead".
-  if (!isMasterAdminUser(req.user)) {
-    return res.status(403).json({ message: 'Apenas o Deivson pode arquivar conversas como não lead.' });
+  // Apenas o Deivson (ADM master) e o Rene Jr podem arquivar conversas como "não é lead".
+  const canArchiveNotLead = isMasterAdminUser(req.user) || String(req.user.username || '').toLowerCase() === 'renejr';
+  if (!canArchiveNotLead) {
+    return res.status(403).json({ message: 'Apenas o Deivson e o Rene Jr podem arquivar conversas como não lead.' });
   }
   const conversation = await getWhatsAppConversationById(req.params.id);
   if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
