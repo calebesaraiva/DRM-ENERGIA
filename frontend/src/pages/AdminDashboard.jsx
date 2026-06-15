@@ -3431,54 +3431,71 @@ const AdminDashboard = () => {
                   </div>
                 </aside>
 
-                <section className="whatsapp-chat" aria-label="Janela de conversa">
+                <section className="whatsapp-chat wc2" aria-label="Janela de conversa">
                   {selectedWhatsappConversation ? (
                     <>
-                      <div className="whatsapp-chat-head">
-                        <button type="button" className="wa-back-button" onClick={() => { setWhatsappMobileChatOpen(false); setWaChatActionsOpen(false); }} aria-label="Voltar para conversas">‹</button>
-                        <span className="wa-avatar large">{String(selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone || 'W').charAt(0)}</span>
-                        <div className="wa-chat-title">
-                          <h4>{selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone}</h4>
-                          <p>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Fila compartilhada'}</p>
+                      {/* ── Header ── */}
+                      <div className="wc2-head">
+                        <button type="button" className="wc2-back" onClick={() => { setWhatsappMobileChatOpen(false); setWaChatActionsOpen(false); }} aria-label="Voltar">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        </button>
+                        <span className="wc2-avatar">{String(selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone || 'W').charAt(0).toUpperCase()}</span>
+                        <div className="wc2-title">
+                          <strong>{selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone}</strong>
+                          <span>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Fila compartilhada'}</span>
                         </div>
-                        <div className="wa-head-actions">
-                          {selectedWhatsappIsPending && (
-                            <button type="button" className="btn btn-primary btn-sm-admin wa-assumir-btn" onClick={() => claimWhatsappConversation()} disabled={whatsappLoading}>
-                              Assumir
-                            </button>
+                        <div className="wa-more-wrap">
+                          <button type="button" className="wc2-more-btn" onClick={() => setWaChatActionsOpen(v => !v)} aria-label="Mais ações">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                          </button>
+                          {waChatActionsOpen && (
+                            <div className="wa-more-dropdown">
+                              {selectedWhatsappIsPending && (
+                                <button type="button" onClick={() => { claimWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Assumir atendimento</button>
+                              )}
+                              <button type="button" disabled>Transferir</button>
+                              {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
+                                <button type="button" onClick={() => { closeWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Finalizar atendimento</button>
+                              )}
+                              <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
+                              <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
+                            </div>
                           )}
-                          <div className="wa-more-wrap">
-                            <button type="button" className="wa-icon-button wa-more-btn" onClick={() => setWaChatActionsOpen(v => !v)} aria-label="Mais ações">⋯</button>
-                            {waChatActionsOpen && (
-                              <div className="wa-more-dropdown">
-                                {selectedWhatsappIsPending && (
-                                  <button type="button" onClick={() => { claimWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Assumir atendimento</button>
-                                )}
-                                <button type="button" disabled title="Transferência será liberada em breve">Transferir</button>
-                                {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
-                                  <button type="button" onClick={() => { closeWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Finalizar atendimento</button>
-                                )}
-                                <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
-                                <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
-                              </div>
-                            )}
-                          </div>
                         </div>
                       </div>
 
-                      {selectedWhatsappIsPending && (
-                        <div className="whatsapp-claim-banner">
-                          <strong>Conversa aguardando atendimento</strong>
-                          <span>Inicie o atendimento para responder pelo sistema usando o número conectado da DRM.</span>
+                      {/* ── Mensagens ── */}
+                      <div className="wc2-messages">
+                        {/* Status badge */}
+                        <div className="wc2-status-row">
+                          <span className={`wc2-status-badge ${selectedWhatsappConversation.status === 'Finalizada' ? 'finalizada' : selectedWhatsappIsPending ? 'pendente' : 'ativo'}`}>
+                            <i className="wc2-status-dot"></i>
+                            {selectedWhatsappConversation.status === 'Finalizada' ? 'Finalizada' : selectedWhatsappIsPending ? 'Aguardando atendimento' : 'Pronto para iniciar'}
+                          </span>
                         </div>
-                      )}
 
-                      <div className="whatsapp-messages">
-                        {whatsappLoading && whatsappMessages.length === 0 && (
-                          <div className="wa-chat-loading">
-                            <span></span><span></span><span></span>
+                        {/* Card de assumir (quando pendente) */}
+                        {selectedWhatsappIsPending && (
+                          <div className="wc2-claim-card">
+                            <div className="wc2-claim-icon">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                            </div>
+                            <div className="wc2-claim-body">
+                              <strong>Assuma este atendimento</strong>
+                              <p>Assuma o atendimento para responder com o número oficial da DRM.</p>
+                            </div>
+                            <button type="button" className="wc2-claim-btn" onClick={() => claimWhatsappConversation()} disabled={whatsappLoading}>
+                              Assumir atendimento
+                            </button>
                           </div>
                         )}
+
+                        {/* Loading skeleton */}
+                        {whatsappLoading && whatsappMessages.length === 0 && (
+                          <div className="wa-chat-loading"><span></span><span></span><span></span></div>
+                        )}
+
+                        {/* Mensagens */}
                         {whatsappMessages.map((message, index) => {
                           const currentDate = message.createdAt ? new Date(message.createdAt).toLocaleDateString('pt-BR') : '';
                           const previousDate = whatsappMessages[index - 1]?.createdAt ? new Date(whatsappMessages[index - 1].createdAt).toLocaleDateString('pt-BR') : '';
@@ -3486,50 +3503,91 @@ const AdminDashboard = () => {
                           return (
                             <div key={message.id} className="wa-message-group">
                               {currentDate && currentDate !== previousDate && <div className="wa-date-separator">{currentDate}</div>}
-                              <div className={`whatsapp-message ${message.direction === 'outgoing' ? 'sent' : 'received'} ${isSystem ? 'system' : ''}`}>
+                              <div className={`wc2-msg ${message.direction === 'outgoing' ? 'sent' : 'received'} ${isSystem ? 'system' : ''}`}>
                                 <p>{message.text}</p>
-                                <span>
-                                  {message.senderName || (message.direction === 'outgoing' ? 'DRM' : selectedWhatsappConversation.clienteNome)}
-                                  {' • '}
+                                <time>
                                   {message.createdAt ? new Date(message.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
-                                  {message.direction === 'outgoing' && ` • ${message.status || 'pendente'}`}
-                                </span>
+                                  {message.direction === 'outgoing' && (
+                                    <svg viewBox="0 0 16 11" className={`wc2-check ${message.status === 'read' ? 'read' : ''}`}><path d="M11.071.603 4.285 7.389l-2.87-2.87-.945.944 3.815 3.815 7.73-7.73-.944-.945Z"/><path d="M14.8.603 8.014 7.389l-.534-.534-.944.945.944.944.944.944 7.73-7.73-.944-.945-.41-.41Z" opacity=".5"/></svg>
+                                  )}
+                                </time>
                               </div>
                             </div>
                           );
                         })}
+
                         <div ref={whatsappMessagesEndRef}></div>
+
+                        {/* Empty state + ações rápidas */}
                         {!whatsappLoading && whatsappMessages.length === 0 && (
-                          <div className="whatsapp-empty chat-empty">
-                            <span className="wa-empty-icon">☀</span>
+                          <div className="wc2-empty">
+                            <div className="wc2-empty-illustration">
+                              <svg viewBox="0 0 80 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="14" width="46" height="34" rx="8" fill="#f1f5f9"/>
+                                <circle cx="18" cy="31" r="3" fill="#cbd5e1"/>
+                                <circle cx="27" cy="31" r="3" fill="#cbd5e1"/>
+                                <circle cx="36" cy="31" r="3" fill="#cbd5e1"/>
+                                <rect x="28" y="6" width="46" height="34" rx="8" fill="#fff7ed"/>
+                                <circle cx="42" cy="23" r="3" fill="#fb923c"/>
+                                <circle cx="51" cy="23" r="3" fill="#fb923c"/>
+                                <circle cx="60" cy="23" r="3" fill="#fb923c"/>
+                              </svg>
+                            </div>
                             <strong>Conversa pronta para iniciar</strong>
-                            <p>Assuma o atendimento para responder pelo sistema usando o número oficial da DRM.</p>
+                            <p>Ainda não há mensagens nesta conversa.<br/>Assuma o atendimento para começar.</p>
+
+                            {canReplyWhatsapp && (
+                              <div className="wc2-quick-actions">
+                                <span className="wc2-qa-label">Ações rápidas</span>
+                                <div className="wc2-qa-row">
+                                  <button type="button" className="wc2-qa-btn" onClick={() => setWhatsappReply('Olá! Sou da DRM Energia Solar. Como posso te ajudar hoje?')}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                    Mensagem padrão
+                                  </button>
+                                  <button type="button" className="wc2-qa-btn" onClick={() => setWhatsappReply('Para continuarmos, preciso do seu nome completo, cidade e o tipo de imóvel (residência ou empresa). Pode me enviar?')}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                                    Solicitar dados
+                                  </button>
+                                  <button type="button" className="wc2-qa-btn" onClick={() => setWhatsappReply('Olá! Tudo bem? 😊 Aqui é da DRM Energia Solar. Vi que você tem interesse em energia solar. Vamos conversar?')}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+                                    Enviar saudação
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
 
-                      <form className="whatsapp-compose" onSubmit={sendWhatsappReply}>
-                        <button type="button" className="wa-compose-tool" title="Anexo" aria-label="Anexo" disabled>＋</button>
-                        <button type="button" className="wa-compose-tool" title="Modelos rápidos" aria-label="Modelos rápidos" disabled>☰</button>
+                      {/* ── Compose ── */}
+                      <form className="wc2-compose" onSubmit={sendWhatsappReply}>
+                        <button type="button" className="wc2-tool" title="Anexo" aria-label="Anexo" disabled>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </button>
                         <textarea
                           value={whatsappReply}
                           onChange={(event) => setWhatsappReply(event.target.value)}
                           onKeyDown={handleWhatsappReplyKeyDown}
-                          placeholder={canReplyWhatsapp ? 'Digite a resposta para o cliente...' : whatsappStatus?.connected ? 'Inicie o atendimento para responder pelo sistema' : 'Conecte o WhatsApp por QR Code para responder'}
+                          placeholder="Digite uma mensagem..."
                           rows={1}
                           disabled={!canReplyWhatsapp}
+                          aria-label="Mensagem"
                         />
-                        <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp} aria-label="Enviar mensagem">
-                          <span className="wa-send-label">Enviar</span>
-                          <svg className="wa-send-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        <button type="button" className="wc2-tool" title="Emoji" aria-label="Emoji" disabled>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                        </button>
+                        <button type="submit" className="wc2-send" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp} aria-label="Enviar mensagem">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         </button>
                       </form>
                     </>
                   ) : (
-                    <div className="whatsapp-no-chat">
-                      <span className="wa-avatar large">W</span>
-                      <h4>Selecione uma conversa</h4>
-                      <p>Atenda leads pelo painel com histórico centralizado, sem misturar grupos ou conversas antigas.</p>
+                    <div className="wc2-no-chat">
+                      <div className="wc2-empty-illustration">
+                        <svg viewBox="0 0 80 64" fill="none"><rect x="4" y="14" width="46" height="34" rx="8" fill="#f1f5f9"/><circle cx="18" cy="31" r="3" fill="#cbd5e1"/><circle cx="27" cy="31" r="3" fill="#cbd5e1"/><circle cx="36" cy="31" r="3" fill="#cbd5e1"/><rect x="28" y="6" width="46" height="34" rx="8" fill="#fff7ed"/><circle cx="42" cy="23" r="3" fill="#fb923c"/><circle cx="51" cy="23" r="3" fill="#fb923c"/><circle cx="60" cy="23" r="3" fill="#fb923c"/></svg>
+                      </div>
+                      <strong>Selecione uma conversa</strong>
+                      <p>Escolha um contato na lista ao lado para iniciar o atendimento.</p>
                     </div>
                   )}
                 </section>
