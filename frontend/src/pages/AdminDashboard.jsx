@@ -1278,8 +1278,8 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (!waChatActionsOpen) return;
     const close = () => setWaChatActionsOpen(false);
-    document.addEventListener('click', close, true);
-    return () => document.removeEventListener('click', close, true);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
   }, [waChatActionsOpen]);
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
   useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
@@ -3706,7 +3706,9 @@ const AdminDashboard = () => {
                               {isMasterAdmin && (
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
                                     setWhatsappTransferUserId(selectedWhatsappConversation.assignedUserId || '');
                                     setWhatsappTransferOpen(true);
                                     setWaChatActionsOpen(false);
