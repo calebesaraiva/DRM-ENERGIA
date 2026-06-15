@@ -5092,7 +5092,6 @@ app.post('/api/admin/whatsapp/conversations/:id/claim', authRequired, requirePer
   if (
     conversation.assignedUserId
     && Number(conversation.assignedUserId) !== Number(req.user.id)
-    && conversation.status !== 'Aguardando atendimento'
     && !isMasterAdminUser(req.user)
   ) {
     return res.status(409).json({ message: `Essa conversa já está em atendimento com ${conversation.assignedUserName || 'outro consultor'}.` });
@@ -5104,8 +5103,7 @@ app.post('/api/admin/whatsapp/conversations/:id/claim', authRequired, requirePer
      SET assignedUserId = ?, assignedUserName = ?, status = 'Em atendimento', unreadCount = 0, updatedAt = ?
      WHERE id = ?
        AND (
-         status = 'Aguardando atendimento'
-         OR assignedUserId IS NULL
+         (assignedUserId IS NULL AND status = 'Aguardando atendimento')
          OR assignedUserId = ?
          OR ? = 1
        )`,
@@ -5237,7 +5235,12 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
     const claimResult = await db.run(
       `UPDATE whatsapp_conversations
        SET assignedUserId = ?, assignedUserName = ?, status = 'Em atendimento', updatedAt = ?
-       WHERE id = ? AND (status = 'Aguardando atendimento' OR assignedUserId IS NULL OR assignedUserId = ? OR ? = 1)`,
+       WHERE id = ?
+         AND (
+           (assignedUserId IS NULL AND status = 'Aguardando atendimento')
+           OR assignedUserId = ?
+           OR ? = 1
+         )`,
       req.user.id,
       req.user.nome || req.user.username,
       new Date().toISOString(),

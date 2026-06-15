@@ -2707,7 +2707,7 @@ const AdminDashboard = () => {
     setFinanceiro(await request('/api/admin/financeiro'));
   };
 
-  const selectedWhatsappIsPending = selectedWhatsappConversation?.status === 'Aguardando atendimento' || !selectedWhatsappConversation?.assignedUserId;
+  const selectedWhatsappIsPending = selectedWhatsappConversation?.status === 'Aguardando atendimento' && !selectedWhatsappConversation?.assignedUserId;
   const selectedWhatsappIsMine = Number(selectedWhatsappConversation?.assignedUserId) === Number(adminUser.id);
   const canReplyWhatsapp = Boolean(selectedWhatsappConversation) && whatsappStatus?.connected && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && !selectedWhatsappIsPending;
 
