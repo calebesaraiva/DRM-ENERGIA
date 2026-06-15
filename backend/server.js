@@ -311,6 +311,14 @@ const whatsAppPhoneVariants = (value) => {
   return [...variants].filter(Boolean);
 };
 
+// Um contato individual real tem telefone de 10 a 13 dígitos. IDs de grupo,
+// canal/newsletter e artefatos de LID têm 14+ dígitos e não são telefones —
+// nunca devem virar conversa.
+const isPlausibleContactPhone = (phone) => {
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 13;
+};
+
 // Para mensagens com endereçamento LID (@lid), o número real vem em remoteJidAlt.
 const resolveIncomingRemoteJid = (key = {}) => {
   const remoteJid = key.remoteJid || '';
@@ -445,7 +453,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     }
 
     const phone = getPhoneFromWhatsAppJid(remoteJid);
-    if (!phone) return;
+    if (!phone || !isPlausibleContactPhone(phone)) return;
 
     const content = message.message || {};
     const text = extractIncomingWhatsAppText(content);
@@ -4840,6 +4848,7 @@ app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('wh
     AND COALESCE(remoteJid, '') NOT LIKE '%@broadcast'
     AND COALESCE(remoteJid, '') NOT LIKE '%@newsletter'
     AND COALESCE(remoteJid, '') NOT LIKE '%@lid'
+    AND length(COALESCE(clienteTelefone, '')) BETWEEN 10 AND 13
   `;
 
   const conversations = isMasterAdminUser(req.user)
