@@ -246,8 +246,16 @@ const isMasterAdminUser = (user) => user?.role === 'ADM' && String(user?.usernam
 const normalizeWhatsAppPhone = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
   if (!digits) return '';
-  if (digits.startsWith('55')) return digits;
-  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+  if (digits.startsWith('55')) {
+    // Brazilian numbers with country code should be 12 (landline) or 13 (mobile) digits.
+    // If 14 digits starting with '559X' the user probably entered an extra 9 after DDD.
+    // e.g. "55989981418025" (14 digits) → "5598981418025" (13 digits)
+    if (digits.length === 14 && digits.charAt(4) === '9') {
+      return digits.slice(0, 4) + digits.slice(5);
+    }
+    return digits;
+  }
+  if (digits.length === 10 || digits.length === 11 || digits.length === 12) return `55${digits}`;
   return digits;
 };
 
@@ -733,7 +741,9 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
     if (!jid) {
       throw new Error('Contato do WhatsApp inválido para envio.');
     }
+    console.log(`[WhatsApp] Enviando para JID: ${jid} (original: ${to})`);
     const result = await whatsappRuntime.socket.sendMessage(jid, { text });
+    console.log(`[WhatsApp] Mensagem enviada — id: ${result?.key?.id}, status: ${result?.status}`);
     return {
       configured: true,
       mode: 'qrcode',
