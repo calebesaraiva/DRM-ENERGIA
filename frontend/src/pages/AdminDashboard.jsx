@@ -623,6 +623,7 @@ const AdminDashboard = () => {
   const [whatsappConversations, setWhatsappConversations] = useState([]);
   const [selectedWhatsappConversation, setSelectedWhatsappConversation] = useState(null);
   const [whatsappMessages, setWhatsappMessages] = useState([]);
+  const [whatsappMediaPreview, setWhatsappMediaPreview] = useState(null);
   const [whatsappReply, setWhatsappReply] = useState('');
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [whatsappFilter, setWhatsappFilter] = useState('aguardando');
@@ -3804,14 +3805,14 @@ const AdminDashboard = () => {
                                 {hasMedia && (
                                   <div className={`wc2-media ${message.messageType || 'media'}`}>
                                     {mediaUrl && message.messageType === 'image' && (
-                                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="wc2-media-image-link">
+                                      <button type="button" className="wc2-media-image-link" onClick={() => setWhatsappMediaPreview({ url: mediaUrl, name: message.fileName || 'Imagem recebida' })}>
                                         <img src={mediaUrl} alt={message.fileName || 'Imagem recebida'} loading="lazy" />
-                                      </a>
+                                      </button>
                                     )}
                                     {mediaUrl && message.messageType === 'sticker' && (
-                                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="wc2-media-sticker-link">
+                                      <button type="button" className="wc2-media-sticker-link" onClick={() => setWhatsappMediaPreview({ url: mediaUrl, name: message.fileName || 'Figurinha recebida' })}>
                                         <img src={mediaUrl} alt={message.fileName || 'Figurinha recebida'} loading="lazy" />
-                                      </a>
+                                      </button>
                                     )}
                                     {mediaUrl && message.messageType === 'video' && (
                                       <video src={mediaUrl} controls preload="metadata" />
@@ -6330,6 +6331,21 @@ const AdminDashboard = () => {
           )}
         </div>
       </main>
+
+      {whatsappMediaPreview && (
+        <div className="whatsapp-media-preview" role="dialog" aria-modal="true" aria-label="Prévia da imagem" onClick={() => setWhatsappMediaPreview(null)}>
+          <div className="whatsapp-media-preview-head">
+            <button type="button" onClick={() => setWhatsappMediaPreview(null)} aria-label="Voltar para a conversa">
+              <span aria-hidden="true">←</span> Voltar
+            </button>
+            <strong>{whatsappMediaPreview.name}</strong>
+            <button type="button" className="whatsapp-media-preview-close" onClick={() => setWhatsappMediaPreview(null)} aria-label="Fechar prévia">×</button>
+          </div>
+          <div className="whatsapp-media-preview-body" onClick={(event) => event.stopPropagation()}>
+            <img src={whatsappMediaPreview.url} alt={whatsappMediaPreview.name} />
+          </div>
+        </div>
+      )}
 
       {whatsappTransferOpen && selectedWhatsappConversation && (
         <div className="contract-modal-backdrop whatsapp-transfer-backdrop" onMouseDown={() => !whatsappLoading && setWhatsappTransferOpen(false)}>

@@ -364,17 +364,24 @@ const isPlausibleContactPhone = (phone) => {
   return digits.length >= 10 && digits.length <= 13;
 };
 
-// Leads novos entram apenas quando o WhatsApp entrega um telefone individual real.
-// Endereços LID/PN costumam representar contatos salvos e ficam fora da fila.
 const getIncomingContactAddress = (key = {}) => {
-  const jid = String(key.remoteJid || '');
-  if (isBlockedWhatsAppJid(jid) || !jid.endsWith('@s.whatsapp.net')) {
-    return { phone: '', remoteJid: '' };
+  const primaryJid = String(key.remoteJid || '');
+  if (isBlockedWhatsAppJid(primaryJid)) {
+    return { phone: '', remoteJid: '', allowNewLead: false };
   }
-  const phone = getPhoneFromWhatsAppJid(jid);
-  return isPlausibleContactPhone(phone)
-    ? { phone, remoteJid: jid }
-    : { phone: '', remoteJid: '' };
+  const phoneJid = [
+    primaryJid,
+    key.remoteJidAlt,
+    key.participantAlt,
+    key.senderPn,
+    key.participant,
+  ].map(value => String(value || '')).find(jid => jid.endsWith('@s.whatsapp.net') && isPlausibleContactPhone(getPhoneFromWhatsAppJid(jid)));
+  if (!phoneJid) return { phone: '', remoteJid: primaryJid, allowNewLead: false };
+  return {
+    phone: getPhoneFromWhatsAppJid(phoneJid),
+    remoteJid: phoneJid,
+    allowNewLead: primaryJid.endsWith('@s.whatsapp.net'),
+  };
 };
 
 const mapBaileysMessageStatus = (status) => {
@@ -458,7 +465,7 @@ const getBaileysMessageTimestampMs = (message = {}) => {
 
 const isSupportedIncomingWhatsAppJid = (remoteJid = '') => {
   if (isBlockedWhatsAppJid(remoteJid)) return false;
-  return remoteJid.endsWith('@s.whatsapp.net');
+  return remoteJid.endsWith('@s.whatsapp.net') || remoteJid.endsWith('@lid') || remoteJid.endsWith('@pn');
 };
 
 const unwrapWhatsAppMessageContent = (content = {}) => {
@@ -577,7 +584,7 @@ const saveIncomingWhatsAppMedia = async (message, mediaInfo) => {
 
 const handleIncomingWhatsAppWebMessage = async (message) => {
   try {
-    const { phone, remoteJid } = getIncomingContactAddress(message.key || {});
+    const { phone, remoteJid, allowNewLead } = getIncomingContactAddress(message.key || {});
     if (message.key?.fromMe || !isSupportedIncomingWhatsAppJid(message.key?.remoteJid || remoteJid) || !phone) {
       return;
     }
@@ -596,11 +603,22 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     if (!text) return;
 
     const phoneVariants = whatsAppPhoneVariants(phone);
+    const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
+    const previousConversation = await db.get(
+      `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
+      ...phoneVariants
+    );
+    // Contatos salvos podem chegar como LID. Eles só atualizam conversas já
+    // existentes e nunca entram como um lead novo na fila.
+    if (!allowNewLead && !previousConversation) return;
+
     const leadPlaceholders = phoneVariants.map(() => '?').join(', ');
     let lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
-    let owner = null;
+    let owner = previousConversation?.assignedUserId
+      ? { id: previousConversation.assignedUserId, nome: previousConversation.assignedUserName }
+      : null;
 
-    if (!lead) {
+    if (!lead && allowNewLead) {
       owner = await getNextLeadOwner();
       const result = await db.run(
         `INSERT INTO leads
@@ -614,28 +632,23 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       );
       lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
       io.emit('novo_lead', lead);
-    } else if (lead.assignedUserId) {
+    } else if (lead?.assignedUserId) {
       owner = { id: lead.assignedUserId, nome: lead.assignedUserName };
-    } else {
+    } else if (lead) {
       owner = await getNextLeadOwner();
       await db.run('UPDATE leads SET assignedUserId = ?, assignedUserName = ? WHERE id = ?', owner.id, owner.nome, lead.id);
       lead = await db.get('SELECT * FROM leads WHERE id = ?', lead.id);
       io.emit('novo_lead', lead);
     }
 
-    const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
-    const previousConversation = await db.get(
-      `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
-      ...phoneVariants
-    );
-    const shouldNotifyNewLead = !previousConversation || ['Finalizada', 'Arquivada'].includes(previousConversation.status);
+    const shouldNotifyNewLead = allowNewLead && (!previousConversation || ['Finalizada', 'Arquivada'].includes(previousConversation.status));
     const conversation = await upsertWhatsAppConversation({
-      leadId: lead.id,
-      nome: lead.nome || message.pushName || phone,
+      leadId: lead?.id || previousConversation?.leadId || null,
+      nome: lead?.nome || previousConversation?.clienteNome || message.pushName || phone,
       telefone: phone,
       remoteJid,
-      assignedUserId: owner?.id || lead.assignedUserId || null,
-      assignedUserName: owner?.nome || lead.assignedUserName || '',
+      assignedUserId: owner?.id || lead?.assignedUserId || null,
+      assignedUserName: owner?.nome || lead?.assignedUserName || '',
       status: 'Aguardando atendimento',
     });
     const savedMessage = await createWhatsAppMessage({
