@@ -11077,7 +11077,7 @@
 
 .admin-main-content.whatsapp-active .wa-redesign .whatsapp-layout {
   display: grid;
-  grid-template-columns: minmax(330px, 390px) minmax(0, 1fr);
+  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
   width: 100%;
   height: calc(100dvh - 130px);
   min-height: 540px;
@@ -12318,6 +12318,401 @@
 }
 
 /* ===================================================
+   WI2 — Inbox redesign (identico ao mockup desktop)
+   =================================================== */
+
+.wi2 {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  min-height: 0;
+  background: #ffffff;
+  border-right: 1px solid #e8edf3;
+  overflow: hidden;
+}
+
+/* Header */
+.wi2-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1rem 0.9rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.wi2-head h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.18rem;
+  font-weight: 900;
+}
+
+.wi2-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.wi2-icon-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+}
+
+.wi2-icon-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.wi2-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.wi2-conn-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+}
+
+.wi2-conn-dot.on  { background: #22c55e; }
+.wi2-conn-dot.off { background: #f97316; }
+
+/* Search */
+.wi2-search-wrap {
+  position: relative;
+  margin: 0.7rem 0.82rem;
+}
+
+.wi2-search-icon {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.wi2-search {
+  width: 100%;
+  padding: 0.6rem 0.72rem 0.6rem 2.1rem;
+  border: 1.5px solid #e8edf3;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.88rem;
+  transition: border-color 0.13s, background 0.13s;
+}
+
+.wi2-search:focus {
+  outline: none;
+  border-color: #fb923c;
+  background: #fff;
+}
+
+.wi2-search::placeholder {
+  color: #94a3b8;
+}
+
+/* Filter tabs */
+.wi2-tabs {
+  display: flex;
+  gap: 0.38rem;
+  padding: 0 0.82rem 0.72rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.wi2-tabs::-webkit-scrollbar { display: none; }
+
+.wi2-tabs button {
+  flex-shrink: 0;
+  padding: 0.32rem 0.78rem;
+  border: 1.5px solid #e8edf3;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.13s;
+  white-space: nowrap;
+}
+
+.wi2-tabs button:hover {
+  border-color: #fb923c;
+  color: #c2410c;
+}
+
+.wi2-tabs button.active {
+  border-color: #f97316;
+  background: #f97316;
+  color: #ffffff;
+}
+
+/* Conversation list */
+.wi2-list {
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.3rem 0;
+}
+
+/* Item */
+.wi2-item {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 0.62rem;
+  width: 100%;
+  padding: 0.78rem 1rem;
+  border: none;
+  border-left: 3px solid transparent;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+  align-items: center;
+}
+
+.wi2-item:hover {
+  background: #f8fafc;
+}
+
+.wi2-item.active {
+  background: #fff7ed;
+  border-left-color: #f97316;
+}
+
+.wi2-item.pending:not(.active) {
+  border-left-color: #fbbf24;
+}
+
+/* Avatar with status dot */
+.wi2-item-avatar-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.wi2-item-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.wi2-item-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+.wi2-item-dot.ativo { background: #22c55e; }
+.wi2-item-dot.pend  { background: #f59e0b; }
+.wi2-item-dot.fin   { background: #94a3b8; }
+
+/* Item body */
+.wi2-item-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.wi2-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.wi2-item-top strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wi2-item-top time {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.wi2-item-mid {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wi2-item-phone {
+  color: #64748b;
+  font-size: 0.77rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wi2-item-status {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.wi2-item-status.ativo { color: #16a34a; }
+.wi2-item-status.pend  { color: #d97706; }
+.wi2-item-status.fin   { color: #94a3b8; }
+
+.wi2-item-preview {
+  margin: 0;
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Unread badge */
+.wi2-unread {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #f97316;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Empty state */
+.wi2-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.wi2-empty svg {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 0.3rem;
+}
+
+.wi2-empty strong {
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.wi2-empty p {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Skeleton */
+.wi2-skeleton {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 0.72rem;
+  padding: 0.82rem 1rem;
+}
+
+.wi2-skeleton span {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #edf2f7 0%, #f8fafc 50%, #edf2f7 100%);
+  background-size: 220% 100%;
+  animation: waSkeleton 1.2s ease-in-out infinite;
+  display: block;
+}
+
+.wi2-skeleton div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  justify-content: center;
+}
+
+.wi2-skeleton b,
+.wi2-skeleton i {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #edf2f7 0%, #f8fafc 50%, #edf2f7 100%);
+  background-size: 220% 100%;
+  animation: waSkeleton 1.2s ease-in-out infinite;
+  font-style: normal;
+}
+
+.wi2-skeleton b { width: 60%; height: 13px; }
+.wi2-skeleton i { width: 90%; height: 10px; }
+
+/* ── WI2 mobile ≤820px ── */
+@media (max-width: 820px) {
+  .wi2 {
+    border-right: 0;
+  }
+
+  .wi2-head {
+    padding: 0.8rem 0.82rem 0.72rem;
+  }
+
+  .wi2-search-wrap {
+    margin: 0.5rem 0.72rem;
+  }
+
+  .wi2-tabs {
+    padding: 0 0.72rem 0.6rem;
+    gap: 0.3rem;
+  }
+
+  .wi2-tabs button {
+    padding: 0.28rem 0.62rem;
+    font-size: 0.74rem;
+  }
+
+  .wi2-item {
+    padding: 0.72rem 0.82rem;
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+  }
+}
+
+/* ===================================================
    WC2 — Chat redesign completo (idêntico ao mockup)
    =================================================== */
 
@@ -12335,11 +12730,10 @@
 
 /* ── Header ── */
 .wc2-head {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 0.72rem;
-  padding: 0.82rem 1rem;
+  padding: 0.82rem 1.1rem;
   border-bottom: 1px solid #e8edf3;
   background: #ffffff;
   min-height: 72px;
@@ -12379,6 +12773,7 @@
 }
 
 .wc2-title {
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -12423,6 +12818,97 @@
 .wc2-more-btn svg {
   width: 22px;
   height: 22px;
+}
+
+/* Status badge no header (desktop) */
+.wc2-head-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.36rem 0.82rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.wc2-head-badge i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+  font-style: normal;
+}
+
+.wc2-head-badge.ativo {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.wc2-head-badge.pend {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.wc2-head-badge.fin {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* Botões de ação no header — visíveis apenas no desktop */
+.wc2-assumir-desktop {
+  flex-shrink: 0;
+  padding: 0.56rem 1.1rem;
+  border: none;
+  border-radius: 12px;
+  background: #f97316;
+  color: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.13s;
+}
+
+.wc2-assumir-desktop:hover { background: #ea580c; }
+.wc2-assumir-desktop:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.wc2-finalizar-desktop {
+  flex-shrink: 0;
+  padding: 0.52rem 0.9rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.13s;
+}
+
+.wc2-finalizar-desktop:hover {
+  border-color: #ef4444;
+  color: #dc2626;
+}
+
+/* Esconder badge e botões de desktop no mobile */
+@media (max-width: 820px) {
+  .wc2-head-badge,
+  .wc2-assumir-desktop,
+  .wc2-finalizar-desktop {
+    display: none;
+  }
+
+  .wc2-head {
+    gap: 0.52rem;
+    padding: 0.6rem 0.72rem;
+    min-height: 58px;
+  }
 }
 
 /* ── Área de mensagens ── */

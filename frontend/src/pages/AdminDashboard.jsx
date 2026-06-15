@@ -3340,92 +3340,91 @@ const AdminDashboard = () => {
           {activeTab === 'whatsapp' && (
             <div className={`admin-section whatsapp-screen wa-redesign ${whatsappMobileChatOpen ? 'mobile-chat-open' : ''}`}>
               <div className="whatsapp-layout">
-                <aside className="whatsapp-inbox" aria-label="Lista de conversas do WhatsApp">
-                  <div className="whatsapp-inbox-head">
-                    <div>
-                      <span className="section-kicker">Atendimento</span>
-                      <h4>WhatsApp</h4>
-                      <p>{whatsappSummary.aguardando} aguardando • {whatsappSummary.emAtendimento} em atendimento</p>
+                <aside className="wi2" aria-label="Lista de conversas">
+                  {/* ── Header da inbox ── */}
+                  <div className="wi2-head">
+                    <h3>Conversas</h3>
+                    <div className="wi2-head-actions">
+                      <button type="button" className="wi2-icon-btn" title="Atualizar" onClick={() => loadData(adminUser).catch(err => showToast(err.message, 'error'))}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                      </button>
+                      <button type="button" className="wi2-icon-btn" title="Conexão WhatsApp" onClick={openWhatsappConnectModal}>
+                        <span className={`wi2-conn-dot ${whatsappStatus?.connected ? 'on' : 'off'}`}></span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.56 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      </button>
                     </div>
-                    <button type="button" className="wa-icon-button" title="Atualizar conversas" aria-label="Atualizar conversas" onClick={() => loadData(adminUser).catch(err => showToast(err.message, 'error'))}>
-                      ↻
-                    </button>
                   </div>
 
-                  <div className={`wa-connection-strip ${whatsappStatus?.connected ? 'online' : 'offline'}`}>
-                    <span className="wa-connection-dot" aria-hidden="true"></span>
-                    <div>
-                      <strong>{whatsappStatus?.connected ? 'Online' : whatsappStatus?.status || 'Desconectado'}</strong>
-                      <small>{whatsappStatus?.phone || 'Número não conectado'}</small>
-                    </div>
-                    <button type="button" onClick={openWhatsappConnectModal}>{whatsappStatus?.connected ? 'Ver conexão' : 'Conectar'}</button>
-                  </div>
-
-                  <label className="wa-search">
-                    <span aria-hidden="true">⌕</span>
+                  {/* ── Busca ── */}
+                  <div className="wi2-search-wrap">
+                    <svg className="wi2-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                     <input
+                      className="wi2-search"
                       type="search"
                       value={whatsappSearch}
                       onChange={(event) => setWhatsappSearch(event.target.value)}
-                      placeholder="Buscar conversa, nome ou telefone"
+                      placeholder="Buscar conversas..."
                     />
-                  </label>
+                  </div>
 
-                  <div className="whatsapp-queue-tabs" aria-label="Filtros do chatbox">
-                    <button type="button" className={whatsappFilter === 'todas' ? 'active' : ''} onClick={() => setWhatsappFilter('todas')}>Todas <span>{whatsappSummary.total}</span></button>
-                    <button type="button" className={whatsappFilter === 'aguardando' ? 'active' : ''} onClick={() => setWhatsappFilter('aguardando')}>Aguardando <span>{whatsappSummary.aguardando}</span></button>
-                    <button type="button" className={whatsappFilter === 'atendimento' ? 'active' : ''} onClick={() => setWhatsappFilter('atendimento')}>Em atendimento <span>{whatsappSummary.emAtendimento}</span></button>
-                    <button type="button" className={whatsappFilter === 'minhas' ? 'active' : ''} onClick={() => setWhatsappFilter('minhas')}>Minhas <span>{whatsappSummary.minhas}</span></button>
+                  {/* ── Filtros ── */}
+                  <div className="wi2-tabs">
+                    <button type="button" className={whatsappFilter === 'todas' ? 'active' : ''} onClick={() => setWhatsappFilter('todas')}>Todas</button>
+                    <button type="button" className={whatsappFilter === 'aguardando' ? 'active' : ''} onClick={() => setWhatsappFilter('aguardando')}>Não atribuídas</button>
+                    <button type="button" className={whatsappFilter === 'atendimento' ? 'active' : ''} onClick={() => setWhatsappFilter('atendimento')}>Em atendimento</button>
+                    <button type="button" className={whatsappFilter === 'minhas' ? 'active' : ''} onClick={() => setWhatsappFilter('minhas')}>Minhas</button>
                     <button type="button" className={whatsappFilter === 'finalizadas' ? 'active' : ''} onClick={() => setWhatsappFilter('finalizadas')}>Finalizadas</button>
                   </div>
 
-                  {pendingWhatsappConversations.length > 0 && (
-                    <div className="whatsapp-pending-alert" role="status">
-                      <span className="wa-alert-dot" aria-hidden="true"></span>
-                      <div>
-                        <strong>{pendingWhatsappConversations.length} aguardando atendimento</strong>
-                        <span>Fila nova para alguém assumir agora.</span>
-                      </div>
-                      {whatsappFilter !== 'aguardando' && (
-                        <button type="button" onClick={() => setWhatsappFilter('aguardando')}>Ver fila</button>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="whatsapp-conversation-list">
+                  {/* ── Lista ── */}
+                  <div className="wi2-list">
                     {whatsappLoading && !selectedWhatsappConversation && filteredWhatsappConversations.length === 0 && (
-                      Array.from({ length: 5 }).map((_, index) => (
-                        <div className="wa-skeleton-card" key={index}><span></span><div><b></b><i></i><i></i></div></div>
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <div className="wi2-skeleton" key={i}><span/><div><b/><i/></div></div>
                       ))
                     )}
                     {filteredWhatsappConversations.map(conversation => {
                       const lastDate = conversation.lastMessageAt || conversation.updatedAt || conversation.createdAt;
+                      const isPending = conversation.status === 'Aguardando atendimento' || !conversation.assignedUserId;
+                      const isFinalizada = conversation.status === 'Finalizada';
+                      const statusLabel = isFinalizada ? 'Finalizada' : isPending ? 'Aguardando' : 'Em atendimento';
+                      const statusClass = isFinalizada ? 'fin' : isPending ? 'pend' : 'ativo';
+                      const initials = String(conversation.clienteNome || conversation.clienteTelefone || 'W').charAt(0).toUpperCase();
+                      const AVATAR_COLORS_WI = ['#22c55e','#3b82f6','#f97316','#8b5cf6','#ef4444','#06b6d4','#f59e0b','#ec4899'];
+                      const avatarColor = AVATAR_COLORS_WI[initials.charCodeAt(0) % AVATAR_COLORS_WI.length];
                       return (
                         <button
                           key={conversation.id}
                           type="button"
-                          className={`whatsapp-conversation ${conversation.status === 'Aguardando atendimento' ? 'pending' : ''} ${selectedWhatsappConversation?.id === conversation.id ? 'active' : ''}`}
+                          className={`wi2-item ${isPending ? 'pending' : ''} ${selectedWhatsappConversation?.id === conversation.id ? 'active' : ''}`}
                           onClick={() => openWhatsappConversation(conversation)}
                         >
-                          <span className="wa-avatar">{String(conversation.clienteNome || conversation.clienteTelefone || 'W').charAt(0)}</span>
-                          <span className="wa-conversation-main">
-                            <span className="wa-conversation-title">
+                          <div className="wi2-item-avatar-wrap">
+                            <span className="wi2-item-avatar" style={{ background: avatarColor + '22', color: avatarColor }}>{initials}</span>
+                            <span className={`wi2-item-dot ${statusClass}`}></span>
+                          </div>
+                          <div className="wi2-item-body">
+                            <div className="wi2-item-top">
                               <strong>{conversation.clienteNome || conversation.clienteTelefone}</strong>
                               <time>{lastDate ? new Date(lastDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</time>
-                            </span>
-                            <small>{conversation.lastMessage || 'Sem mensagens no histórico'}</small>
-                            <em>{conversation.assignedUserName || 'Fila compartilhada'} • {conversation.clienteTelefone}</em>
-                            <i className={`wa-status-chip wa-status-${String(conversation.status || 'aguardando').toLowerCase().replace(/\s+/g, '-')}`}>{conversation.status || 'Aguardando atendimento'}</i>
-                          </span>
-                          {Number(conversation.unreadCount || 0) > 0 && <span className="wa-unread">{conversation.unreadCount}</span>}
+                            </div>
+                            <div className="wi2-item-mid">
+                              <span className="wi2-item-phone">{conversation.clienteTelefone}</span>
+                              <span className={`wi2-item-status ${statusClass}`}>{statusLabel}</span>
+                            </div>
+                            <p className="wi2-item-preview">{conversation.lastMessage || 'Nenhuma mensagem ainda'}</p>
+                          </div>
+                          {Number(conversation.unreadCount || 0) > 0 && (
+                            <span className="wi2-unread">{conversation.unreadCount}</span>
+                          )}
                         </button>
                       );
                     })}
                     {filteredWhatsappConversations.length === 0 && !whatsappLoading && (
-                      <div className="whatsapp-empty">
-                        <span className="wa-empty-icon">✦</span>
-                        <strong>Nenhuma conversa nessa fila</strong>
-                        <p>Quando chegar um lead novo individual pelo WhatsApp, ele aparece aqui para atendimento.</p>
+                      <div className="wi2-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <strong>Nenhuma conversa</strong>
+                        <p>Nenhuma conversa nessa fila ainda.</p>
                       </div>
                     )}
                   </div>
@@ -3444,6 +3443,23 @@ const AdminDashboard = () => {
                           <strong>{selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone}</strong>
                           <span>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Fila compartilhada'}</span>
                         </div>
+                        {/* Status badge — visível no desktop */}
+                        <span className={`wc2-head-badge ${selectedWhatsappConversation.status === 'Finalizada' ? 'fin' : selectedWhatsappIsPending ? 'pend' : 'ativo'}`}>
+                          <i></i>
+                          {selectedWhatsappConversation.status === 'Finalizada' ? 'Finalizada' : selectedWhatsappIsPending ? 'Aguardando' : 'Pronto para iniciar'}
+                        </span>
+                        {/* Botão assumir — visível no desktop quando pendente */}
+                        {selectedWhatsappIsPending && (
+                          <button type="button" className="wc2-assumir-desktop" onClick={() => claimWhatsappConversation()} disabled={whatsappLoading}>
+                            Assumir atendimento
+                          </button>
+                        )}
+                        {/* Finalizar — visível no desktop */}
+                        {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
+                          <button type="button" className="wc2-finalizar-desktop" onClick={closeWhatsappConversation} disabled={whatsappLoading}>
+                            Finalizar
+                          </button>
+                        )}
                         <div className="wa-more-wrap">
                           <button type="button" className="wc2-more-btn" onClick={() => setWaChatActionsOpen(v => !v)} aria-label="Mais ações">
                             <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
