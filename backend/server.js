@@ -923,7 +923,13 @@ const isRealEmail = (value = '') => {
 
 const hasVerifiedEmail = (user = {}) => isRealEmail(user.email) && Boolean(user.emailVerified);
 
-const requiresEmailVerification = (user = {}) => !hasVerifiedEmail(user);
+// Verificação de e-mail é exigida apenas para clientes que se cadastram sozinhos.
+// Equipe interna é provisionada pelo admin (pode usar e-mail @drm.local) e não deve
+// ficar bloqueada do painel — pode verificar depois para habilitar reset de senha.
+const isInternalStaffUser = (user = {}) => user.userType === 'interno'
+  || ['ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(user.role);
+
+const requiresEmailVerification = (user = {}) => !isInternalStaffUser(user) && !hasVerifiedEmail(user);
 
 const createEmailCode = () => String(crypto.randomInt(100000, 1000000));
 
