@@ -10875,14 +10875,19 @@
 .homo-docs-table td { font-size: 0.83rem; }
 .homo-arquivo-cell { max-width: 180px; }
 .homo-file-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #2563eb;
   text-decoration: underline;
   font-size: 0.83rem;
+  font-family: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: inline-block;
   max-width: 160px;
+  cursor: pointer;
 }
 .homo-status-select {
   padding: 0.2rem 0.4rem;
@@ -13248,6 +13253,86 @@
   grid-template-rows: auto minmax(0, 1fr);
   background: rgba(8, 15, 28, .94);
   backdrop-filter: blur(10px);
+}
+
+.project-document-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 14500;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: #eef2f6;
+}
+
+.project-document-preview-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #dbe3ec;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .08);
+}
+
+.project-document-preview-head strong {
+  overflow: hidden;
+  color: #172033;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-document-preview-body {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  overflow: auto;
+}
+
+.project-document-preview-body img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, .18);
+}
+
+.project-document-preview-body iframe {
+  width: min(100%, 1100px);
+  height: 100%;
+  min-height: 480px;
+  border: 0;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, .18);
+}
+
+@media (max-width: 600px) {
+  .project-document-preview-head {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .project-document-preview-head .btn {
+    min-height: 40px;
+    padding: 0 10px;
+    font-size: .78rem;
+  }
+
+  .project-document-preview-body {
+    padding: 8px;
+  }
+
+  .project-document-preview-body iframe {
+    width: 100%;
+    min-height: 100%;
+  }
 }
 
 .whatsapp-media-preview-head {

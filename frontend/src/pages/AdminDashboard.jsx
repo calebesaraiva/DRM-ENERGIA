@@ -727,6 +727,7 @@ const AdminDashboard = () => {
   const [homoStatusFilter, setHomoStatusFilter] = useState('todos');
   const [homoDocUpload, setHomoDocUpload] = useState({ tipo: 'cliente', nome: '', descricao: '', arquivo: null });
   const [homoDocUploadLoading, setHomoDocUploadLoading] = useState(false);
+  const [projetoDocumentPreview, setProjetoDocumentPreview] = useState(null);
 
   const headers = useMemo(() => ({
     'Content-Type': 'application/json',
@@ -757,6 +758,50 @@ const AdminDashboard = () => {
     setToasts(prev => [...prev, { id, message, type, icon: icons[type] || 'i' }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4800);
   }, []);
+
+  const openProjetoDocumento = useCallback((documento) => {
+    if (!documento?.dataUrl) {
+      showToast('Este documento não possui um arquivo disponível.', 'error');
+      return;
+    }
+
+    try {
+      const [metadata, encodedData] = String(documento.dataUrl).split(',', 2);
+      const mimeType = metadata.match(/^data:([^;]+);base64$/i)?.[1];
+      if (!mimeType || !encodedData) throw new Error('Formato inválido');
+
+      const binary = window.atob(encodedData);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+
+      const url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+      setProjetoDocumentPreview({
+        url,
+        mimeType,
+        name: documento.arquivo || documento.nome || 'Documento',
+      });
+    } catch {
+      showToast('Não foi possível abrir este documento. Substitua o arquivo e tente novamente.', 'error');
+    }
+  }, [showToast]);
+
+  const closeProjetoDocumentPreview = useCallback(() => {
+    setProjetoDocumentPreview(current => {
+      if (current?.url) URL.revokeObjectURL(current.url);
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!projetoDocumentPreview) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closeProjetoDocumentPreview();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [closeProjetoDocumentPreview, projetoDocumentPreview]);
 
   const playNewLeadAlert = useCallback(() => {
     try {
@@ -5401,7 +5446,9 @@ const AdminDashboard = () => {
                                         </td>
                                         <td className="homo-arquivo-cell">
                                           {doc.dataUrl ? (
-                                            <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" className="homo-file-link">{doc.arquivo || 'Ver arquivo'}</a>
+                                            <button type="button" className="homo-file-link" onClick={() => openProjetoDocumento(doc)}>
+                                              {doc.arquivo || 'Ver arquivo'}
+                                            </button>
                                           ) : <span className="muted-text">—</span>}
                                         </td>
                                         <td>{doc.responsavel || '—'}</td>
@@ -5490,7 +5537,7 @@ const AdminDashboard = () => {
                                     {(selectedProjeto.documentosConcessionaria || []).map(doc => (
                                       <tr key={doc.id}>
                                         <td><strong>{doc.nome}</strong></td>
-                                        <td>{doc.dataUrl ? <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" className="homo-file-link">{doc.arquivo || 'Ver'}</a> : '—'}</td>
+                                        <td>{doc.dataUrl ? <button type="button" className="homo-file-link" onClick={() => openProjetoDocumento(doc)}>{doc.arquivo || 'Ver'}</button> : '—'}</td>
                                         <td>{doc.responsavel || '—'}</td>
                                         <td>{doc.data || '—'}</td>
                                         <td><span className={`homo-badge ${doc.status === 'Concluído' ? 'homo-badge-completo' : 'homo-badge-pendente'}`}>{doc.status}</span></td>
@@ -6444,6 +6491,23 @@ const AdminDashboard = () => {
           )}
         </div>
       </main>
+
+      {projetoDocumentPreview && (
+        <div className="project-document-preview" role="dialog" aria-modal="true" aria-label={`Prévia de ${projetoDocumentPreview.name}`}>
+          <header className="project-document-preview-head">
+            <button type="button" className="btn btn-outline" onClick={closeProjetoDocumentPreview}>Voltar</button>
+            <strong title={projetoDocumentPreview.name}>{projetoDocumentPreview.name}</strong>
+            <a className="btn btn-primary" href={projetoDocumentPreview.url} download={projetoDocumentPreview.name}>Baixar</a>
+          </header>
+          <div className="project-document-preview-body">
+            {projetoDocumentPreview.mimeType.startsWith('image/') ? (
+              <img src={projetoDocumentPreview.url} alt={projetoDocumentPreview.name} />
+            ) : (
+              <iframe src={projetoDocumentPreview.url} title={projetoDocumentPreview.name} />
+            )}
+          </div>
+        </div>
+      )}
 
       {whatsappMediaPreview && (
         <div className="whatsapp-media-preview" role="dialog" aria-modal="true" aria-label="Prévia da imagem" onClick={() => setWhatsappMediaPreview(null)}>
