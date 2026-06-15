@@ -1496,14 +1496,23 @@ const AdminDashboard = () => {
     if (!selectedWhatsappConversation) return;
     if (!window.confirm('Marcar esta conversa como "Não é lead"? Ela será removida da lista de atendimento para todos.')) return;
     const archivedId = selectedWhatsappConversation.id;
+    const archivedConversation = selectedWhatsappConversation;
     setWhatsappLoading(true);
+    setWhatsappConversations(prev => prev.filter(item => item.id !== archivedId));
+    setSelectedWhatsappConversation(null);
+    setWhatsappMessages([]);
+    setWhatsappMobileChatOpen(false);
+    setWaChatActionsOpen(false);
     try {
       await request(`/api/admin/whatsapp/conversations/${archivedId}/archive`, { method: 'POST' });
-      setWhatsappConversations(prev => prev.filter(item => item.id !== archivedId));
-      setSelectedWhatsappConversation(null);
-      setWhatsappMobileChatOpen(false);
+      const conversations = await request('/api/admin/whatsapp/conversations');
+      setWhatsappConversations(conversations);
       showToast('Conversa arquivada (não é lead).', 'success');
     } catch (err) {
+      setWhatsappConversations(prev => (
+        prev.some(item => item.id === archivedId) ? prev : [archivedConversation, ...prev]
+      ));
+      setSelectedWhatsappConversation(archivedConversation);
       showToast(err.message, 'error');
     } finally {
       setWhatsappLoading(false);
@@ -3552,7 +3561,18 @@ const AdminDashboard = () => {
                               <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
                               <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
                               {isMasterAdmin && (
-                                <button type="button" className="wa-more-danger" onClick={() => { archiveWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Não é lead (arquivar)</button>
+                                <button
+                                  type="button"
+                                  className="wa-more-danger"
+                                  onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    archiveWhatsappConversation();
+                                  }}
+                                  disabled={whatsappLoading}
+                                >
+                                  Não é lead (arquivar)
+                                </button>
                               )}
                             </div>
                           )}
