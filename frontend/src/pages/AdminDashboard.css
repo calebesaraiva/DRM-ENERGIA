@@ -13609,13 +13609,78 @@
 /* ── Compose ── */
 .wc2-compose {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px 48px;
+  grid-template-columns: 44px minmax(0, 1fr) 48px;
   align-items: center;
   gap: 0.42rem;
   padding: 0.72rem 0.82rem;
   padding-bottom: max(0.72rem, env(safe-area-inset-bottom, 0px) + 4px);
   border-top: 1px solid #e8edf3;
   background: #ffffff;
+}
+
+.wc2-mic:not(:disabled) {
+  color: #f97316;
+}
+
+.wc2-audio-recorder {
+  grid-column: 1 / -1;
+  min-width: 0;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px 7px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.wc2-audio-recorder strong {
+  color: #172033;
+}
+
+.wc2-audio-recorder time {
+  margin-left: auto;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.wc2-audio-recorder audio {
+  min-width: 0;
+  height: 38px;
+  flex: 1;
+}
+
+.wc2-audio-recorder button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #dbe5f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wc2-audio-recorder .wc2-audio-send {
+  border-color: #f97316;
+  background: #f97316;
+  color: #fff;
+}
+
+.wc2-recording-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: wc2-recording-pulse 1s infinite;
+}
+
+@keyframes wc2-recording-pulse {
+  50% { opacity: .35; transform: scale(.8); }
 }
 
 .wc2-tool {
@@ -13762,7 +13827,7 @@
   }
 
   .wc2-compose {
-    grid-template-columns: 40px minmax(0, 1fr) 40px 46px;
+    grid-template-columns: 40px minmax(0, 1fr) 46px;
     gap: 0.35rem;
     padding: 0.6rem 0.62rem;
     padding-bottom: max(0.6rem, env(safe-area-inset-bottom, 0px) + 4px);
@@ -13781,6 +13846,19 @@
   .wc2-send {
     width: 46px;
     height: 46px;
+  }
+
+  .wc2-audio-recorder.preview {
+    flex-wrap: wrap;
+  }
+
+  .wc2-audio-recorder.preview audio {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .wc2-audio-recorder.preview button {
+    flex: 1;
   }
 
   .wc2-qa-row {

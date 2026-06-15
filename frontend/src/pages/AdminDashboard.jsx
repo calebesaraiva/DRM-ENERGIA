@@ -625,6 +625,9 @@ const AdminDashboard = () => {
   const [whatsappMessages, setWhatsappMessages] = useState([]);
   const [whatsappMediaPreview, setWhatsappMediaPreview] = useState(null);
   const [whatsappReply, setWhatsappReply] = useState('');
+  const [whatsappRecording, setWhatsappRecording] = useState(false);
+  const [whatsappRecordedAudio, setWhatsappRecordedAudio] = useState(null);
+  const [whatsappRecordingSeconds, setWhatsappRecordingSeconds] = useState(0);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [whatsappFilter, setWhatsappFilter] = useState('aguardando');
   const [whatsappSearch, setWhatsappSearch] = useState('');
@@ -689,6 +692,9 @@ const AdminDashboard = () => {
   const [produtoSearch, setProdutoSearch] = useState('');
   const equipamentoNomeRef = useRef(null);
   const whatsappMessagesEndRef = useRef(null);
+  const whatsappMediaRecorderRef = useRef(null);
+  const whatsappRecordingStreamRef = useRef(null);
+  const whatsappRecordingTimerRef = useRef(null);
   const [selectedEquipamentos, setSelectedEquipamentos] = useState({});
   const [contractModal, setContractModal] = useState({ open: false, orcamento: null, manual: emptyContractManual, equipamentoId: '' });
   const [contractConfig, setContractConfig] = useState(defaultContractConfig);
@@ -1326,6 +1332,11 @@ const AdminDashboard = () => {
     whatsappMessagesEndRef.current?.scrollIntoView({ block: 'end' });
   }, [selectedWhatsappConversation, whatsappMessages.length]);
 
+  useEffect(() => () => {
+    clearInterval(whatsappRecordingTimerRef.current);
+    whatsappRecordingStreamRef.current?.getTracks().forEach(track => track.stop());
+  }, []);
+
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('user'));
     const token = localStorage.getItem('token');
@@ -1726,6 +1737,87 @@ const AdminDashboard = () => {
       }
     } catch (err) {
       setWhatsappReply(text);
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  const clearWhatsappRecording = () => {
+    if (whatsappRecordedAudio?.url) URL.revokeObjectURL(whatsappRecordedAudio.url);
+    setWhatsappRecordedAudio(null);
+    setWhatsappRecordingSeconds(0);
+  };
+
+  const stopWhatsappRecording = () => {
+    whatsappMediaRecorderRef.current?.stop();
+    setWhatsappRecording(false);
+    clearInterval(whatsappRecordingTimerRef.current);
+    whatsappRecordingTimerRef.current = null;
+    whatsappRecordingStreamRef.current?.getTracks().forEach(track => track.stop());
+    whatsappRecordingStreamRef.current = null;
+  };
+
+  const startWhatsappRecording = async () => {
+    if (!canReplyWhatsapp || whatsappLoading) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      showToast('Este navegador não permite gravar áudio.', 'error');
+      return;
+    }
+    try {
+      clearWhatsappRecording();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredType = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm']
+        .find(type => MediaRecorder.isTypeSupported(type));
+      const recorder = preferredType ? new MediaRecorder(stream, { mimeType: preferredType }) : new MediaRecorder(stream);
+      const chunks = [];
+      recorder.ondataavailable = event => {
+        if (event.data?.size) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        if (!chunks.length) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || preferredType || 'audio/webm' });
+        setWhatsappRecordedAudio({ blob, url: URL.createObjectURL(blob), mimeType: blob.type || 'audio/webm' });
+      };
+      whatsappMediaRecorderRef.current = recorder;
+      whatsappRecordingStreamRef.current = stream;
+      recorder.start(250);
+      setWhatsappRecording(true);
+      setWhatsappRecordingSeconds(0);
+      whatsappRecordingTimerRef.current = setInterval(() => {
+        setWhatsappRecordingSeconds(seconds => {
+          if (seconds >= 119) {
+            setTimeout(stopWhatsappRecording, 0);
+            return 120;
+          }
+          return seconds + 1;
+        });
+      }, 1000);
+    } catch (err) {
+      showToast(err.name === 'NotAllowedError' ? 'Permita o acesso ao microfone para gravar áudio.' : 'Não foi possível iniciar a gravação.', 'error');
+    }
+  };
+
+  const sendWhatsappAudio = async () => {
+    if (!selectedWhatsappConversation || !whatsappRecordedAudio?.blob) return;
+    setWhatsappLoading(true);
+    try {
+      const audioBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
+        reader.onerror = reject;
+        reader.readAsDataURL(whatsappRecordedAudio.blob);
+      });
+      const data = await request(`/api/admin/whatsapp/conversations/${selectedWhatsappConversation.id}/audio`, {
+        method: 'POST',
+        body: JSON.stringify({ audioBase64, mimeType: whatsappRecordedAudio.mimeType }),
+      });
+      setWhatsappMessages(prev => [...prev.filter(item => item.id !== data.message.id), data.message]);
+      setSelectedWhatsappConversation(data.conversation);
+      setWhatsappConversations(prev => prev.map(item => item.id === data.conversation.id ? data.conversation : item));
+      clearWhatsappRecording();
+      showToast('Áudio enviado pelo WhatsApp.', 'success');
+    } catch (err) {
       showToast(err.message, 'error');
     } finally {
       setWhatsappLoading(false);
@@ -3897,24 +3989,38 @@ const AdminDashboard = () => {
 
                       {/* ── Compose ── */}
                       <form className="wc2-compose" onSubmit={sendWhatsappReply}>
-                        <button type="button" className="wc2-tool" title="Anexo" aria-label="Anexo" disabled>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                        </button>
-                        <textarea
-                          value={whatsappReply}
-                          onChange={(event) => setWhatsappReply(event.target.value)}
-                          onKeyDown={handleWhatsappReplyKeyDown}
-                          placeholder="Digite uma mensagem..."
-                          rows={1}
-                          disabled={!canReplyWhatsapp}
-                          aria-label="Mensagem"
-                        />
-                        <button type="button" className="wc2-tool" title="Emoji" aria-label="Emoji" disabled>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-                        </button>
-                        <button type="submit" className="wc2-send" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp} aria-label="Enviar mensagem">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                        </button>
+                        {whatsappRecording ? (
+                          <div className="wc2-audio-recorder recording">
+                            <span className="wc2-recording-dot"></span>
+                            <strong>Gravando áudio</strong>
+                            <time>{Math.floor(whatsappRecordingSeconds / 60)}:{String(whatsappRecordingSeconds % 60).padStart(2, '0')}</time>
+                            <button type="button" onClick={stopWhatsappRecording}>Parar</button>
+                          </div>
+                        ) : whatsappRecordedAudio ? (
+                          <div className="wc2-audio-recorder preview">
+                            <audio src={whatsappRecordedAudio.url} controls />
+                            <button type="button" className="wc2-audio-cancel" onClick={clearWhatsappRecording}>Cancelar</button>
+                            <button type="button" className="wc2-audio-send" onClick={sendWhatsappAudio} disabled={whatsappLoading}>Enviar áudio</button>
+                          </div>
+                        ) : (
+                          <>
+                            <button type="button" className="wc2-tool wc2-mic" title="Gravar áudio" aria-label="Gravar áudio" disabled={!canReplyWhatsapp || whatsappLoading} onClick={startWhatsappRecording}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>
+                            </button>
+                            <textarea
+                              value={whatsappReply}
+                              onChange={(event) => setWhatsappReply(event.target.value)}
+                              onKeyDown={handleWhatsappReplyKeyDown}
+                              placeholder="Digite uma mensagem..."
+                              rows={1}
+                              disabled={!canReplyWhatsapp}
+                              aria-label="Mensagem"
+                            />
+                            <button type="submit" className="wc2-send" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp} aria-label="Enviar mensagem">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            </button>
+                          </>
+                        )}
                       </form>
                     </>
                   ) : (

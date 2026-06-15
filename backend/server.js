@@ -1076,6 +1076,33 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
   };
 };
 
+const sendWhatsAppAudioMessage = async (to, buffer, mimeType = 'audio/webm', options = {}) => {
+  if (!whatsappRuntime.socket && !whatsappRuntime.starting) {
+    await startWhatsAppQrSession({ force: true });
+    await new Promise(resolve => setTimeout(resolve, 4000));
+  }
+  if (!whatsappRuntime.connected || !whatsappRuntime.socket) {
+    const error = new Error('WhatsApp não conectado. Conecte pelo QR Code antes de enviar áudio.');
+    error.statusCode = 409;
+    throw error;
+  }
+  const rawJid = normalizeWhatsAppRemoteJid(options.remoteJid || to);
+  if (!rawJid) throw new Error('Contato do WhatsApp inválido para envio.');
+  const jid = await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
+  const result = await whatsappRuntime.socket.sendMessage(jid, {
+    audio: buffer,
+    mimetype: mimeType,
+    ptt: true,
+  });
+  return {
+    configured: true,
+    mode: 'qrcode',
+    status: 'enviada',
+    providerMessageId: result?.key?.id || '',
+    payload: result,
+  };
+};
+
 const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', test = false } = {}) => {
   const notice = buildWhatsAppNewLeadNotice({
     nome: conversation?.clienteNome,
@@ -5642,6 +5669,69 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
   } catch (error) {
     console.error('Erro ao enviar WhatsApp:', error);
     res.status(error.statusCode || 502).json({ message: error.message || 'Não foi possível enviar pelo WhatsApp agora.' });
+  }
+});
+
+app.post('/api/admin/whatsapp/conversations/:id/audio', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const conversation = await getWhatsAppConversationById(req.params.id);
+  if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+  if (!canAccessWhatsAppConversation(req.user, conversation)) {
+    return res.status(403).json({ message: 'Você não tem acesso a esta conversa.' });
+  }
+
+  const mimeType = String(req.body.mimeType || 'audio/webm').split(';')[0].toLowerCase();
+  const audioBase64 = String(req.body.audioBase64 || '').replace(/^data:[^;]+;base64,/, '');
+  if (!audioBase64) return res.status(400).json({ message: 'Grave um áudio antes de enviar.' });
+
+  const buffer = Buffer.from(audioBase64, 'base64');
+  if (!buffer.length || buffer.length > 15 * 1024 * 1024) {
+    return res.status(400).json({ message: 'O áudio deve ter no máximo 15 MB.' });
+  }
+
+  let activeConversation = conversation;
+  if (conversation.status === 'Finalizada') {
+    await db.run(
+      `UPDATE whatsapp_conversations
+       SET assignedUserId = ?, assignedUserName = ?, status = 'Em atendimento', updatedAt = ?
+       WHERE id = ?`,
+      conversation.assignedUserId || req.user.id,
+      conversation.assignedUserName || req.user.nome || req.user.username,
+      new Date().toISOString(),
+      conversation.id
+    );
+    activeConversation = await getWhatsAppConversationById(conversation.id);
+  }
+
+  try {
+    const provider = await sendWhatsAppAudioMessage(activeConversation.clienteTelefone, buffer, mimeType, {
+      remoteJid: activeConversation.remoteJid,
+    });
+    fs.mkdirSync(WHATSAPP_MEDIA_DIR, { recursive: true });
+    const extension = getMediaExtension(mimeType, 'audio');
+    const fileName = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}.${extension}`;
+    await fs.promises.writeFile(path.join(WHATSAPP_MEDIA_DIR, fileName), buffer);
+    const message = await createWhatsAppMessage({
+      conversationId: activeConversation.id,
+      direction: 'outgoing',
+      messageType: 'audio',
+      text: 'Áudio enviado',
+      mediaUrl: `/api/whatsapp/media/${fileName}`,
+      mimeType,
+      fileName,
+      fileSize: buffer.length,
+      providerMessageId: provider.providerMessageId,
+      status: provider.status,
+      senderId: req.user.id,
+      senderName: getConsultantDisplayName(req.user),
+      rawPayload: provider.payload || provider,
+    });
+    const updatedConversation = await getWhatsAppConversationById(activeConversation.id);
+    io.emit('whatsapp_message_created', { message, conversation: updatedConversation });
+    io.emit('whatsapp_conversation_updated', updatedConversation);
+    res.status(201).json({ message, conversation: updatedConversation, provider });
+  } catch (error) {
+    console.error('Erro ao enviar áudio WhatsApp:', error);
+    res.status(error.statusCode || 502).json({ message: error.message || 'Não foi possível enviar o áudio.' });
   }
 });
 
