@@ -3413,6 +3413,12 @@ const AdminDashboard = () => {
                               <span className={`wi2-item-status ${statusClass}`}>{statusLabel}</span>
                             </div>
                             <p className="wi2-item-preview">{conversation.lastMessage || 'Nenhuma mensagem ainda'}</p>
+                            {conversation.assignedUserName && !isPending && (
+                              <span className="wi2-item-agent">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                {conversation.assignedUserName}
+                              </span>
+                            )}
                           </div>
                           {Number(conversation.unreadCount || 0) > 0 && (
                             <span className="wi2-unread">{conversation.unreadCount}</span>

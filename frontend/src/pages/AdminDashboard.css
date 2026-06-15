@@ -12605,6 +12605,28 @@
   white-space: nowrap;
 }
 
+/* Consultor atendente */
+.wi2-item-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 2px 8px;
+  max-width: 100%;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wi2-item-agent svg {
+  flex: 0 0 auto;
+}
+
 /* Unread badge */
 .wi2-unread {
   display: flex;
