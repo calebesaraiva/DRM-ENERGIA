@@ -8814,6 +8814,26 @@
   white-space: nowrap;
 }
 
+.lsv2-owner-inline {
+  width: min(190px, 100%);
+  height: 34px;
+  padding: 0 0.65rem;
+  border: 1.5px solid #dbe5f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+}
+
+.lsv2-owner-inline:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+}
+
 /* ── Card list ── */
 .lsv2-card-list {
   display: flex;

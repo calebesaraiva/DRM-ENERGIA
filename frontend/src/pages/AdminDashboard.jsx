@@ -732,6 +732,10 @@ const AdminDashboard = () => {
 
   const isMasterAdmin = adminUser.role === 'ADM' && String(adminUser.username || '').toLowerCase() === 'deivson';
   const canArchiveWhatsappNotLead = isMasterAdmin || String(adminUser.username || '').toLowerCase() === 'renejr';
+  const leadAssignableUsers = useMemo(
+    () => usuarios.filter(user => user.active !== 0 && user.permissions?.leads && String(user.username || '').toLowerCase() !== 'deivson'),
+    [usuarios]
+  );
 
   const showToast = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
@@ -1347,8 +1351,13 @@ const AdminDashboard = () => {
     };
 
     const handleNewLead = (novoLead) => {
-      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson') || novoLead.assignedUserId === loggedInUser.id;
-      if (canSee) setLeads(prev => [novoLead, ...prev.filter(lead => lead.id !== novoLead.id)]);
+      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson')
+        || Number(novoLead.assignedUserId) === Number(loggedInUser.id);
+      setLeads(prev => (
+        canSee
+          ? [novoLead, ...prev.filter(lead => lead.id !== novoLead.id)]
+          : prev.filter(lead => lead.id !== novoLead.id)
+      ));
     };
 
     const handleContratoAtualizado = (contrato) => {
@@ -1403,8 +1412,7 @@ const AdminDashboard = () => {
         return;
       }
       const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson')
-        || Number(conversation.assignedUserId) === Number(loggedInUser.id)
-        || (!conversation.assignedUserId && conversation.status === 'Aguardando atendimento');
+        || Number(conversation.assignedUserId) === Number(loggedInUser.id);
       if (!canSee) {
         setWhatsappConversations(prev => prev.filter(item => item.id !== conversation.id));
         setSelectedWhatsappConversation(prev => prev?.id === conversation.id ? null : prev);
@@ -1699,6 +1707,21 @@ const AdminDashboard = () => {
       body: JSON.stringify({ status, ultimoContato: new Date().toISOString().split('T')[0] }),
     });
     setLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, status } : lead));
+  };
+
+  const assignLeadOwner = async (leadId, assignedUserId) => {
+    if (!assignedUserId) return;
+    try {
+      const updatedLead = await request(`/api/admin/leads/${leadId}/responsavel`, {
+        method: 'PUT',
+        body: JSON.stringify({ assignedUserId }),
+      });
+      setLeads(prev => prev.map(lead => lead.id === leadId ? updatedLead : lead));
+      request('/api/admin/whatsapp/conversations').then(setWhatsappConversations).catch(() => {});
+      showToast(`Lead #${updatedLead.id} designado para ${updatedLead.assignedUserName}.`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const closeManualLeadModal = () => {
@@ -4010,7 +4033,21 @@ const AdminDashboard = () => {
                       <div className="lsv2-card-meta">
                         <div className="lsv2-meta-block">
                           <span className="lsv2-meta-label">Consultor</span>
-                          <span className="lsv2-meta-val">{getResponsibleName(lead.assignedUserName)}</span>
+                          {isMasterAdmin ? (
+                            <select
+                              className="lsv2-owner-inline"
+                              value={lead.assignedUserId || ''}
+                              onChange={(event) => assignLeadOwner(lead.id, event.target.value)}
+                              aria-label={`Designar responsável para ${lead.nome}`}
+                            >
+                              <option value="">Sem responsável</option>
+                              {leadAssignableUsers.map(user => (
+                                <option key={user.id} value={user.id}>{user.nome}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="lsv2-meta-val">{getResponsibleName(lead.assignedUserName)}</span>
+                          )}
                         </div>
                         <div className="lsv2-meta-block">
                           <span className="lsv2-meta-label">Etapa</span>

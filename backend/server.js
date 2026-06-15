@@ -634,8 +634,8 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       nome: lead.nome || message.pushName || phone,
       telefone: phone,
       remoteJid,
-      assignedUserId: null,
-      assignedUserName: '',
+      assignedUserId: owner?.id || lead.assignedUserId || null,
+      assignedUserName: owner?.nome || lead.assignedUserName || '',
       status: 'Aguardando atendimento',
     });
     const savedMessage = await createWhatsAppMessage({
@@ -838,7 +838,6 @@ const getWhatsAppProviderStatus = () => {
 const canAccessWhatsAppConversation = (user, conversation = {}) => (
   isMasterAdminUser(user)
     || Number(conversation.assignedUserId) === Number(user?.id)
-    || (!conversation.assignedUserId && conversation.status === 'Aguardando atendimento')
 );
 
 const getWhatsAppConversationById = async (id) => db.get('SELECT * FROM whatsapp_conversations WHERE id = ?', id);
@@ -867,8 +866,8 @@ const upsertWhatsAppConversation = async ({
     // 'Arquivada' = "não é lead": permanece oculta mesmo que o contato mande
     // novas mensagens. Apenas 'Finalizada' (atendimento concluído) pode reabrir.
     const shouldReopen = conversation.status === 'Finalizada' && status === 'Aguardando atendimento';
-    const nextOwnerId = shouldReopen ? null : (conversation.assignedUserId || assignedUserId || null);
-    const nextOwnerName = shouldReopen ? null : (conversation.assignedUserName || assignedUserName || null);
+    const nextOwnerId = shouldReopen ? (assignedUserId || null) : (conversation.assignedUserId || assignedUserId || null);
+    const nextOwnerName = shouldReopen ? (assignedUserName || null) : (conversation.assignedUserName || assignedUserName || null);
     const nextStatus = shouldReopen ? 'Aguardando atendimento' : (conversation.status || status);
     await db.run(
       `UPDATE whatsapp_conversations
@@ -5132,6 +5131,64 @@ app.post('/api/admin/leads', authRequired, requirePermission('leads'), async (re
   res.status(201).json(lead);
 });
 
+app.put('/api/admin/leads/:id/responsavel', authRequired, requirePermission('leads'), async (req, res) => {
+  if (!isMasterAdminUser(req.user)) {
+    return res.status(403).json({ message: 'Apenas o Deivson pode designar leads manualmente.' });
+  }
+
+  const lead = await db.get('SELECT * FROM leads WHERE id = ?', req.params.id);
+  if (!lead) return res.status(404).json({ message: 'Lead não encontrado.' });
+
+  const ownerId = Number(req.body.assignedUserId || 0);
+  if (!ownerId) return res.status(400).json({ message: 'Selecione um vendedor para receber o lead.' });
+
+  const owner = await db.get('SELECT * FROM usuarios WHERE id = ? AND active = 1', ownerId);
+  const ownerPermissions = parsePermissions(owner?.permissions);
+  if (!owner || !ownerPermissions.leads) {
+    return res.status(400).json({ message: 'O usuário escolhido precisa estar ativo e ter permissão de leads.' });
+  }
+
+  await db.run(
+    'UPDATE leads SET assignedUserId = ?, assignedUserName = ? WHERE id = ?',
+    owner.id,
+    owner.nome,
+    lead.id
+  );
+
+  const phoneVariants = whatsAppPhoneVariants(lead.telefone);
+  if (phoneVariants.length) {
+    const placeholders = phoneVariants.map(() => '?').join(', ');
+    const conversations = await db.all(
+      `SELECT id FROM whatsapp_conversations
+       WHERE status != 'Arquivada'
+         AND clienteTelefone IN (${placeholders})`,
+      ...phoneVariants
+    );
+    if (conversations.length) {
+      const ids = conversations.map(item => item.id);
+      const idPlaceholders = ids.map(() => '?').join(', ');
+      await db.run(
+        `UPDATE whatsapp_conversations
+         SET assignedUserId = ?, assignedUserName = ?, status = CASE WHEN status = 'Arquivada' THEN status ELSE 'Aguardando atendimento' END, updatedAt = ?
+         WHERE id IN (${idPlaceholders})`,
+        owner.id,
+        owner.nome,
+        new Date().toISOString(),
+        ...ids
+      );
+      const updatedConversations = await db.all(
+        `SELECT * FROM whatsapp_conversations WHERE id IN (${idPlaceholders})`,
+        ...ids
+      );
+      updatedConversations.forEach(item => io.emit('whatsapp_conversation_updated', item));
+    }
+  }
+
+  const updatedLead = await db.get('SELECT * FROM leads WHERE id = ?', lead.id);
+  io.emit('novo_lead', updatedLead);
+  res.json(updatedLead);
+});
+
 app.get('/api/admin/whatsapp/status', authRequired, requirePermission('whatsapp'), async (req, res) => {
   res.json({
     ...getWhatsAppProviderStatus(),
@@ -5257,10 +5314,7 @@ app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('wh
     : await db.all(
       `SELECT * FROM whatsapp_conversations
        WHERE ${visibleWhere}
-         AND (
-           assignedUserId = ?
-           OR (assignedUserId IS NULL AND status = 'Aguardando atendimento')
-         )
+         AND assignedUserId = ?
        ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC`,
       req.user.id
     );
@@ -5271,6 +5325,10 @@ app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('wh
 app.post('/api/admin/whatsapp/conversations/:id/claim', authRequired, requirePermission('whatsapp'), async (req, res) => {
   const conversation = await getWhatsAppConversationById(req.params.id);
   if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+
+  if (!isMasterAdminUser(req.user) && Number(conversation.assignedUserId) !== Number(req.user.id)) {
+    return res.status(403).json({ message: 'Esta conversa precisa ser designada para você pelo Deivson ou pelo rodízio.' });
+  }
 
   if (
     conversation.assignedUserId
