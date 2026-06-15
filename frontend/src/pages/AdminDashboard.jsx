@@ -565,6 +565,7 @@ const AdminDashboard = () => {
   const [whatsappFilter, setWhatsappFilter] = useState('aguardando');
   const [whatsappSearch, setWhatsappSearch] = useState('');
   const [whatsappMobileChatOpen, setWhatsappMobileChatOpen] = useState(false);
+  const [waChatActionsOpen, setWaChatActionsOpen] = useState(false);
   const [whatsappConnectOpen, setWhatsappConnectOpen] = useState(false);
   const [whatsappConnectLoading, setWhatsappConnectLoading] = useState(false);
   const [orcamentoSearch, setOrcamentoSearch] = useState('');
@@ -1193,6 +1194,12 @@ const AdminDashboard = () => {
     document.addEventListener('click', close, true);
     return () => document.removeEventListener('click', close, true);
   }, [openLeadMenu]);
+  useEffect(() => {
+    if (!waChatActionsOpen) return;
+    const close = () => setWaChatActionsOpen(false);
+    document.addEventListener('click', close, true);
+    return () => document.removeEventListener('click', close, true);
+  }, [waChatActionsOpen]);
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
   useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
   useEffect(() => {
@@ -3428,37 +3435,34 @@ const AdminDashboard = () => {
                   {selectedWhatsappConversation ? (
                     <>
                       <div className="whatsapp-chat-head">
-                        <button type="button" className="wa-back-button" onClick={() => setWhatsappMobileChatOpen(false)} aria-label="Voltar para conversas">‹</button>
+                        <button type="button" className="wa-back-button" onClick={() => { setWhatsappMobileChatOpen(false); setWaChatActionsOpen(false); }} aria-label="Voltar para conversas">‹</button>
                         <span className="wa-avatar large">{String(selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone || 'W').charAt(0)}</span>
                         <div className="wa-chat-title">
                           <h4>{selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone}</h4>
-                          <p>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Fila compartilhada'} • {selectedWhatsappConversation.status || 'Aguardando atendimento'}</p>
+                          <p>{selectedWhatsappConversation.clienteTelefone} • {selectedWhatsappConversation.assignedUserName || 'Fila compartilhada'}</p>
                         </div>
-                        <div className="whatsapp-chat-actions">
+                        <div className="wa-head-actions">
                           {selectedWhatsappIsPending && (
-                            <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => claimWhatsappConversation()} disabled={whatsappLoading}>
+                            <button type="button" className="btn btn-primary btn-sm-admin wa-assumir-btn" onClick={() => claimWhatsappConversation()} disabled={whatsappLoading}>
                               Assumir
                             </button>
                           )}
-                          <button type="button" className="btn btn-outline btn-sm-admin" disabled title="Transferência será liberada quando houver troca de responsável no backend.">
-                            Transferir
-                          </button>
-                          {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
-                            <button type="button" className="btn btn-outline btn-sm-admin" onClick={closeWhatsappConversation} disabled={whatsappLoading}>
-                              Finalizar
-                            </button>
-                          )}
-                          <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setActiveTab('orcamentos')}>
-                            Orçamento
-                          </button>
-                          <a
-                            className="btn btn-outline btn-sm-admin"
-                            href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Abrir WhatsApp
-                          </a>
+                          <div className="wa-more-wrap">
+                            <button type="button" className="wa-icon-button wa-more-btn" onClick={() => setWaChatActionsOpen(v => !v)} aria-label="Mais ações">⋯</button>
+                            {waChatActionsOpen && (
+                              <div className="wa-more-dropdown">
+                                {selectedWhatsappIsPending && (
+                                  <button type="button" onClick={() => { claimWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Assumir atendimento</button>
+                                )}
+                                <button type="button" disabled title="Transferência será liberada em breve">Transferir</button>
+                                {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
+                                  <button type="button" onClick={() => { closeWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Finalizar atendimento</button>
+                                )}
+                                <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
+                                <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -3512,7 +3516,7 @@ const AdminDashboard = () => {
                           onChange={(event) => setWhatsappReply(event.target.value)}
                           onKeyDown={handleWhatsappReplyKeyDown}
                           placeholder={canReplyWhatsapp ? 'Digite a resposta para o cliente...' : whatsappStatus?.connected ? 'Inicie o atendimento para responder pelo sistema' : 'Conecte o WhatsApp por QR Code para responder'}
-                          rows={3}
+                          rows={1}
                           disabled={!canReplyWhatsapp}
                         />
                         <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp}>

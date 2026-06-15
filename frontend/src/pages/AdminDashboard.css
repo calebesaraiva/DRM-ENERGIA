@@ -11903,3 +11903,123 @@
     font-size: 0.92rem;
   }
 }
+
+/* === WA CHAT V2 — Compact header + green sent bubbles + better compose === */
+
+/* Sent messages: green like real WhatsApp */
+.wa-redesign .whatsapp-message.sent {
+  border-color: #bbf7d0;
+  border-radius: 17px 17px 5px 17px;
+  background: #dcfce7;
+}
+
+.wa-redesign .whatsapp-message.sent p {
+  color: #14532d;
+}
+
+.wa-redesign .whatsapp-message.sent span {
+  color: #16a34a;
+}
+
+/* Chat head — compact 4-col: back | avatar | title | actions */
+.wa-redesign .whatsapp-chat-head {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+
+/* Head actions container */
+.wa-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex: 0 0 auto;
+}
+
+.wa-assumir-btn {
+  white-space: nowrap;
+}
+
+/* More (⋯) dropdown */
+.wa-more-wrap {
+  position: relative;
+}
+
+.wa-more-btn {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.wa-more-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 500;
+  min-width: 200px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.13);
+  overflow: hidden;
+}
+
+.wa-more-dropdown button,
+.wa-more-dropdown a {
+  display: block;
+  width: 100%;
+  padding: 0.78rem 1rem;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.wa-more-dropdown button:last-child,
+.wa-more-dropdown a:last-child {
+  border-bottom: 0;
+}
+
+.wa-more-dropdown button:hover,
+.wa-more-dropdown a:hover {
+  background: #f8fafc;
+}
+
+.wa-more-dropdown button:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Compose: single-line growing textarea */
+.wa-redesign .whatsapp-compose textarea {
+  min-height: 44px;
+  max-height: 120px;
+  resize: none;
+}
+
+/* Mobile ≤820px: hide desktop-only action buttons, rely on ⋯ menu */
+@media (max-width: 820px) {
+  .wa-redesign .whatsapp-chat-head {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    flex-wrap: unset;
+  }
+
+  .wa-head-actions {
+    gap: 0.35rem;
+  }
+
+  .wa-assumir-btn {
+    min-height: 36px;
+    padding: 0.38rem 0.6rem;
+    font-size: 0.78rem;
+  }
+
+  .wa-more-dropdown {
+    right: 0;
+    min-width: 190px;
+  }
+}
