@@ -609,6 +609,9 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
     socket.ev.on('messages.update', async (updates = []) => {
       for (const update of updates) {
         const providerMessageId = update.key?.id || '';
+        if (update.update?.status !== undefined) {
+          console.log(`[WhatsApp][ack] id=${providerMessageId} para=${update.key?.remoteJid} status=${update.update.status}`);
+        }
         if (!providerMessageId || update.update?.status === undefined) continue;
         try {
           const status = mapBaileysMessageStatus(update.update.status);
