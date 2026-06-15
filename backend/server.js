@@ -3161,12 +3161,13 @@ const buildProcuracaoPdf = async (procuracao) => {
   });
 };
 
-const sendProcuracaoPdf = async (res, procuracao) => {
+const sendProcuracaoPdf = async (res, procuracao, { download = true } = {}) => {
   const pdf = await buildProcuracaoPdf(procuracao);
   const safeName = String(procuracao.clienteNome || 'cliente').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w-]+/g, '-').toLowerCase();
+  const disposition = download ? 'attachment' : 'inline';
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Length', pdf.length);
-  res.setHeader('Content-Disposition', `attachment; filename="procuracao-drm-${procuracao.id}-${safeName}.pdf"`);
+  res.setHeader('Content-Disposition', `${disposition}; filename="procuracao-drm-${procuracao.id}-${safeName}.pdf"`);
   res.send(pdf);
 };
 
@@ -6246,7 +6247,7 @@ app.get('/api/admin/procuracoes/:id/preview', authRequired, requirePermission('c
   if (req.user.role !== 'ADM') return res.status(403).send('Somente administrador pode revisar procurações pendentes.');
   const procuracao = await db.get('SELECT * FROM procuracoes WHERE id = ?', req.params.id);
   if (!procuracao) return res.status(404).send('Procuração não encontrada.');
-  await sendProcuracaoPdf(res, procuracao);
+  await sendProcuracaoPdf(res, procuracao, { download: false });
 });
 
 app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), async (req, res) => {
