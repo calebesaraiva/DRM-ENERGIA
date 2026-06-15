@@ -324,7 +324,14 @@ const formatWhatsAppPanelMessage = (text, consultantName) => [
 const buildWhatsAppClaimNotice = (consultantName) => [
   '*DRM ENERGIA SOLAR*',
   '',
-  `${consultantName} começou o seu atendimento.`,
+  `Olá! Meu nome é ${consultantName} e a partir de agora vou cuidar do seu atendimento. 😊`,
+].join('\n');
+
+const buildWhatsAppCloseNotice = (consultantName) => [
+  '*DRM ENERGIA SOLAR*',
+  '',
+  `Seu atendimento foi finalizado por ${consultantName}.`,
+  'Obrigado pelo contato! Se precisar de algo, é só chamar que iniciamos um novo atendimento. 🙏',
 ].join('\n');
 
 const buildWhatsAppNewLeadNotice = ({ nome = '', telefone = '', mensagem = '', teste = false } = {}) => [
@@ -4888,6 +4895,19 @@ app.post('/api/admin/whatsapp/conversations/:id/close', authRequired, requirePer
   if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
   if (!canAccessWhatsAppConversation(req.user, conversation)) {
     return res.status(403).json({ message: 'Você não tem acesso a esta conversa.' });
+  }
+
+  // Envia o aviso de finalização ao cliente ANTES de marcar como finalizada,
+  // pois o envio exige que a conversa ainda esteja acessível ao consultor.
+  try {
+    await sendAndStoreWhatsAppMessage({
+      conversation,
+      text: buildWhatsAppCloseNotice(getConsultantDisplayName(req.user)),
+      user: req.user,
+      system: true,
+    });
+  } catch (error) {
+    console.error('Erro ao enviar aviso de finalização de atendimento:', error);
   }
 
   const now = new Date().toISOString();
