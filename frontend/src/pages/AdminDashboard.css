@@ -1231,6 +1231,47 @@
   line-height: 1.35;
 }
 
+.permission-presets {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  padding: 0.78rem 0.85rem;
+  border: 1px dashed #d7dee9;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.permission-presets > span {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.permission-presets > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.permission-presets button {
+  border: 1px solid #dbe3ef;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 0.45rem 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.permission-presets button:hover {
+  border-color: #fb923c;
+  color: #c2410c;
+  background: #fff7ed;
+}
+
 .permission-user-main {
   display: flex;
   align-items: center;

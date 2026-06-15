@@ -187,6 +187,7 @@ const INTERNAL_USERS = [
     temporaryPassword: 'ReneJr@DRM#2026',
     permissions: {
       dashboard: true,
+      clientes: true,
       leads: true,
       orcamentos: true,
       contratos: true,
@@ -194,6 +195,7 @@ const INTERNAL_USERS = [
       whatsapp: true,
       precosSistemas: true,
       equipeTecnica: true,
+      gerenciarClientes: true,
     },
   },
   {
@@ -248,11 +250,30 @@ const mergePermissions = (permissions = {}) => ({
   ...permissions,
 });
 
+const normalizePermissions = (permissions = {}) => {
+  const merged = mergePermissions(permissions);
+  if (merged.clientes) merged.gerenciarClientes = true;
+  if (merged.gerenciarClientes) merged.clientes = true;
+  if (merged.whatsapp) merged.leads = true;
+  if (merged.permissoes) merged.usuarios = true;
+  if (merged.orcamentos) merged.clientes = true;
+  if (merged.contratos) {
+    merged.clientes = true;
+    merged.orcamentos = true;
+  }
+  if (merged.equipeTecnica) {
+    merged.ordensServico = true;
+    merged.precosSistemas = true;
+  }
+  if (merged.clientes) merged.gerenciarClientes = true;
+  return merged;
+};
+
 const parsePermissions = (value) => {
   try {
-    return mergePermissions(value ? JSON.parse(value) : {});
+    return normalizePermissions(value ? JSON.parse(value) : {});
   } catch {
-    return mergePermissions();
+    return normalizePermissions();
   }
 };
 
@@ -3777,7 +3798,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
         normalizeWhatsAppPhone(user.whatsapp),
         await bcrypt.hash(user.temporaryPassword, 10),
         user.role,
-        JSON.stringify(mergePermissions(user.permissions)),
+        JSON.stringify(normalizePermissions(user.permissions)),
         user.mustChangePassword === false ? 0 : 1,
         new Date().toISOString()
       );
@@ -3790,38 +3811,52 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     }
   }
 
-  const savedUsers = await db.all('SELECT id, permissions FROM usuarios');
+  const savedUsers = await db.all('SELECT id, username, permissions FROM usuarios');
   for (const savedUser of savedUsers) {
     let rawPermissions = {};
     try {
       rawPermissions = savedUser.permissions ? JSON.parse(savedUser.permissions) : {};
     } catch {}
 
+    const normalizedSavedPermissions = normalizePermissions(
+      String(savedUser.username || '').toLowerCase() === 'renejr'
+        ? { ...rawPermissions, clientes: true, gerenciarClientes: true }
+        : rawPermissions
+    );
+    if (JSON.stringify(normalizedSavedPermissions) !== JSON.stringify(mergePermissions(rawPermissions))) {
+      await db.run(
+        'UPDATE usuarios SET permissions = ? WHERE id = ?',
+        JSON.stringify(normalizedSavedPermissions),
+        savedUser.id
+      );
+      rawPermissions = normalizedSavedPermissions;
+    }
+
     if (rawPermissions.orcamentos === true && typeof rawPermissions.contratos === 'undefined') {
       await db.run(
         'UPDATE usuarios SET permissions = ? WHERE id = ?',
-        JSON.stringify(mergePermissions({ ...rawPermissions, contratos: true })),
+        JSON.stringify(normalizePermissions({ ...rawPermissions, contratos: true })),
         savedUser.id
       );
     }
     if (rawPermissions.equipeTecnica === true && rawPermissions.ordensServico !== true) {
       await db.run(
         'UPDATE usuarios SET permissions = ? WHERE id = ?',
-        JSON.stringify(mergePermissions({ ...rawPermissions, ordensServico: true })),
+        JSON.stringify(normalizePermissions({ ...rawPermissions, ordensServico: true })),
         savedUser.id
       );
     }
     if ((rawPermissions.financeiro === true || rawPermissions.equipeTecnica === true) && rawPermissions.precosSistemas !== true) {
       await db.run(
         'UPDATE usuarios SET permissions = ? WHERE id = ?',
-        JSON.stringify(mergePermissions({ ...rawPermissions, precosSistemas: true })),
+        JSON.stringify(normalizePermissions({ ...rawPermissions, precosSistemas: true })),
         savedUser.id
       );
     }
     if (rawPermissions.leads === true && typeof rawPermissions.whatsapp === 'undefined') {
       await db.run(
         'UPDATE usuarios SET permissions = ? WHERE id = ?',
-        JSON.stringify(mergePermissions({ ...rawPermissions, whatsapp: true })),
+        JSON.stringify(normalizePermissions({ ...rawPermissions, whatsapp: true })),
         savedUser.id
       );
     }
@@ -4858,7 +4893,7 @@ app.get('/api/admin/clientes', authRequired, requirePermission('clientes'), asyn
   res.json(clientes.map(publicClient));
 });
 
-app.post('/api/admin/clientes', authRequired, requirePermission('gerenciarClientes'), async (req, res) => {
+app.post('/api/admin/clientes', authRequired, requirePermission('clientes'), async (req, res) => {
   const data = normalizeClientPayload(req.body);
   if (!data.nome || !data.whatsapp || !data.cidade) {
     return res.status(400).json({ message: 'Nome, WhatsApp e cidade são obrigatórios.' });
@@ -4887,7 +4922,7 @@ app.post('/api/admin/clientes', authRequired, requirePermission('gerenciarClient
   }
 });
 
-app.put('/api/admin/clientes/:id', authRequired, requirePermission('gerenciarClientes'), async (req, res) => {
+app.put('/api/admin/clientes/:id', authRequired, requirePermission('clientes'), async (req, res) => {
   const data = normalizeClientPayload(req.body);
   const fields = ['nome', 'whatsapp', 'cidade', 'email', ...CLIENT_EXTRA_FIELDS];
   await db.run(
@@ -6128,7 +6163,7 @@ app.post('/api/admin/usuarios', authRequired, requirePermission('usuarios'), asy
   if (!isRealEmail(normalizedEmail)) {
     return res.status(400).json({ message: 'Informe um e-mail válido para recuperação de senha.' });
   }
-  const mergedPermissions = mergePermissions(permissions || {
+  const mergedPermissions = normalizePermissions(permissions || {
     dashboard: true,
     leads: true,
     orcamentos: true,
@@ -6183,7 +6218,7 @@ app.put('/api/admin/usuarios/:id/permissoes', authRequired, requirePermission('p
     'UPDATE usuarios SET nome = ?, role = ?, permissions = ?, active = ?, whatsapp = ? WHERE id = ?',
     String(nome || user.nome).trim(),
     nextRole,
-    JSON.stringify(mergePermissions(permissions)),
+    JSON.stringify(normalizePermissions(permissions)),
     active === false ? 0 : 1,
     typeof whatsapp === 'undefined' ? user.whatsapp : normalizeWhatsAppPhone(whatsapp),
     req.params.id

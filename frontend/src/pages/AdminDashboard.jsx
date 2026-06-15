@@ -30,7 +30,7 @@ const permissionLabels = {
 
 const permissionDescriptions = {
   dashboard: 'Visualiza a operação da empresa',
-  clientes: 'Visualiza a base de clientes',
+  clientes: 'Visualiza, cadastra e altera clientes',
   leads: 'Recebe e acompanha leads',
   orcamentos: 'Visualiza simulações e propostas',
   contratos: 'Gera e acompanha contratos',
@@ -44,6 +44,69 @@ const permissionDescriptions = {
   verTodosLeads: 'Vê leads de toda a equipe',
   gerenciarClientes: 'Cadastra e altera clientes',
 };
+
+const normalizePanelPermissions = (permissions = {}) => {
+  const next = { ...permissions };
+  if (next.clientes) next.gerenciarClientes = true;
+  if (next.gerenciarClientes) next.clientes = true;
+  if (next.whatsapp) next.leads = true;
+  if (next.permissoes) next.usuarios = true;
+  if (next.orcamentos) next.clientes = true;
+  if (next.contratos) {
+    next.clientes = true;
+    next.orcamentos = true;
+  }
+  if (next.equipeTecnica) {
+    next.ordensServico = true;
+    next.precosSistemas = true;
+  }
+  if (next.clientes) next.gerenciarClientes = true;
+  return next;
+};
+
+const permissionPresets = [
+  {
+    id: 'comercial',
+    label: 'Comercial completo',
+    permissions: {
+      dashboard: true,
+      clientes: true,
+      leads: true,
+      whatsapp: true,
+      orcamentos: true,
+      contratos: true,
+      precosSistemas: true,
+    },
+  },
+  {
+    id: 'consultor',
+    label: 'Consultor WhatsApp',
+    permissions: {
+      dashboard: true,
+      leads: true,
+      whatsapp: true,
+      orcamentos: true,
+      contratos: true,
+    },
+  },
+  {
+    id: 'tecnico',
+    label: 'Técnico',
+    permissions: {
+      dashboard: true,
+      clientes: true,
+      equipeTecnica: true,
+      ordensServico: true,
+      contratos: true,
+      precosSistemas: true,
+    },
+  },
+  {
+    id: 'limpar',
+    label: 'Limpar acesso',
+    permissions: { dashboard: true },
+  },
+];
 
 const roleLabels = {
   ADM: 'Administrador',
@@ -661,7 +724,10 @@ const AdminDashboard = () => {
   }), []);
 
   const hasPermission = useCallback((permission) => (
-    adminUser.role === 'ADM' || adminUser.permissions?.[permission] || (permission === 'whatsapp' && adminUser.permissions?.leads)
+    adminUser.role === 'ADM'
+    || adminUser.permissions?.[permission]
+    || (permission === 'whatsapp' && adminUser.permissions?.leads)
+    || (permission === 'gerenciarClientes' && adminUser.permissions?.clientes)
   ), [adminUser.permissions, adminUser.role]);
 
   const isMasterAdmin = adminUser.role === 'ADM' && String(adminUser.username || '').toLowerCase() === 'deivson';
@@ -2015,11 +2081,12 @@ const AdminDashboard = () => {
   );
 
   const updatePermissions = async (userId, permissions, active, extra = {}) => {
+    const normalizedPermissions = normalizePanelPermissions(permissions);
     await request(`/api/admin/usuarios/${userId}/permissoes`, {
       method: 'PUT',
-      body: JSON.stringify({ permissions, active, ...extra }),
+      body: JSON.stringify({ permissions: normalizedPermissions, active, ...extra }),
     });
-    setUsuarios(prev => prev.map(user => user.id === userId ? { ...user, permissions, active, ...extra } : user));
+    setUsuarios(prev => prev.map(user => user.id === userId ? { ...user, permissions: normalizedPermissions, active, ...extra } : user));
   };
 
   const createUsuario = async (event) => {
@@ -2029,7 +2096,7 @@ const AdminDashboard = () => {
       method: 'POST',
       body: JSON.stringify({
         ...newUserForm,
-        permissions: {
+        permissions: normalizePanelPermissions({
           dashboard: true,
           leads: true,
           orcamentos: true,
@@ -2050,7 +2117,7 @@ const AdminDashboard = () => {
             verTodosLeads: true,
             gerenciarClientes: true,
           } : {}),
-        },
+        }),
       }),
     });
     setUsuarios(prev => [...prev, user]);
@@ -6103,13 +6170,33 @@ const AdminDashboard = () => {
                       </label>
                       <small>{user.role !== 'ADM' && user.permissions?.leads && user.active && user.whatsapp ? 'Participando do rodízio de leads.' : 'Não participa do rodízio sem WhatsApp, permissão de leads e usuário ativo.'}</small>
                     </div>
+                    <div className="permission-presets">
+                      <span>Modelos rápidos</span>
+                      <div>
+                        {permissionPresets.map(preset => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => updatePermissions(user.id, normalizePanelPermissions(preset.permissions), user.active, { role: user.role, nome: user.nome, whatsapp: user.whatsapp })}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="permissions-grid">
                       {Object.entries(permissionLabels).map(([key, label]) => (
                         <label key={key} className="permission-toggle">
                           <input
                             type="checkbox"
                             checked={Boolean(user.permissions?.[key])}
-                            onChange={(event) => updatePermissions(user.id, { ...user.permissions, [key]: event.target.checked }, user.active)}
+                            onChange={(event) => {
+                              const checked = event.target.checked;
+                              const nextPermissions = { ...user.permissions, [key]: checked };
+                              if (key === 'clientes') nextPermissions.gerenciarClientes = checked;
+                              if (key === 'gerenciarClientes' && checked) nextPermissions.clientes = true;
+                              updatePermissions(user.id, nextPermissions, user.active);
+                            }}
                           />
                           <span>
                             <strong>{label}</strong>
