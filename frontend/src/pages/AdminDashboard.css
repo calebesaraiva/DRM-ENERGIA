@@ -8595,6 +8595,580 @@
   }
 }
 
+/* === LEADS V2 CARD REDESIGN === */
+
+.leads-screen-v2 {
+  position: relative;
+  padding-bottom: 80px;
+}
+
+/* ── Summary scroll ── */
+.lsv2-summary-wrap {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1rem 1rem 0.75rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+
+.lsv2-summary-scroll {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+}
+.lsv2-summary-scroll::-webkit-scrollbar { display: none; }
+
+.lsv2-sum-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 130px;
+  padding: 0.75rem 0.6rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  text-align: center;
+}
+.lsv2-sum-card:hover { border-color: #cbd5e1; }
+.lsv2-sum-card.active { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,.12); }
+
+.lsv2-sum-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.lsv2-sum-icon svg { width: 22px; height: 22px; fill: currentColor; }
+.lsv2-icon-orange { background: #fff7ed; color: #f97316; }
+.lsv2-icon-blue   { background: #eff6ff; color: #3b82f6; }
+.lsv2-icon-gray   { background: #f1f5f9; color: #64748b; }
+.lsv2-icon-red    { background: #fef2f2; color: #ef4444; }
+.lsv2-icon-green  { background: #f0fdf4; color: #22c55e; }
+
+.lsv2-sum-label {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+.lsv2-sum-num {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.lsv2-orange { color: #f97316; }
+.lsv2-blue   { color: #3b82f6; }
+.lsv2-gray   { color: #64748b; }
+.lsv2-red    { color: #ef4444; }
+.lsv2-green  { color: #22c55e; }
+
+/* ── Tab bar ── */
+.lsv2-tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.4rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.lsv2-tab-bar::-webkit-scrollbar { display: none; }
+
+.lsv2-tab {
+  display: flex; align-items: center; gap: 0.35rem;
+  white-space: nowrap;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #64748b;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.lsv2-tab:hover { background: #f1f5f9; color: #334155; }
+.lsv2-tab.active { background: #fff7ed; color: #ea580c; font-weight: 700; }
+
+.lsv2-tab-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  min-width: 20px;
+  text-align: center;
+}
+.lsv2-tc-red   { background: #fee2e2; color: #dc2626; }
+.lsv2-tc-green { background: #dcfce7; color: #16a34a; }
+
+/* ── Search bar ── */
+.lsv2-search-bar {
+  display: flex; gap: 0.6rem; align-items: center;
+}
+
+.lsv2-search-wrap {
+  flex: 1;
+  display: flex; align-items: center; gap: 0.5rem;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0 0.75rem;
+  height: 44px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.lsv2-search-wrap:focus-within { border-color: #f97316; }
+
+.lsv2-search-icon { width: 18px; height: 18px; fill: #94a3b8; flex-shrink: 0; }
+
+.lsv2-search-input {
+  flex: 1; border: none; background: transparent; outline: none;
+  font: inherit; font-size: 0.9rem; color: #1e293b;
+}
+.lsv2-search-input::placeholder { color: #94a3b8; }
+
+.lsv2-owner-select {
+  height: 44px;
+  padding: 0 0.75rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── Card list ── */
+.lsv2-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.lsv2-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: #fff;
+  border-radius: 14px;
+  padding: 0.9rem 0.85rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  border: 1px solid #f1f5f9;
+  position: relative;
+  transition: box-shadow .15s;
+}
+.lsv2-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,.09); }
+
+.lsv2-card-avatar {
+  flex-shrink: 0;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.lsv2-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.lsv2-card-identity { flex: 1 1 140px; min-width: 0; }
+
+.lsv2-card-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lsv2-card-phone {
+  display: flex; align-items: center; gap: 0.3rem;
+  font-size: 0.82rem;
+  color: #374151;
+  margin-top: 0.15rem;
+}
+
+.lsv2-phone-wa-icon { width: 14px; height: 14px; fill: #25d366; flex-shrink: 0; }
+
+.lsv2-card-location {
+  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 0.2rem;
+}
+
+.lsv2-source-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.lsv2-src-manual   { background: #e0e7ff; color: #4338ca; }
+.lsv2-src-site     { background: #dbeafe; color: #1d4ed8; }
+.lsv2-src-whatsapp { background: #dcfce7; color: #15803d; }
+.lsv2-src-facebook { background: #dbeafe; color: #1e40af; }
+.lsv2-src-indicacao{ background: #f3e8ff; color: #7e22ce; }
+
+.lsv2-card-meta,
+.lsv2-card-dates {
+  flex: 1 1 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lsv2-meta-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lsv2-meta-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.lsv2-meta-val {
+  font-size: 0.82rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.lsv2-etapa-badge { font-size: 0.75rem !important; padding: 0.2rem 0.6rem !important; }
+
+.lsv2-retorno-row {
+  display: flex; align-items: center; gap: 0.4rem;
+}
+
+.lsv2-retorno-val {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+}
+.lsv2-retorno-urgent { color: #f97316; }
+.lsv2-retorno-medium { color: #eab308; }
+
+.lsv2-priority {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.lsv2-pri-alta  { background: #fee2e2; color: #dc2626; }
+.lsv2-pri-média { background: #fef9c3; color: #92400e; }
+.lsv2-pri-baixa { background: #dcfce7; color: #15803d; }
+
+/* ── Card actions ── */
+.lsv2-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.lsv2-action-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity .15s, transform .15s;
+  flex-shrink: 0;
+}
+.lsv2-action-btn:hover { opacity: .85; transform: scale(1.08); }
+.lsv2-action-btn svg { width: 18px; height: 18px; }
+
+.lsv2-wa   { background: #25d366; color: #fff; }
+.lsv2-wa svg { fill: #fff; }
+.lsv2-call { background: #3b82f6; color: #fff; }
+.lsv2-call svg { fill: #fff; }
+.lsv2-more { background: #f1f5f9; color: #475569; }
+.lsv2-more svg { fill: #475569; }
+
+.lsv2-more-wrap {
+  position: relative;
+}
+
+.lsv2-more-menu {
+  position: absolute;
+  right: 0;
+  top: 42px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.14);
+  min-width: 180px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.lsv2-more-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 0.5rem 0.75rem 0.25rem;
+}
+
+.lsv2-more-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #374151;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background .1s;
+}
+.lsv2-more-item:hover { background: #f8fafc; }
+.lsv2-more-item.active { color: #f97316; font-weight: 600; }
+
+/* ── Antigos sem contato ── */
+.lsv2-antigos-section { padding: 1rem; }
+
+.lsv2-antigos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.lsv2-antigos-left {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+
+.lsv2-antigos-icon-wrap {
+  width: 32px; height: 32px;
+  background: #fef2f2; color: #ef4444;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.lsv2-antigos-icon-wrap svg { width: 18px; height: 18px; fill: currentColor; }
+
+.lsv2-antigos-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #111827;
+}
+
+.lsv2-antigos-badge {
+  background: #fef2f2;
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+
+.lsv2-antigos-sub {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0 0 0.75rem;
+}
+
+.lsv2-antigos-ver-todos {
+  display: flex; align-items: center; gap: 0.2rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f97316;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lsv2-antigos-ver-todos svg { width: 14px; height: 14px; }
+
+.lsv2-antigos-scroll {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+}
+.lsv2-antigos-scroll::-webkit-scrollbar { display: none; }
+
+.lsv2-antigo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 120px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem 0.6rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.lsv2-antigo-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.lsv2-antigo-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 108px;
+}
+
+.lsv2-antigo-city {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.lsv2-antigo-call {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  background: #3b82f6;
+  border-radius: 50%;
+  color: #fff;
+  margin-top: 0.15rem;
+}
+.lsv2-antigo-call svg { width: 15px; height: 15px; fill: #fff; }
+
+.lsv2-antigo-days {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #ef4444;
+  margin-top: 0.1rem;
+}
+
+/* ── FAB ── */
+.lsv2-fab {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #22c55e;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.7rem 1.1rem 0.7rem 0.9rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(34,197,94,.4);
+  z-index: 50;
+  transition: box-shadow .15s, transform .15s;
+}
+.lsv2-fab:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(34,197,94,.5); }
+.lsv2-fab svg { width: 20px; height: 20px; fill: #fff; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .lsv2-card-body { gap: 0.5rem; }
+  .lsv2-card-meta,
+  .lsv2-card-dates { flex: 1 1 120px; }
+  .lsv2-sum-card { min-width: 110px; padding: 0.6rem 0.45rem; }
+  .lsv2-sum-num { font-size: 1.5rem; }
+  .lsv2-search-bar { flex-wrap: wrap; }
+  .lsv2-owner-select { width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .leads-screen-v2 { padding-bottom: 90px; }
+
+  .lsv2-summary-wrap { padding: 0.75rem 0.75rem 0.5rem; }
+  .lsv2-sum-card { min-width: 100px; gap: 0.2rem; }
+  .lsv2-sum-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .lsv2-sum-icon svg { width: 18px; height: 18px; }
+  .lsv2-sum-label { font-size: 0.65rem; }
+  .lsv2-sum-num { font-size: 1.4rem; }
+
+  .lsv2-tab { padding: 0.4rem 0.65rem; font-size: 0.8rem; }
+
+  .lsv2-card {
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 0.85rem 0.75rem 0.75rem;
+  }
+  .lsv2-card-avatar {
+    width: 40px; height: 40px; font-size: 0.82rem;
+    margin-bottom: 0;
+    align-self: flex-start;
+  }
+  .lsv2-card-body {
+    flex: 1;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .lsv2-card-meta,
+  .lsv2-card-dates {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.75rem;
+  }
+  .lsv2-meta-block { flex: 1 1 42%; min-width: 0; }
+  .lsv2-card-actions {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    flex-direction: row;
+    gap: 0.3rem;
+  }
+  .lsv2-card-name { padding-right: 100px; }
+  .lsv2-action-btn { width: 32px; height: 32px; }
+  .lsv2-action-btn svg { width: 16px; height: 16px; }
+
+  .lsv2-more-menu {
+    right: 0;
+    top: 38px;
+    min-width: 160px;
+  }
+
+  .lsv2-fab {
+    bottom: 20px;
+    right: 16px;
+    padding: 0.65rem 1rem 0.65rem 0.8rem;
+    font-size: 0.85rem;
+  }
+
+  .lsv2-antigos-section { padding: 0.75rem; }
+  .lsv2-antigo-card { min-width: 105px; padding: 0.6rem 0.5rem; }
+  .lsv2-antigo-avatar { width: 34px; height: 34px; font-size: 0.72rem; }
+  .lsv2-antigo-name { font-size: 0.72rem; max-width: 93px; }
+}
+
 /* === ORCAMENTOS TWO-PANEL REDESIGN === */
 
 /* ── Layout ── */

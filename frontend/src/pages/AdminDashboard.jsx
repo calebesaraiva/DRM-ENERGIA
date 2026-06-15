@@ -162,6 +162,62 @@ const getLeadStatusClass = (status) => {
   }
 };
 
+const getLeadInitials = (nome = '') => {
+  const parts = nome.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (nome.slice(0, 2) || 'LD').toUpperCase();
+};
+const AVATAR_COLORS = ['#f97316','#3b82f6','#10b981','#8b5cf6','#ef4444','#f59e0b','#06b6d4','#ec4899'];
+const getLeadAvatarColor = (nome = '') => {
+  let hash = 0;
+  for (const ch of String(nome)) hash = (hash * 31 + ch.charCodeAt(0)) & 0xffffffff;
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
+const getLeadSourceLabel = (lead) => {
+  const o = String(lead.origem || '').toLowerCase();
+  if (o.includes('facebook') || o.includes('fb')) return 'FACEBOOK';
+  if (o.includes('whatsapp') || o.includes('zap')) return 'WHATSAPP';
+  if (o.includes('indica')) return 'INDICAÇÃO';
+  if (lead.tipoCadastro === 'manual') return 'MANUAL';
+  if (o.includes('site') || lead.tipoCadastro === 'site') return 'SITE';
+  if (lead.origem) return String(lead.origem).toUpperCase();
+  return lead.tipoCadastro === 'manual' ? 'MANUAL' : 'SITE';
+};
+const getLeadSourceKey = (lead) => {
+  const label = getLeadSourceLabel(lead).toLowerCase();
+  if (label === 'facebook') return 'facebook';
+  if (label === 'whatsapp') return 'whatsapp';
+  if (label.includes('indica')) return 'indicacao';
+  if (label === 'manual') return 'manual';
+  return 'site';
+};
+const formatRetornoDate = (value) => {
+  if (!value) return '–';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const dDay = new Date(d); dDay.setHours(0, 0, 0, 0);
+  if (dDay.getTime() === today.getTime()) return 'Hoje';
+  if (dDay.getTime() === tomorrow.getTime()) return 'Amanhã';
+  return dDay.toLocaleDateString('pt-BR');
+};
+const getLeadPriority = (proximoRetorno) => {
+  if (!proximoRetorno) return 'Baixa';
+  const d = new Date(proximoRetorno); d.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  if (d <= today) return 'Alta';
+  if (d.getTime() === tomorrow.getTime()) return 'Média';
+  return 'Baixa';
+};
+const daysSinceContact = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+};
+
 const ESTADOS_BR = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO',
   'MA','MT','MS','MG','PA','PB','PR','PE','PI',
@@ -496,8 +552,8 @@ const AdminDashboard = () => {
   const [leads, setLeads] = useState([]);
   const [leadSearch, setLeadSearch] = useState('');
   const [leadOwnerFilter, setLeadOwnerFilter] = useState('todos');
-  const [leadStatusFilter, setLeadStatusFilter] = useState('todos');
-  const [leadSourceFilter, setLeadSourceFilter] = useState('todos');
+  const [leadTabFilter, setLeadTabFilter] = useState('todos');
+  const [openLeadMenu, setOpenLeadMenu] = useState(null);
   const [showManualLeadForm, setShowManualLeadForm] = useState(false);
   const [manualLeadForm, setManualLeadForm] = useState(emptyManualLeadForm);
   const [whatsappStatus, setWhatsappStatus] = useState(null);
@@ -788,6 +844,11 @@ const AdminDashboard = () => {
       site,
       manual,
       porResponsavel: leadUsers,
+      atendimento: (statusCounts['Novo'] || 0) + (statusCounts['Em atendimento'] || 0),
+      negociacao: (statusCounts['Em negociação'] || 0) + (statusCounts['Fechando'] || 0) + (statusCounts['Proposta enviada'] || 0),
+      suspensos: (statusCounts['Suspenso'] || 0) + (statusCounts['Sem retorno'] || 0),
+      convertidos: statusCounts['Convertido'] || 0,
+      antigos: leads.filter(l => !['Convertido', 'Perdido'].includes(l.status) && (daysSinceContact(l.ultimoContato) ?? 0) >= 7).length,
     };
   }, [leads, usuarios]);
 
@@ -805,21 +866,25 @@ const AdminDashboard = () => {
         return false;
       }
 
-      if (leadStatusFilter !== 'todos' && String(lead.status || 'Sem status') !== leadStatusFilter) {
-        return false;
-      }
-
-      if (leadSourceFilter !== 'todos') {
-        const source = lead.tipoCadastro === 'manual' ? 'manual' : 'site';
-        if (source !== leadSourceFilter) return false;
+      if (leadTabFilter === 'atendimento') {
+        if (!['Novo', 'Em atendimento'].includes(lead.status || 'Novo')) return false;
+      } else if (leadTabFilter === 'negociacao') {
+        if (!['Em negociação', 'Fechando', 'Proposta enviada'].includes(lead.status)) return false;
+      } else if (leadTabFilter === 'suspensos') {
+        if (!['Suspenso', 'Sem retorno', 'Perdido'].includes(lead.status)) return false;
+      } else if (leadTabFilter === 'antigos') {
+        if (['Convertido', 'Perdido'].includes(lead.status)) return false;
+        const days = daysSinceContact(lead.ultimoContato);
+        if (days === null || days < 7) return false;
+      } else if (leadTabFilter === 'convertidos') {
+        if (lead.status !== 'Convertido') return false;
       }
 
       if (!search) return true;
-
       return [lead.nome, lead.telefone, lead.email, lead.cidade, lead.assignedUserName, lead.status, lead.origem]
         .some(value => String(value || '').toLowerCase().includes(search));
     });
-  }, [leadOwnerFilter, leadSearch, leadStatusFilter, leadSourceFilter, leads, isMasterAdmin]);
+  }, [leadOwnerFilter, leadSearch, leadTabFilter, leads, isMasterAdmin]);
 
   const paginatedLeads = useMemo(() => {
     const start = (leadsPage - 1) * LEADS_PER_PAGE;
@@ -1121,7 +1186,13 @@ const AdminDashboard = () => {
     if (failed) throw failed.reason;
   }, [request]);
 
-  useEffect(() => { setLeadsPage(1); }, [leadSearch, leadStatusFilter, leadOwnerFilter, leadSourceFilter]);
+  useEffect(() => { setLeadsPage(1); }, [leadSearch, leadTabFilter, leadOwnerFilter]);
+  useEffect(() => {
+    if (!openLeadMenu) return;
+    const close = () => setOpenLeadMenu(null);
+    document.addEventListener('click', close, true);
+    return () => document.removeEventListener('click', close, true);
+  }, [openLeadMenu]);
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
   useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
   useEffect(() => {
@@ -1464,7 +1535,7 @@ const AdminDashboard = () => {
       setLeads(prev => [lead, ...prev.filter(item => item.id !== lead.id)]);
       setManualLeadForm(emptyManualLeadForm);
       setShowManualLeadForm(false);
-      setLeadSourceFilter('manual');
+      setLeadTabFilter('todos');
       request('/api/admin/resumo').then(setResumo).catch(() => {});
       showToast(`Lead manual #${lead.id} cadastrado com sucesso.`, 'success');
     } catch (err) {
@@ -3436,61 +3507,81 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'leads' && (
-            <div className="admin-section leads-screen">
+            <div className="admin-section leads-screen leads-screen-v2">
 
-              <div className="admin-card leads-command-card">
-                <div className="leads-command-head">
-                  <div>
-                    <h3>Atendimento de leads</h3>
-                    <p>{filteredLeads.length} na visão atual</p>
-                  </div>
-                  <div className="leads-header-actions">
-                    {isMasterAdmin && (
-                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setLeadOwnerFilter('todos')}>Todos</button>
-                    )}
-                    <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(true)}>+ Cadastrar lead</button>
-                  </div>
-                </div>
-
-                <div className="lead-metric-row">
-                  <button type="button" className={`lead-metric-pill ${leadSourceFilter === 'todos' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('todos')}><strong>{leadSummary.total}</strong><span>Total</span></button>
-                  <button type="button" className={`lead-metric-pill ${leadSourceFilter === 'site' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('site')}><strong>{leadSummary.site}</strong><span>Site</span></button>
-                  <button type="button" className={`lead-metric-pill ${leadSourceFilter === 'manual' ? 'active' : ''}`} onClick={() => setLeadSourceFilter('manual')}><strong>{leadSummary.manual}</strong><span>Manual</span></button>
-                  <button type="button" className={`lead-metric-pill ${leadStatusFilter === 'Novo' ? 'active' : ''}`} onClick={() => setLeadStatusFilter('Novo')}><strong>{leadSummary.novos}</strong><span>Novos</span></button>
-                  <button type="button" className={`lead-metric-pill ${leadStatusFilter === 'Em atendimento' ? 'active' : ''}`} onClick={() => setLeadStatusFilter('Em atendimento')}><strong>{leadSummary.emAtendimento}</strong><span>Atendimento</span></button>
-                </div>
-
-                <div className="leads-search-row">
-                  <div className="leads-search-input-wrap">
-                    <svg className="leads-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12A6 6 0 0 1 10 4Z" /></svg>
-                    <input
-                      className="leads-search-input"
-                      placeholder="Buscar lead por nome, telefone, cidade, status da negociação..."
-                      value={leadSearch}
-                      onChange={(event) => setLeadSearch(event.target.value)}
-                    />
-                  </div>
-                  {isMasterAdmin && leadSummary.porResponsavel.length > 0 && (
-                    <select className="lead-compact-select" value={leadOwnerFilter} onChange={(event) => setLeadOwnerFilter(event.target.value)} aria-label="Filtrar por responsável">
-                      <option value="todos">Todos responsáveis</option>
-                      {leadSummary.porResponsavel.map(user => (
-                        <option key={user.id} value={user.id}>{user.nome} ({user.total})</option>
-                      ))}
-                    </select>
-                  )}
-                  <div className="leads-filter-group" aria-label="Filtros de status">
-                    <button type="button" className={`leads-filter-btn ${leadStatusFilter === 'todos' ? 'active' : ''}`} onClick={() => setLeadStatusFilter('todos')}>
-                      Todos
-                    </button>
-                    {leadStatusOptions.map(status => (
-                      <button type="button" key={status} className={`leads-filter-btn ${leadStatusFilter === status ? 'active' : ''}`} onClick={() => setLeadStatusFilter(status)}>
-                        {status}
-                      </button>
-                    ))}
-                  </div>
+              {/* ── Summary cards ── */}
+              <div className="lsv2-summary-wrap">
+                <div className="lsv2-summary-scroll">
+                  <button type="button" className={`lsv2-sum-card ${leadTabFilter === 'atendimento' ? 'active' : ''}`} onClick={() => setLeadTabFilter('atendimento')}>
+                    <div className="lsv2-sum-icon lsv2-icon-orange">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C7 3 3 7 3 12v2a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1H5v-1a7 7 0 0 1 14 0v1h-1a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 0 2-2v-2c0-5-4-9-9-9Z"/></svg>
+                    </div>
+                    <span className="lsv2-sum-label">Precisam de atendimento</span>
+                    <strong className="lsv2-sum-num lsv2-orange">{leadSummary.atendimento}</strong>
+                  </button>
+                  <button type="button" className={`lsv2-sum-card ${leadTabFilter === 'negociacao' ? 'active' : ''}`} onClick={() => setLeadTabFilter('negociacao')}>
+                    <div className="lsv2-sum-icon lsv2-icon-blue">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2ZM9 11H7V9h2v2Zm4 0h-2V9h2v2Zm4 0h-2V9h2v2Z"/></svg>
+                    </div>
+                    <span className="lsv2-sum-label">Em negociação</span>
+                    <strong className="lsv2-sum-num lsv2-blue">{leadSummary.negociacao}</strong>
+                  </button>
+                  <button type="button" className={`lsv2-sum-card ${leadTabFilter === 'suspensos' ? 'active' : ''}`} onClick={() => setLeadTabFilter('suspensos')}>
+                    <div className="lsv2-sum-icon lsv2-icon-gray">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2Zm-1 15V7h2v10h-2Z"/></svg>
+                    </div>
+                    <span className="lsv2-sum-label">Suspensos</span>
+                    <strong className="lsv2-sum-num lsv2-gray">{leadSummary.suspensos}</strong>
+                  </button>
+                  <button type="button" className={`lsv2-sum-card ${leadTabFilter === 'antigos' ? 'active' : ''}`} onClick={() => setLeadTabFilter('antigos')}>
+                    <div className="lsv2-sum-icon lsv2-icon-red">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm1-13h-2v6l5.2 3.2.8-1.4-4-2.4V7Z"/></svg>
+                    </div>
+                    <span className="lsv2-sum-label">Sem contato há semanas</span>
+                    <strong className="lsv2-sum-num lsv2-red">{leadSummary.antigos}</strong>
+                  </button>
+                  <button type="button" className={`lsv2-sum-card ${leadTabFilter === 'convertidos' ? 'active' : ''}`} onClick={() => setLeadTabFilter('convertidos')}>
+                    <div className="lsv2-sum-icon lsv2-icon-green">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2Zm-2 14.5-4-4 1.4-1.4L10 13.7l6.6-6.6 1.4 1.4-8 8Z"/></svg>
+                    </div>
+                    <span className="lsv2-sum-label">Convertidos</span>
+                    <strong className="lsv2-sum-num lsv2-green">{leadSummary.convertidos}</strong>
+                  </button>
                 </div>
               </div>
 
+              {/* ── Tab bar ── */}
+              <div className="lsv2-tab-bar">
+                <button type="button" className={`lsv2-tab ${leadTabFilter === 'todos' ? 'active' : ''}`} onClick={() => setLeadTabFilter('todos')}>Todos</button>
+                <button type="button" className={`lsv2-tab ${leadTabFilter === 'atendimento' ? 'active' : ''}`} onClick={() => setLeadTabFilter('atendimento')}>Atendimento <span className="lsv2-tab-count">{leadSummary.atendimento}</span></button>
+                <button type="button" className={`lsv2-tab ${leadTabFilter === 'negociacao' ? 'active' : ''}`} onClick={() => setLeadTabFilter('negociacao')}>Negociação <span className="lsv2-tab-count">{leadSummary.negociacao}</span></button>
+                <button type="button" className={`lsv2-tab ${leadTabFilter === 'suspensos' ? 'active' : ''}`} onClick={() => setLeadTabFilter('suspensos')}>Suspensos <span className="lsv2-tab-count">{leadSummary.suspensos}</span></button>
+                <button type="button" className={`lsv2-tab ${leadTabFilter === 'antigos' ? 'active' : ''}`} onClick={() => setLeadTabFilter('antigos')}>Antigos <span className="lsv2-tab-count lsv2-tc-red">{leadSummary.antigos}</span></button>
+                <button type="button" className={`lsv2-tab ${leadTabFilter === 'convertidos' ? 'active' : ''}`} onClick={() => setLeadTabFilter('convertidos')}>Convertidos <span className="lsv2-tab-count lsv2-tc-green">{leadSummary.convertidos}</span></button>
+              </div>
+
+              {/* ── Search + owner filter ── */}
+              <div className="lsv2-search-bar">
+                <div className="lsv2-search-wrap">
+                  <svg className="lsv2-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12A6 6 0 0 1 10 4Z"/></svg>
+                  <input
+                    className="lsv2-search-input"
+                    placeholder="Buscar por nome, telefone ou cidade..."
+                    value={leadSearch}
+                    onChange={(e) => setLeadSearch(e.target.value)}
+                  />
+                </div>
+                {isMasterAdmin && leadSummary.porResponsavel.length > 0 && (
+                  <select className="lsv2-owner-select" value={leadOwnerFilter} onChange={(e) => setLeadOwnerFilter(e.target.value)} aria-label="Filtrar por responsável">
+                    <option value="todos">Todos</option>
+                    {leadSummary.porResponsavel.map(u => (
+                      <option key={u.id} value={u.id}>{u.nome} ({u.total})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* ── Registrar contato ── */}
               <details className="admin-card leads-rc-card leads-activity-drawer">
                 <summary>
                   <span>Registrar contato</span>
@@ -3502,7 +3593,7 @@ const AdminDashboard = () => {
                       <label className="rc-label">Lead</label>
                       <select className="rc-input" value={activityForm.leadId} onChange={(event) => setActivityForm(prev => ({ ...prev, leadId: event.target.value }))} required>
                         <option value="">Escolha o lead</option>
-                        {filteredLeads.map(lead => <option key={lead.id} value={lead.id}>{lead.nome} — {lead.telefone}</option>)}
+                        {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.nome} — {lead.telefone}</option>)}
                       </select>
                     </div>
                     <div className="rc-field">
@@ -3548,105 +3639,178 @@ const AdminDashboard = () => {
                 </form>
               </details>
 
-              <div className="admin-card leads-list-card">
-                <div className="list-section-header">
-                  <div>
-                    <h4>Lista de atendimento</h4>
-                    <p>{filteredLeads.length} lead{filteredLeads.length === 1 ? '' : 's'} na visão atual. Consultores veem apenas os próprios leads.</p>
-                  </div>
-                  <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => setShowManualLeadForm(true)}>+ Cadastrar lead</button>
-                </div>
-                <div className="table-container leads-table-container">
-                  <table className="modern-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>LEAD</th>
-                        <th>CIDADE</th>
-                        <th>ORIGEM</th>
-                        <th>RESPONSÁVEL</th>
-                        <th>STATUS</th>
-                        <th>RETORNO</th>
-                        <th>AÇÕES</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedLeads.map(lead => (
-                        <tr key={lead.id}>
-                          <td data-label="ID">#{lead.id}</td>
-                          <td data-label="LEAD">
-                            <div className="lead-person-cell">
-                              <strong>{lead.nome}</strong>
-                              <span>{lead.telefone || 'Sem telefone'}{lead.email ? ` • ${lead.email}` : ''}</span>
-                            </div>
-                          </td>
-                          <td data-label="CIDADE">{lead.cidade}</td>
-                          <td data-label="ORIGEM">
-                            <div className="lead-origin-cell">
-                              <span className={`lead-source-badge ${lead.tipoCadastro === 'manual' ? 'lead-source-manual' : 'lead-source-site'}`}>
-                                {lead.tipoCadastro === 'manual' ? 'Manual' : 'Site'}
-                              </span>
-                              <small>{lead.origem || (lead.tipoCadastro === 'manual' ? 'Manual' : 'Site')}</small>
-                            </div>
-                          </td>
-                          <td data-label="RESPONSÁVEL">{getResponsibleName(lead.assignedUserName)}</td>
-                          <td data-label="STATUS">
-                            <span className={`lead-status-badge ${getLeadStatusClass(lead.status)}`}>{lead.status || 'Novo'}</span>
-                          </td>
-                          <td data-label="RETORNO">{lead.proximoRetorno ? dateBr(lead.proximoRetorno) : 'Sem retorno'}</td>
-                          <td data-label="AÇÕES">
-                            <div className="table-actions">
-                              <select
-                                className="lead-status-select"
-                                value={lead.status || 'Novo'}
-                                onChange={(event) => updateLeadStatus(lead.id, event.target.value)}
-                                title="Alterar filtro/status do lead"
-                              >
-                                {LEAD_STATUS_PRESETS.map(status => <option key={status}>{status}</option>)}
-                              </select>
-                              <a
-                                className="leads-wa-btn"
-                                href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label="WhatsApp"
-                              >
-                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" /></svg>
-                              </a>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {filteredLeads.length === 0 && (
-                    <div className="empty-state-orcamento lead-empty-state">
-                      <div className="icon">LD</div>
-                      <h4>Nenhum lead encontrado</h4>
-                      <p>Ajuste a busca, mude o status ou volte para todos os leads.</p>
-                    </div>
-                  )}
-                </div>
-
-                {filteredLeads.length > LEADS_PER_PAGE && (
-                  <div className="leads-pagination">
-                    <p>Exibindo {Math.min((leadsPage - 1) * LEADS_PER_PAGE + 1, filteredLeads.length)} a {Math.min(leadsPage * LEADS_PER_PAGE, filteredLeads.length)} de {filteredLeads.length} leads</p>
-                    <div className="leads-pagination-btns">
-                      {Array.from({ length: leadsTotalPages }, (_, i) => i + 1).map(page => (
-                        <button
-                          key={page}
-                          type="button"
-                          className={`leads-page-btn ${page === leadsPage ? 'active' : ''}`}
-                          onClick={() => setLeadsPage(page)}
-                        >{page}</button>
-                      ))}
-                      {leadsPage < leadsTotalPages && (
-                        <button type="button" className="leads-page-btn" onClick={() => setLeadsPage(p => p + 1)}>›</button>
-                      )}
-                    </div>
+              {/* ── Lead card list ── */}
+              <div className="lsv2-card-list">
+                {paginatedLeads.length === 0 && (
+                  <div className="empty-state-orcamento lead-empty-state">
+                    <div className="icon">LD</div>
+                    <h4>Nenhum lead encontrado</h4>
+                    <p>Ajuste a busca ou mude o filtro.</p>
                   </div>
                 )}
+                {paginatedLeads.map(lead => (
+                  <div key={lead.id} className="lsv2-card">
+                    <div className="lsv2-card-avatar" style={{ background: getLeadAvatarColor(lead.nome) }}>
+                      {getLeadInitials(lead.nome)}
+                    </div>
+
+                    <div className="lsv2-card-body">
+                      <div className="lsv2-card-identity">
+                        <div className="lsv2-card-name">{lead.nome}</div>
+                        <div className="lsv2-card-phone">
+                          {lead.telefone || 'Sem telefone'}
+                          {lead.telefone && (
+                            <svg className="lsv2-phone-wa-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z"/></svg>
+                          )}
+                        </div>
+                        <div className="lsv2-card-location">
+                          {lead.cidade || 'Cidade não informada'}
+                          <span className={`lsv2-source-tag lsv2-src-${getLeadSourceKey(lead)}`}>{getLeadSourceLabel(lead)}</span>
+                        </div>
+                      </div>
+
+                      <div className="lsv2-card-meta">
+                        <div className="lsv2-meta-block">
+                          <span className="lsv2-meta-label">Consultor</span>
+                          <span className="lsv2-meta-val">{getResponsibleName(lead.assignedUserName)}</span>
+                        </div>
+                        <div className="lsv2-meta-block">
+                          <span className="lsv2-meta-label">Etapa</span>
+                          <span className={`lead-status-badge lsv2-etapa-badge ${getLeadStatusClass(lead.status)}`}>{lead.status || 'Novo'}</span>
+                        </div>
+                      </div>
+
+                      <div className="lsv2-card-dates">
+                        <div className="lsv2-meta-block">
+                          <span className="lsv2-meta-label">Último contato</span>
+                          <span className="lsv2-meta-val">{lead.ultimoContato ? dateBr(lead.ultimoContato) : '–'}</span>
+                        </div>
+                        <div className="lsv2-meta-block">
+                          <span className="lsv2-meta-label">Próximo retorno</span>
+                          <div className="lsv2-retorno-row">
+                            <span className={`lsv2-retorno-val ${getLeadPriority(lead.proximoRetorno) === 'Alta' ? 'lsv2-retorno-urgent' : getLeadPriority(lead.proximoRetorno) === 'Média' ? 'lsv2-retorno-medium' : ''}`}>
+                              {formatRetornoDate(lead.proximoRetorno)}
+                            </span>
+                            <span className={`lsv2-priority lsv2-pri-${getLeadPriority(lead.proximoRetorno).toLowerCase()}`}>
+                              {getLeadPriority(lead.proximoRetorno)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="lsv2-card-actions">
+                      <a
+                        className="lsv2-action-btn lsv2-wa"
+                        href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="WhatsApp"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z"/></svg>
+                      </a>
+                      {lead.telefone && (
+                        <a
+                          className="lsv2-action-btn lsv2-call"
+                          href={`tel:${String(lead.telefone || '').replace(/\D/g, '')}`}
+                          aria-label="Ligar"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2Z"/></svg>
+                        </a>
+                      )}
+                      <div className="lsv2-more-wrap">
+                        <button
+                          type="button"
+                          className="lsv2-action-btn lsv2-more"
+                          onClick={() => setOpenLeadMenu(openLeadMenu === lead.id ? null : lead.id)}
+                          aria-label="Mais opções"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                        </button>
+                        {openLeadMenu === lead.id && (
+                          <div className="lsv2-more-menu">
+                            <div className="lsv2-more-title">Alterar etapa</div>
+                            {LEAD_STATUS_PRESETS.map(s => (
+                              <button key={s} type="button" className={`lsv2-more-item ${lead.status === s ? 'active' : ''}`} onClick={() => { updateLeadStatus(lead.id, s); setOpenLeadMenu(null); }}>{s}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              {/* ── Antigos sem contato ── */}
+              {leadTabFilter === 'todos' && leadSummary.antigos > 0 && (
+                <div className="admin-card lsv2-antigos-section">
+                  <div className="lsv2-antigos-header">
+                    <div className="lsv2-antigos-left">
+                      <div className="lsv2-antigos-icon-wrap">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm1-13h-2v6l5.2 3.2.8-1.4-4-2.4V7Z"/></svg>
+                      </div>
+                      <span className="lsv2-antigos-title">Antigos sem contato</span>
+                      <span className="lsv2-antigos-badge">{leadSummary.antigos}</span>
+                    </div>
+                    <button type="button" className="lsv2-antigos-ver-todos" onClick={() => setLeadTabFilter('antigos')}>
+                      Ver todos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/></svg>
+                    </button>
+                  </div>
+                  <p className="lsv2-antigos-sub">Leads sem contato há mais de 7 dias. Retome agora!</p>
+                  <div className="lsv2-antigos-scroll">
+                    {leads
+                      .filter(l => !['Convertido', 'Perdido'].includes(l.status) && (daysSinceContact(l.ultimoContato) ?? 0) >= 7)
+                      .sort((a, b) => (daysSinceContact(b.ultimoContato) ?? 0) - (daysSinceContact(a.ultimoContato) ?? 0))
+                      .slice(0, 6)
+                      .map(lead => (
+                        <div key={lead.id} className="lsv2-antigo-card">
+                          <div className="lsv2-antigo-avatar" style={{ background: getLeadAvatarColor(lead.nome) }}>
+                            {getLeadInitials(lead.nome)}
+                          </div>
+                          <div className="lsv2-antigo-name">{lead.nome}</div>
+                          <div className="lsv2-antigo-city">{lead.telefone}</div>
+                          <div className="lsv2-antigo-city">{lead.cidade}</div>
+                          <a
+                            className="lsv2-antigo-call"
+                            href={`tel:${String(lead.telefone || '').replace(/\D/g, '')}`}
+                            aria-label="Ligar"
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2Z"/></svg>
+                          </a>
+                          <div className="lsv2-antigo-days">Sem contato há {daysSinceContact(lead.ultimoContato)} dias</div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* ── Pagination ── */}
+              {filteredLeads.length > LEADS_PER_PAGE && (
+                <div className="leads-pagination">
+                  <p>Exibindo {Math.min((leadsPage - 1) * LEADS_PER_PAGE + 1, filteredLeads.length)} a {Math.min(leadsPage * LEADS_PER_PAGE, filteredLeads.length)} de {filteredLeads.length} leads</p>
+                  <div className="leads-pagination-btns">
+                    {Array.from({ length: leadsTotalPages }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        type="button"
+                        className={`leads-page-btn ${page === leadsPage ? 'active' : ''}`}
+                        onClick={() => setLeadsPage(page)}
+                      >{page}</button>
+                    ))}
+                    {leadsPage < leadsTotalPages && (
+                      <button type="button" className="leads-page-btn" onClick={() => setLeadsPage(p => p + 1)}>›</button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── FAB ── */}
+              <button type="button" className="lsv2-fab" onClick={() => setShowManualLeadForm(true)} aria-label="Cadastrar novo lead">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6v-2Z"/></svg>
+                <span>Lead</span>
+              </button>
+
             </div>
           )}
 
