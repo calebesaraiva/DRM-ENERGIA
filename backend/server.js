@@ -375,10 +375,16 @@ const extractIncomingWhatsAppText = (content = {}) => {
 const handleIncomingWhatsAppWebMessage = async (message) => {
   try {
     const remoteJid = message.key?.remoteJid || '';
-    if (message.key?.fromMe || message.key?.participant || !isSupportedIncomingWhatsAppJid(remoteJid)) return;
+    if (message.key?.fromMe || message.key?.participant || !isSupportedIncomingWhatsAppJid(remoteJid)) {
+      console.log(`[WhatsApp] msg DESCARTADA — jid=${remoteJid} fromMe=${message.key?.fromMe} participant=${message.key?.participant || '-'} suportado=${isSupportedIncomingWhatsAppJid(remoteJid)}`);
+      return;
+    }
 
     const timestampMs = getBaileysMessageTimestampMs(message);
-    if (whatsappRuntime.acceptIncomingAfter && timestampMs && timestampMs < whatsappRuntime.acceptIncomingAfter) return;
+    if (whatsappRuntime.acceptIncomingAfter && timestampMs && timestampMs < whatsappRuntime.acceptIncomingAfter) {
+      console.log(`[WhatsApp] msg IGNORADA por tempo — ts=${timestampMs} limite=${whatsappRuntime.acceptIncomingAfter}`);
+      return;
+    }
 
     const phone = getPhoneFromWhatsAppJid(remoteJid);
     if (!phone) return;
@@ -522,8 +528,10 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
     });
 
     socket.ev.on('messages.upsert', async ({ messages = [], type }) => {
+      console.log(`[WhatsApp] messages.upsert type=${type} count=${messages.length}`);
       if (type !== 'notify') return;
       for (const message of messages) {
+        console.log(`[WhatsApp] msg recebida — remoteJid=${message.key?.remoteJid} fromMe=${message.key?.fromMe} participant=${message.key?.participant || '-'}`);
         await handleIncomingWhatsAppWebMessage(message);
       }
     });
