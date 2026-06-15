@@ -55,7 +55,7 @@ server {
     root /var/www/drm-site;
     index index.html;
 
-    location /api/ {
+    location ^~ /api/ {
         proxy_pass http://127.0.0.1:3401/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

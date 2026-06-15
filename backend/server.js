@@ -364,29 +364,17 @@ const isPlausibleContactPhone = (phone) => {
   return digits.length >= 10 && digits.length <= 13;
 };
 
-// Contatos salvos podem chegar com endereçamento LID/PN. Procura primeiro o
-// identificador que contém telefone real e só aceita conversa individual.
+// Leads novos entram apenas quando o WhatsApp entrega um telefone individual real.
+// Endereços LID/PN costumam representar contatos salvos e ficam fora da fila.
 const getIncomingContactAddress = (key = {}) => {
-  const candidates = [
-    key.remoteJidAlt,
-    key.participantAlt,
-    key.senderPn,
-    key.remoteJid,
-    key.participant,
-  ].filter(Boolean);
-
-  for (const jid of candidates) {
-    if (isBlockedWhatsAppJid(jid)) continue;
-    const phone = getPhoneFromWhatsAppJid(jid);
-    if (isPlausibleContactPhone(phone)) {
-      return {
-        phone,
-        remoteJid: String(jid).endsWith('@s.whatsapp.net') ? String(jid) : `${phone}@s.whatsapp.net`,
-      };
-    }
+  const jid = String(key.remoteJid || '');
+  if (isBlockedWhatsAppJid(jid) || !jid.endsWith('@s.whatsapp.net')) {
+    return { phone: '', remoteJid: '' };
   }
-
-  return { phone: '', remoteJid: '' };
+  const phone = getPhoneFromWhatsAppJid(jid);
+  return isPlausibleContactPhone(phone)
+    ? { phone, remoteJid: jid }
+    : { phone: '', remoteJid: '' };
 };
 
 const mapBaileysMessageStatus = (status) => {
@@ -470,9 +458,7 @@ const getBaileysMessageTimestampMs = (message = {}) => {
 
 const isSupportedIncomingWhatsAppJid = (remoteJid = '') => {
   if (isBlockedWhatsAppJid(remoteJid)) return false;
-  return remoteJid.endsWith('@s.whatsapp.net')
-    || remoteJid.endsWith('@lid')
-    || remoteJid.endsWith('@pn');
+  return remoteJid.endsWith('@s.whatsapp.net');
 };
 
 const unwrapWhatsAppMessageContent = (content = {}) => {
