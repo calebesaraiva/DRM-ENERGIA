@@ -1019,14 +1019,7 @@ const notifyAssignedConsultantAboutReply = async ({ conversation, text = '' }) =
     }
   }
 
-  // E-mail do consultor (apenas se for um e-mail real).
-  if (isRealEmail(consultant.email)) {
-    try {
-      await sendConsultantReplyEmail({ to: consultant.email, ...payload });
-    } catch (error) {
-      console.error(`Erro ao avisar consultor ${consultant.username} por e-mail:`, error?.message || error);
-    }
-  }
+  // Aviso por e-mail desativado a pedido — o consultor é notificado só pelo WhatsApp.
 };
 
 const getAppUrl = () => String(process.env.APP_URL || 'http://127.0.0.1:5173').replace(/\/+$/, '');
