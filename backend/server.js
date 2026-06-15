@@ -735,12 +735,38 @@ const sendAndStoreWhatsAppMessage = async ({ conversation, text, user, system = 
   return { message, conversation: updatedConversation, provider: providerResult };
 };
 
+const resolveWhatsAppJid = async (socket, rawJid) => {
+  // Para conversas existentes (remoteJid já veio do WhatsApp), confia no JID.
+  if (!rawJid || rawJid.includes('@g.us')) return rawJid;
+
+  const phone = rawJid.split('@')[0].split(':')[0];
+  if (!phone) return rawJid;
+
+  try {
+    // Pergunta ao servidor do WhatsApp qual é o JID canônico real do número.
+    // Resolve a ambiguidade do 9º dígito em números brasileiros.
+    const results = await socket.onWhatsApp(phone);
+    const match = Array.isArray(results) ? results.find(r => r?.exists && r?.jid) : null;
+    if (match?.jid) {
+      if (match.jid !== rawJid) {
+        console.log(`[WhatsApp] JID canônico resolvido: ${rawJid} -> ${match.jid}`);
+      }
+      return match.jid;
+    }
+    console.warn(`[WhatsApp] Número ${phone} NÃO existe no WhatsApp (onWhatsApp retornou vazio).`);
+  } catch (error) {
+    console.warn(`[WhatsApp] Falha ao resolver JID via onWhatsApp para ${phone}:`, error?.message || error);
+  }
+  return rawJid;
+};
+
 const sendWhatsAppTextMessage = async (to, text, options = {}) => {
   if (whatsappRuntime.connected && whatsappRuntime.socket) {
-    const jid = normalizeWhatsAppRemoteJid(options.remoteJid || to);
-    if (!jid) {
+    const rawJid = normalizeWhatsAppRemoteJid(options.remoteJid || to);
+    if (!rawJid) {
       throw new Error('Contato do WhatsApp inválido para envio.');
     }
+    const jid = await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
     console.log(`[WhatsApp] Enviando para JID: ${jid} (original: ${to})`);
     const result = await whatsappRuntime.socket.sendMessage(jid, { text });
     console.log(`[WhatsApp] Mensagem enviada — id: ${result?.key?.id}, status: ${result?.status}`);
