@@ -629,6 +629,8 @@ const AdminDashboard = () => {
   const [whatsappSearch, setWhatsappSearch] = useState('');
   const [whatsappMobileChatOpen, setWhatsappMobileChatOpen] = useState(false);
   const [waChatActionsOpen, setWaChatActionsOpen] = useState(false);
+  const [whatsappTransferOpen, setWhatsappTransferOpen] = useState(false);
+  const [whatsappTransferUserId, setWhatsappTransferUserId] = useState('');
   const [whatsappConnectOpen, setWhatsappConnectOpen] = useState(false);
   const [whatsappConnectLoading, setWhatsappConnectLoading] = useState(false);
   const [whatsappSetupOpen, setWhatsappSetupOpen] = useState(false);
@@ -734,6 +736,10 @@ const AdminDashboard = () => {
   const canArchiveWhatsappNotLead = isMasterAdmin || String(adminUser.username || '').toLowerCase() === 'renejr';
   const leadAssignableUsers = useMemo(
     () => usuarios.filter(user => user.active !== 0 && user.permissions?.leads && String(user.username || '').toLowerCase() !== 'deivson'),
+    [usuarios]
+  );
+  const whatsappTransferUsers = useMemo(
+    () => usuarios.filter(user => user.active !== 0 && user.permissions?.whatsapp && String(user.username || '').toLowerCase() !== 'deivson'),
     [usuarios]
   );
 
@@ -1561,6 +1567,34 @@ const AdminDashboard = () => {
       setSelectedWhatsappConversation(updated);
       setWhatsappConversations(prev => prev.map(item => item.id === updated.id ? updated : item));
       showToast('Atendimento finalizado.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  const transferWhatsappConversation = async (event) => {
+    event.preventDefault();
+    if (!selectedWhatsappConversation || !whatsappTransferUserId) return;
+    setWhatsappLoading(true);
+    try {
+      const data = await request(`/api/admin/whatsapp/conversations/${selectedWhatsappConversation.id}/transfer`, {
+        method: 'POST',
+        body: JSON.stringify({ assignedUserId: whatsappTransferUserId }),
+      });
+      const updated = data.conversation;
+      setSelectedWhatsappConversation(updated);
+      setWhatsappConversations(prev => prev.map(item => item.id === updated.id ? updated : item));
+      setWhatsappTransferOpen(false);
+      setWhatsappTransferUserId('');
+      setWaChatActionsOpen(false);
+      showToast(
+        data.notification?.sent
+          ? `Lead transferido para ${updated.assignedUserName}. O consultor foi avisado no WhatsApp.`
+          : `Lead transferido para ${updated.assignedUserName}, mas o aviso privado não pôde ser enviado.`,
+        data.notification?.sent ? 'success' : 'warning'
+      );
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -3669,7 +3703,18 @@ const AdminDashboard = () => {
                               {selectedWhatsappIsPending && (
                                 <button type="button" onClick={() => { claimWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Assumir atendimento</button>
                               )}
-                              <button type="button" disabled>Transferir</button>
+                              {isMasterAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setWhatsappTransferUserId(selectedWhatsappConversation.assignedUserId || '');
+                                    setWhatsappTransferOpen(true);
+                                    setWaChatActionsOpen(false);
+                                  }}
+                                >
+                                  Transferir
+                                </button>
+                              )}
                               {!selectedWhatsappIsPending && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && (
                                 <button type="button" onClick={() => { closeWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Finalizar atendimento</button>
                               )}
@@ -6267,6 +6312,56 @@ const AdminDashboard = () => {
           )}
         </div>
       </main>
+
+      {whatsappTransferOpen && selectedWhatsappConversation && (
+        <div className="contract-modal-backdrop whatsapp-transfer-backdrop" onMouseDown={() => !whatsappLoading && setWhatsappTransferOpen(false)}>
+          <form
+            className="whatsapp-transfer-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="whatsapp-transfer-title"
+            onSubmit={transferWhatsappConversation}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="whatsapp-transfer-head">
+              <div>
+                <span>TRANSFERIR LEAD</span>
+                <h3 id="whatsapp-transfer-title">{selectedWhatsappConversation.clienteNome || selectedWhatsappConversation.clienteTelefone}</h3>
+                <p>Escolha quem receberá esta conversa e o lead vinculado.</p>
+              </div>
+              <button type="button" onClick={() => setWhatsappTransferOpen(false)} disabled={whatsappLoading} aria-label="Fechar">×</button>
+            </div>
+            <div className="whatsapp-transfer-list">
+              {whatsappTransferUsers.map(user => (
+                <label key={user.id} className={String(whatsappTransferUserId) === String(user.id) ? 'selected' : ''}>
+                  <input
+                    type="radio"
+                    name="whatsapp-transfer-user"
+                    value={user.id}
+                    checked={String(whatsappTransferUserId) === String(user.id)}
+                    onChange={(event) => setWhatsappTransferUserId(event.target.value)}
+                  />
+                  <span className="whatsapp-transfer-avatar">{String(user.nome || user.username || 'C').charAt(0).toUpperCase()}</span>
+                  <span className="whatsapp-transfer-person">
+                    <strong>{user.nome}</strong>
+                    <small>{user.whatsapp || 'Sem WhatsApp privado cadastrado'}</small>
+                  </span>
+                  <span className="whatsapp-transfer-check">✓</span>
+                </label>
+              ))}
+              {whatsappTransferUsers.length === 0 && (
+                <p className="whatsapp-transfer-empty">Nenhum consultor ativo com permissão de WhatsApp.</p>
+              )}
+            </div>
+            <div className="whatsapp-transfer-foot">
+              <button type="button" className="btn btn-outline" onClick={() => setWhatsappTransferOpen(false)} disabled={whatsappLoading}>Cancelar</button>
+              <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappTransferUserId}>
+                {whatsappLoading ? 'Transferindo...' : 'Transferir e avisar'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {whatsappSetupOpen && (
         <div className="contract-modal-backdrop whatsapp-connect-backdrop">

@@ -1103,6 +1103,32 @@ const buildConsultantReplyNotice = ({ consultantName, clienteNome, telefone, men
   'Abra o painel > WhatsApp para continuar o atendimento.',
 ].filter(Boolean).join('\n');
 
+const buildConsultantTransferNotice = ({ consultantName, clienteNome, telefone, transferredBy }) => [
+  '*DRM ENERGIA SOLAR*',
+  '',
+  `Olá, ${consultantName}! Você recebeu um novo lead.`,
+  '',
+  `Cliente: ${clienteNome || 'Sem nome'}`,
+  `WhatsApp: ${telefone || '-'}`,
+  `Transferido por: ${transferredBy || 'Deivson DRM'}`,
+  '',
+  'Abra o painel > WhatsApp para iniciar o atendimento.',
+].filter(Boolean).join('\n');
+
+const notifyConsultantAboutTransfer = async ({ consultant, conversation, transferredBy }) => {
+  const consultantPhone = normalizeWhatsAppPhone(consultant?.whatsapp);
+  const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
+  if (!consultantPhone || consultantPhone === businessPhone) return { sent: false, reason: 'Número privado não disponível.' };
+
+  const result = await sendWhatsAppTextMessage(consultantPhone, buildConsultantTransferNotice({
+    consultantName: getConsultantDisplayName(consultant),
+    clienteNome: conversation?.clienteNome,
+    telefone: conversation?.clienteTelefone,
+    transferredBy,
+  }));
+  return { sent: true, result };
+};
+
 const sendConsultantReplyEmail = async ({ to, consultantName, clienteNome, telefone, mensagem }) => {
   const from = process.env.SMTP_FROM || `DRM ENERGIA SOLAR <${process.env.SMTP_USER}>`;
   const safeName = escapeHtml(consultantName || 'consultor');
@@ -5373,6 +5399,79 @@ app.post('/api/admin/whatsapp/conversations/:id/claim', authRequired, requirePer
     io.emit('whatsapp_conversation_updated', updated);
   }
   res.json(updated);
+});
+
+app.post('/api/admin/whatsapp/conversations/:id/transfer', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  if (!isMasterAdminUser(req.user)) {
+    return res.status(403).json({ message: 'Apenas o Deivson pode transferir conversas.' });
+  }
+
+  const conversation = await getWhatsAppConversationById(req.params.id);
+  if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+  if (conversation.status === 'Arquivada') {
+    return res.status(400).json({ message: 'Uma conversa arquivada como não lead não pode ser transferida.' });
+  }
+
+  const consultantId = Number(req.body.assignedUserId || 0);
+  const consultant = await db.get('SELECT * FROM usuarios WHERE id = ? AND active = 1', consultantId);
+  if (!consultant || consultant.role === 'ADM' || !parsePermissions(consultant.permissions).whatsapp) {
+    return res.status(400).json({ message: 'Selecione um consultor ativo com acesso ao WhatsApp.' });
+  }
+
+  const now = new Date().toISOString();
+  let leadId = conversation.leadId;
+  if (!leadId) {
+    const result = await db.run(
+      `INSERT INTO leads
+        (nome, telefone, email, cidade, origem, status, dataCadastro, assignedUserId, assignedUserName, observacoes, tipoCadastro, criadoPorId, criadoPorNome)
+       VALUES (?, ?, '', '', 'WhatsApp transferido', 'Novo', ?, ?, ?, 'Lead criado ao transferir uma conversa do WhatsApp.', 'manual', ?, ?)`,
+      conversation.clienteNome || conversation.clienteTelefone,
+      conversation.clienteTelefone,
+      now.split('T')[0],
+      consultant.id,
+      consultant.nome,
+      req.user.id,
+      req.user.nome
+    );
+    leadId = result.lastID;
+  }
+
+  await db.run(
+    `UPDATE whatsapp_conversations
+     SET leadId = ?, assignedUserId = ?, assignedUserName = ?, status = 'Aguardando atendimento', unreadCount = 0, updatedAt = ?
+     WHERE id = ?`,
+    leadId,
+    consultant.id,
+    consultant.nome,
+    now,
+    conversation.id
+  );
+
+  await db.run(
+    'UPDATE leads SET assignedUserId = ?, assignedUserName = ? WHERE id = ?',
+    consultant.id,
+    consultant.nome,
+    leadId
+  );
+  const updatedLead = await db.get('SELECT * FROM leads WHERE id = ?', leadId);
+  if (updatedLead) io.emit('novo_lead', updatedLead);
+
+  const updated = await getWhatsAppConversationById(conversation.id);
+  io.emit('whatsapp_conversation_updated', updated);
+
+  let notification = { sent: false };
+  try {
+    notification = await notifyConsultantAboutTransfer({
+      consultant,
+      conversation: updated,
+      transferredBy: getConsultantDisplayName(req.user),
+    });
+  } catch (error) {
+    notification = { sent: false, reason: error?.message || 'Falha ao enviar aviso privado.' };
+    console.error(`Erro ao avisar transferência para ${consultant.username}:`, error?.message || error);
+  }
+
+  res.json({ conversation: updated, notification });
 });
 
 app.post('/api/admin/whatsapp/conversations/:id/close', authRequired, requirePermission('whatsapp'), async (req, res) => {

@@ -12060,6 +12060,157 @@
   cursor: not-allowed;
 }
 
+.whatsapp-transfer-backdrop {
+  z-index: 12000;
+  padding: 20px;
+}
+
+.whatsapp-transfer-modal {
+  width: min(520px, 100%);
+  max-height: min(720px, calc(100dvh - 40px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+}
+
+.whatsapp-transfer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px;
+  border-bottom: 1px solid #e8edf3;
+}
+
+.whatsapp-transfer-head span {
+  display: block;
+  margin-bottom: 5px;
+  color: #f97316;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.whatsapp-transfer-head h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 1.25rem;
+}
+
+.whatsapp-transfer-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: .88rem;
+}
+
+.whatsapp-transfer-head button {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid #fed7aa;
+  border-radius: 50%;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 1.45rem;
+  cursor: pointer;
+}
+
+.whatsapp-transfer-list {
+  display: grid;
+  gap: 9px;
+  padding: 18px 24px;
+  overflow-y: auto;
+}
+
+.whatsapp-transfer-list label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.whatsapp-transfer-list label.selected {
+  border-color: #f97316;
+  background: #fff7ed;
+}
+
+.whatsapp-transfer-list input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.whatsapp-transfer-avatar {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 800;
+}
+
+.whatsapp-transfer-person {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  flex: 1;
+}
+
+.whatsapp-transfer-person strong,
+.whatsapp-transfer-person small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whatsapp-transfer-person strong { color: #172033; }
+.whatsapp-transfer-person small { color: #64748b; }
+
+.whatsapp-transfer-check {
+  opacity: 0;
+  color: #ea580c;
+  font-weight: 900;
+}
+
+.whatsapp-transfer-list label.selected .whatsapp-transfer-check { opacity: 1; }
+
+.whatsapp-transfer-empty {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  color: #64748b;
+}
+
+.whatsapp-transfer-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 18px 24px;
+  border-top: 1px solid #e8edf3;
+}
+
+@media (max-width: 600px) {
+  .whatsapp-transfer-backdrop { padding: 0; align-items: flex-end; }
+  .whatsapp-transfer-modal {
+    width: 100%;
+    max-height: 88dvh;
+    border-radius: 16px 16px 0 0;
+  }
+  .whatsapp-transfer-head,
+  .whatsapp-transfer-list,
+  .whatsapp-transfer-foot { padding-left: 16px; padding-right: 16px; }
+  .whatsapp-transfer-foot button { flex: 1; }
+}
+
 /* Compose: single-line growing textarea */
 .wa-redesign .whatsapp-compose textarea {
   min-height: 44px;
