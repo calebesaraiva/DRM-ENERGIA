@@ -2778,7 +2778,9 @@ const AdminDashboard = () => {
   const selectedWhatsappIsMine = Number(selectedWhatsappConversation?.assignedUserId) === Number(adminUser.id);
   const canReplyWhatsapp = Boolean(selectedWhatsappConversation) && whatsappStatus?.connected && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && !selectedWhatsappIsPending;
   const getWhatsappMediaUrl = (message) => (
-    message?.mediaUrl ? withApiBase(message.mediaUrl) : ''
+    message?.mediaUrl
+      ? withApiBase(String(message.mediaUrl).replace(/^\/uploads\/whatsapp\//, '/api/whatsapp/media/'))
+      : ''
   );
   const getWhatsappMediaLabel = (message) => {
     const labels = {

@@ -107,6 +107,14 @@ app.use('/uploads/whatsapp', express.static(WHATSAPP_MEDIA_DIR, {
   immutable: true,
   fallthrough: false,
 }));
+app.get('/api/whatsapp/media/:fileName', (req, res) => {
+  const fileName = path.basename(String(req.params.fileName || ''));
+  if (!fileName || fileName !== req.params.fileName) return res.status(400).send('Arquivo inválido.');
+  const filePath = path.join(WHATSAPP_MEDIA_DIR, fileName);
+  res.sendFile(filePath, (error) => {
+    if (error && !res.headersSent) res.status(error.statusCode || 404).send('Mídia não encontrada.');
+  });
+});
 
 // Limita tentativas de login para mitigar força bruta (por IP).
 const loginRateLimiter = rateLimit({
@@ -445,6 +453,23 @@ const isSupportedIncomingWhatsAppJid = (remoteJid = '') => {
   return remoteJid.endsWith('@s.whatsapp.net');
 };
 
+const unwrapWhatsAppMessageContent = (content = {}) => {
+  let current = content || {};
+  for (let i = 0; i < 6; i += 1) {
+    const next = current.ephemeralMessage?.message
+      || current.viewOnceMessage?.message
+      || current.viewOnceMessageV2?.message
+      || current.viewOnceMessageV2Extension?.message
+      || current.documentWithCaptionMessage?.message
+      || current.editedMessage?.message
+      || current.deviceSentMessage?.message
+      || null;
+    if (!next || next === current) break;
+    current = next;
+  }
+  return current;
+};
+
 const extractIncomingWhatsAppText = (content = {}) => {
   const text = content.conversation
     || content.extendedTextMessage?.text
@@ -514,13 +539,17 @@ const saveIncomingWhatsAppMedia = async (message, mediaInfo) => {
   if (!message || !mediaInfo) return null;
   try {
     fs.mkdirSync(WHATSAPP_MEDIA_DIR, { recursive: true });
+    const normalizedMessage = {
+      ...message,
+      message: unwrapWhatsAppMessageContent(message.message || {}),
+    };
     const buffer = await downloadMediaMessage(
-      message,
+      normalizedMessage,
       'buffer',
       {},
       {
         logger: pino({ level: 'silent' }),
-        reuploadRequest: whatsappRuntime.socket?.updateMediaMessage,
+        reuploadRequest: whatsappRuntime.socket?.updateMediaMessage?.bind(whatsappRuntime.socket),
       }
     );
     if (!buffer?.length) return null;
@@ -529,7 +558,7 @@ const saveIncomingWhatsAppMedia = async (message, mediaInfo) => {
     const absolutePath = path.join(WHATSAPP_MEDIA_DIR, fileName);
     await fs.promises.writeFile(absolutePath, buffer);
     return {
-      mediaUrl: `/uploads/whatsapp/${fileName}`,
+      mediaUrl: `/api/whatsapp/media/${fileName}`,
       fileSize: buffer.length,
     };
   } catch (error) {
@@ -553,7 +582,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     const phone = getPhoneFromWhatsAppJid(remoteJid);
     if (!phone || !isPlausibleContactPhone(phone)) return;
 
-    const content = message.message || {};
+    const content = unwrapWhatsAppMessageContent(message.message || {});
     const mediaInfo = getWhatsAppMediaInfo(content);
     const mediaFile = await saveIncomingWhatsAppMedia(message, mediaInfo);
     const text = extractIncomingWhatsAppText(content) || buildWhatsAppMediaText(mediaInfo);
