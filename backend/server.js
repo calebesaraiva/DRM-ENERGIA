@@ -323,6 +323,15 @@ const normalizeWhatsAppRemoteJid = (value) => {
 
 const getPhoneFromWhatsAppJid = (jid) => normalizeWhatsAppPhone(String(jid || '').split('@')[0].split(':')[0]);
 
+const isBlockedWhatsAppJid = (jid = '') => {
+  const value = String(jid || '');
+  return !value
+    || value === 'status@broadcast'
+    || value.endsWith('@g.us')
+    || value.endsWith('@broadcast')
+    || value.endsWith('@newsletter');
+};
+
 // Gera variantes de um número brasileiro (com/sem 55, com/sem 9º dígito)
 // para casar leads/conversas independente de como o número foi cadastrado.
 const whatsAppPhoneVariants = (value) => {
@@ -355,14 +364,29 @@ const isPlausibleContactPhone = (phone) => {
   return digits.length >= 10 && digits.length <= 13;
 };
 
-// Para mensagens com endereçamento LID (@lid), o número real vem em remoteJidAlt.
-const resolveIncomingRemoteJid = (key = {}) => {
-  const remoteJid = key.remoteJid || '';
-  if (remoteJid.endsWith('@lid')) {
-    const alt = key.remoteJidAlt || '';
-    if (alt && alt.endsWith('@s.whatsapp.net')) return alt;
+// Contatos salvos podem chegar com endereçamento LID/PN. Procura primeiro o
+// identificador que contém telefone real e só aceita conversa individual.
+const getIncomingContactAddress = (key = {}) => {
+  const candidates = [
+    key.remoteJidAlt,
+    key.participantAlt,
+    key.senderPn,
+    key.remoteJid,
+    key.participant,
+  ].filter(Boolean);
+
+  for (const jid of candidates) {
+    if (isBlockedWhatsAppJid(jid)) continue;
+    const phone = getPhoneFromWhatsAppJid(jid);
+    if (isPlausibleContactPhone(phone)) {
+      return {
+        phone,
+        remoteJid: String(jid).endsWith('@s.whatsapp.net') ? String(jid) : `${phone}@s.whatsapp.net`,
+      };
+    }
   }
-  return remoteJid;
+
+  return { phone: '', remoteJid: '' };
 };
 
 const mapBaileysMessageStatus = (status) => {
@@ -445,12 +469,10 @@ const getBaileysMessageTimestampMs = (message = {}) => {
 };
 
 const isSupportedIncomingWhatsAppJid = (remoteJid = '') => {
-  if (!remoteJid) return false;
-  if (remoteJid === 'status@broadcast') return false;
-  if (remoteJid.endsWith('@g.us')) return false;
-  if (remoteJid.endsWith('@broadcast')) return false;
-  if (remoteJid.endsWith('@newsletter')) return false;
-  return remoteJid.endsWith('@s.whatsapp.net');
+  if (isBlockedWhatsAppJid(remoteJid)) return false;
+  return remoteJid.endsWith('@s.whatsapp.net')
+    || remoteJid.endsWith('@lid')
+    || remoteJid.endsWith('@pn');
 };
 
 const unwrapWhatsAppMessageContent = (content = {}) => {
@@ -569,8 +591,8 @@ const saveIncomingWhatsAppMedia = async (message, mediaInfo) => {
 
 const handleIncomingWhatsAppWebMessage = async (message) => {
   try {
-    const remoteJid = resolveIncomingRemoteJid(message.key || {});
-    if (message.key?.fromMe || message.key?.participant || !isSupportedIncomingWhatsAppJid(remoteJid)) {
+    const { phone, remoteJid } = getIncomingContactAddress(message.key || {});
+    if (message.key?.fromMe || !isSupportedIncomingWhatsAppJid(message.key?.remoteJid || remoteJid) || !phone) {
       return;
     }
 
@@ -579,7 +601,6 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       return;
     }
 
-    const phone = getPhoneFromWhatsAppJid(remoteJid);
     if (!phone || !isPlausibleContactPhone(phone)) return;
 
     const content = unwrapWhatsAppMessageContent(message.message || {});
@@ -616,7 +637,11 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       io.emit('novo_lead', lead);
     }
 
-    const previousConversation = await db.get('SELECT * FROM whatsapp_conversations WHERE clienteTelefone = ?', phone);
+    const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
+    const previousConversation = await db.get(
+      `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
+      ...phoneVariants
+    );
     const shouldNotifyNewLead = !previousConversation || ['Finalizada', 'Arquivada'].includes(previousConversation.status);
     const conversation = await upsertWhatsAppConversation({
       leadId: lead.id,
