@@ -532,6 +532,13 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
       if (type !== 'notify') return;
       for (const message of messages) {
         console.log(`[WhatsApp] msg recebida — remoteJid=${message.key?.remoteJid} fromMe=${message.key?.fromMe} participant=${message.key?.participant || '-'}`);
+        if (String(message.key?.remoteJid || '').endsWith('@lid')) {
+          console.log(`[WhatsApp][LID] key=${JSON.stringify(message.key)}`);
+          try {
+            const pn = whatsappRuntime.socket?.signalRepository?.lidMapping?.getPNForLID?.(message.key.remoteJid);
+            console.log(`[WhatsApp][LID] getPNForLID=${pn}`);
+          } catch (e) { console.log('[WhatsApp][LID] getPNForLID erro:', e?.message); }
+        }
         await handleIncomingWhatsAppWebMessage(message);
       }
     });
