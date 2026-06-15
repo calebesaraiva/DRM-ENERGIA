@@ -3519,8 +3519,9 @@ const AdminDashboard = () => {
                           rows={1}
                           disabled={!canReplyWhatsapp}
                         />
-                        <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp}>
-                          Enviar
+                        <button type="submit" className="btn btn-primary" disabled={whatsappLoading || !whatsappReply.trim() || !canReplyWhatsapp} aria-label="Enviar mensagem">
+                          <span className="wa-send-label">Enviar</span>
+                          <svg className="wa-send-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         </button>
                       </form>
                     </>
