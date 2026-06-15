@@ -8353,8 +8353,8 @@
 }
 
 .lead-status-atendimento {
-  background: #dcfce7;
-  color: #166534;
+  background: #fff7ed;
+  color: #c2410c;
 }
 
 .lead-status-proposta {
@@ -8595,11 +8595,39 @@
   }
 }
 
+/* === MANUAL LEAD MODAL MOBILE FIX === */
+@media (max-width: 640px) {
+  .manual-lead-modal {
+    width: 100%;
+    max-height: 96dvh;
+    border-radius: 16px 16px 0 0;
+    margin-top: auto;
+  }
+  .manual-lead-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .manual-lead-form {
+    grid-template-columns: 1fr 1fr;
+    padding: 1rem;
+  }
+  .manual-lead-modal .manual-lead-header {
+    padding: 1rem 1rem 0.75rem;
+  }
+  .manual-lead-notes { grid-column: 1 / -1; }
+  .manual-lead-actions { grid-column: 1 / -1; }
+}
+@media (max-width: 400px) {
+  .manual-lead-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* === LEADS V2 CARD REDESIGN === */
 
 .leads-screen-v2 {
   position: relative;
-  padding-bottom: 80px;
+  padding-bottom: 90px;
 }
 
 /* ── Summary scroll ── */
@@ -9055,13 +9083,17 @@
 
 .lsv2-antigo-call {
   display: flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px;
-  background: #3b82f6;
+  width: 32px; height: 32px;
+  background: #25d366;
+  border: none;
   border-radius: 50%;
   color: #fff;
-  margin-top: 0.15rem;
+  cursor: pointer;
+  margin-top: 0.2rem;
+  transition: opacity .15s;
 }
-.lsv2-antigo-call svg { width: 15px; height: 15px; fill: #fff; }
+.lsv2-antigo-call:hover { opacity: .85; }
+.lsv2-antigo-call svg { width: 16px; height: 16px; fill: #fff; }
 
 .lsv2-antigo-days {
   font-size: 0.68rem;
@@ -9073,8 +9105,8 @@
 /* ── FAB ── */
 .lsv2-fab {
   position: fixed;
-  bottom: 80px;
-  right: 20px;
+  bottom: 24px;
+  right: 24px;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -9082,16 +9114,17 @@
   color: #fff;
   border: none;
   border-radius: 999px;
-  padding: 0.7rem 1.1rem 0.7rem 0.9rem;
+  padding: 0.75rem 1.25rem 0.75rem 1rem;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(34,197,94,.4);
-  z-index: 50;
+  box-shadow: 0 4px 20px rgba(34,197,94,.45);
+  z-index: 200;
   transition: box-shadow .15s, transform .15s;
 }
-.lsv2-fab:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(34,197,94,.5); }
+.lsv2-fab:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(34,197,94,.55); }
+.lsv2-fab:active { transform: translateY(0); }
 .lsv2-fab svg { width: 20px; height: 20px; fill: #fff; }
 
 /* ── Responsive ── */
@@ -9157,10 +9190,11 @@
   }
 
   .lsv2-fab {
-    bottom: 20px;
-    right: 16px;
+    bottom: 18px;
+    right: 14px;
     padding: 0.65rem 1rem 0.65rem 0.8rem;
     font-size: 0.85rem;
+    z-index: 200;
   }
 
   .lsv2-antigos-section { padding: 0.75rem; }

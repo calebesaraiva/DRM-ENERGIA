@@ -1400,6 +1400,32 @@ const AdminDashboard = () => {
     }
   };
 
+  const openLeadInWhatsapp = async (lead) => {
+    const phone = String(lead.telefone || '').replace(/\D/g, '');
+    if (!phone) {
+      window.open(`https://wa.me/55${phone}?text=${whatsappLeadMessage(lead)}`, '_blank');
+      return;
+    }
+    const canUseInternal = adminUser.role === 'ADM' || adminUser.permissions?.whatsapp || adminUser.permissions?.leads;
+    if (!canUseInternal) {
+      window.open(`https://wa.me/55${phone}?text=${whatsappLeadMessage(lead)}`, '_blank');
+      return;
+    }
+    const existing = whatsappConversations.find(c => {
+      const cp = String(c.clienteTelefone || '').replace(/\D/g, '');
+      return cp === phone || cp === phone.replace(/^55/, '') || ('55' + cp) === phone;
+    });
+    if (existing) {
+      setActiveTab('whatsapp');
+      await openWhatsappConversation(existing);
+    } else {
+      setWhatsappSearch(lead.telefone || '');
+      setWhatsappFilter('todas');
+      setActiveTab('whatsapp');
+      showToast(`Nenhuma conversa encontrada para ${lead.nome}. Aguarde o lead entrar em contato ou inicie pelo WhatsApp.`, 'info');
+    }
+  };
+
   const claimWhatsappConversation = async (conversation = selectedWhatsappConversation) => {
     if (!conversation) return;
     setWhatsappLoading(true);
@@ -3700,15 +3726,15 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="lsv2-card-actions">
-                      <a
+                      <button
+                        type="button"
                         className="lsv2-action-btn lsv2-wa"
-                        href={`https://wa.me/55${String(lead.telefone || '').replace(/\D/g, '')}?text=${whatsappLeadMessage(lead)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="WhatsApp"
+                        onClick={() => openLeadInWhatsapp(lead)}
+                        aria-label="Abrir chat WhatsApp"
+                        title="Abrir conversa no chat interno"
                       >
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z"/></svg>
-                      </a>
+                      </button>
                       {lead.telefone && (
                         <a
                           className="lsv2-action-btn lsv2-call"
@@ -3770,13 +3796,14 @@ const AdminDashboard = () => {
                           <div className="lsv2-antigo-name">{lead.nome}</div>
                           <div className="lsv2-antigo-city">{lead.telefone}</div>
                           <div className="lsv2-antigo-city">{lead.cidade}</div>
-                          <a
+                          <button
+                            type="button"
                             className="lsv2-antigo-call"
-                            href={`tel:${String(lead.telefone || '').replace(/\D/g, '')}`}
-                            aria-label="Ligar"
+                            onClick={() => openLeadInWhatsapp(lead)}
+                            aria-label="Abrir chat"
                           >
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2Z"/></svg>
-                          </a>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z"/></svg>
+                          </button>
                           <div className="lsv2-antigo-days">Sem contato há {daysSinceContact(lead.ultimoContato)} dias</div>
                         </div>
                       ))
