@@ -4971,6 +4971,58 @@ app.post('/api/admin/whatsapp/test-new-lead-notifications', authRequired, requir
   res.json({ ok: results.every(item => item.ok), results });
 });
 
+// Teste do aviso de "cliente respondeu" para consultores específicos (master only).
+app.post('/api/admin/whatsapp/test-consultant-alert', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  if (!isMasterAdminUser(req.user)) {
+    return res.status(403).json({ message: 'Apenas o ADM master pode enviar teste de aviso.' });
+  }
+  const usernames = Array.isArray(req.body?.usernames) && req.body.usernames.length
+    ? req.body.usernames
+    : ['renejr', 'gleyson'];
+  const placeholders = usernames.map(() => '?').join(', ');
+  const consultants = await db.all(`SELECT * FROM usuarios WHERE username IN (${placeholders}) AND active = 1`, ...usernames);
+
+  const payloadBase = {
+    clienteNome: 'Cliente Teste DRM',
+    telefone: '5599999990000',
+    mensagem: 'Olá, gostaria de saber mais sobre energia solar! (mensagem de teste)',
+  };
+
+  const results = [];
+  for (const consultant of consultants) {
+    const consultantName = getConsultantDisplayName(consultant);
+    const payload = { consultantName, ...payloadBase };
+    const item = { username: consultant.username, whatsapp: '-', email: '-' };
+
+    const consultantPhone = normalizeWhatsAppPhone(consultant.whatsapp);
+    const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
+    if (consultantPhone && consultantPhone !== businessPhone) {
+      try {
+        await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload));
+        item.whatsapp = 'enviado para ' + consultantPhone;
+      } catch (error) {
+        item.whatsapp = 'erro: ' + (error?.message || 'falha');
+      }
+    } else {
+      item.whatsapp = consultantPhone ? 'pulado (numero da empresa)' : 'sem numero';
+    }
+
+    if (isRealEmail(consultant.email)) {
+      try {
+        await sendConsultantReplyEmail({ to: consultant.email, ...payload });
+        item.email = 'enviado para ' + consultant.email;
+      } catch (error) {
+        item.email = 'erro: ' + (error?.message || 'falha');
+      }
+    } else {
+      item.email = 'email nao real (' + (consultant.email || '-') + ')';
+    }
+    results.push(item);
+  }
+
+  res.json({ ok: true, results });
+});
+
 app.post('/api/admin/whatsapp/disconnect', authRequired, requirePermission('whatsapp'), async (req, res) => {
   if (!isMasterAdminUser(req.user)) {
     return res.status(403).json({ message: 'Apenas o ADM master pode desconectar o WhatsApp oficial.' });
