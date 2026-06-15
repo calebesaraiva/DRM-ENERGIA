@@ -4998,8 +4998,8 @@ app.post('/api/admin/whatsapp/test-consultant-alert', authRequired, requirePermi
     const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
     if (consultantPhone && consultantPhone !== businessPhone) {
       try {
-        await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload));
-        item.whatsapp = 'enviado para ' + consultantPhone;
+        const r = await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload));
+        item.whatsapp = 'enviado para ' + consultantPhone + ' | baileysStatus=' + (r?.payload?.status ?? '?') + ' | id=' + (r?.providerMessageId || '-');
       } catch (error) {
         item.whatsapp = 'erro: ' + (error?.message || 'falha');
       }
