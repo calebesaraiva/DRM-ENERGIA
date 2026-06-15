@@ -5023,6 +5023,20 @@ app.post('/api/admin/whatsapp/test-consultant-alert', authRequired, requirePermi
   res.json({ ok: true, results });
 });
 
+// Master reseta a confirmação de WhatsApp de um consultor, forçando o modal de
+// cadastro no próximo acesso para ele informar o número correto no aparelho dele.
+app.post('/api/admin/whatsapp/reset-consultant-number', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  if (!isMasterAdminUser(req.user)) {
+    return res.status(403).json({ message: 'Apenas o ADM master pode resetar o número dos consultores.' });
+  }
+  const usernames = Array.isArray(req.body?.usernames) && req.body.usernames.length ? req.body.usernames : [];
+  if (!usernames.length) return res.status(400).json({ message: 'Informe os usernames.' });
+  const placeholders = usernames.map(() => '?').join(', ');
+  await db.run(`UPDATE usuarios SET whatsappConfirmed = 0 WHERE username IN (${placeholders})`, ...usernames);
+  const updated = await db.all(`SELECT username, whatsapp, whatsappConfirmed FROM usuarios WHERE username IN (${placeholders})`, ...usernames);
+  res.json({ ok: true, usuarios: updated });
+});
+
 app.post('/api/admin/whatsapp/disconnect', authRequired, requirePermission('whatsapp'), async (req, res) => {
   if (!isMasterAdminUser(req.user)) {
     return res.status(403).json({ message: 'Apenas o ADM master pode desconectar o WhatsApp oficial.' });
