@@ -1080,7 +1080,7 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
   };
 };
 
-const sendWhatsAppAudioMessage = async (to, buffer, mimeType = 'audio/webm', options = {}) => {
+const sendWhatsAppAudioMessage = async (to, media, mimeType = 'audio/mp4', options = {}) => {
   if (!whatsappRuntime.socket && !whatsappRuntime.starting) {
     await startWhatsAppQrSession({ force: true });
     await new Promise(resolve => setTimeout(resolve, 4000));
@@ -1094,9 +1094,9 @@ const sendWhatsAppAudioMessage = async (to, buffer, mimeType = 'audio/webm', opt
   if (!rawJid) throw new Error('Contato do WhatsApp inválido para envio.');
   const jid = await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
   const result = await whatsappRuntime.socket.sendMessage(jid, {
-    audio: buffer,
+    audio: media,
     mimetype: mimeType,
-    ptt: true,
+    ptt: false,
   });
   return {
     configured: true,
@@ -1112,23 +1112,23 @@ const convertAudioToWhatsAppVoice = async (buffer, inputMimeType = 'audio/webm')
   fs.mkdirSync(WHATSAPP_MEDIA_DIR, { recursive: true });
   const token = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
   const inputPath = path.join(WHATSAPP_MEDIA_DIR, `${token}.${getMediaExtension(inputMimeType, 'webm')}`);
-  const outputPath = path.join(WHATSAPP_MEDIA_DIR, `${token}.ogg`);
+  const outputPath = path.join(WHATSAPP_MEDIA_DIR, `${token}.m4a`);
   try {
     await fs.promises.writeFile(inputPath, buffer);
     await execFileAsync(ffmpegPath, [
       '-y',
       '-i', inputPath,
       '-vn',
-      '-c:a', 'libopus',
-      '-b:a', '32k',
-      '-vbr', 'on',
-      '-application', 'voip',
-      '-f', 'ogg',
+      '-c:a', 'aac',
+      '-b:a', '64k',
+      '-ar', '44100',
+      '-ac', '1',
+      '-movflags', '+faststart',
       outputPath,
     ], { timeout: 30000, windowsHide: true });
     return {
       buffer: await fs.promises.readFile(outputPath),
-      mimeType: 'audio/ogg; codecs=opus',
+      mimeType: 'audio/mp4',
       fileName: path.basename(outputPath),
       absolutePath: outputPath,
     };
@@ -5738,7 +5738,7 @@ app.post('/api/admin/whatsapp/conversations/:id/audio', authRequired, requirePer
 
   try {
     const voice = await convertAudioToWhatsAppVoice(buffer, mimeType);
-    const provider = await sendWhatsAppAudioMessage(activeConversation.clienteTelefone, voice.buffer, voice.mimeType, {
+    const provider = await sendWhatsAppAudioMessage(activeConversation.clienteTelefone, { url: voice.absolutePath }, voice.mimeType, {
       remoteJid: activeConversation.remoteJid,
     });
     const message = await createWhatsAppMessage({
