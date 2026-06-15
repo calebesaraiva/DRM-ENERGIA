@@ -1417,12 +1417,18 @@ const updateAuthUserEmailVerification = async (user, fields = {}) => {
   );
 };
 
+// Equipe interna precisa cadastrar/confirmar o WhatsApp pessoal para receber
+// avisos de atendimento. Clientes não.
+const needsWhatsappSetup = (user = {}) => isInternalStaffUser(user) && !Boolean(user.whatsappConfirmed);
+
 const sanitizeUser = (user) => ({
   id: user.id,
   nome: user.nome,
   username: user.username,
   email: user.email,
   whatsapp: user.whatsapp || '',
+  whatsappConfirmed: Boolean(user.whatsappConfirmed),
+  needsWhatsappSetup: needsWhatsappSetup({ ...user, userType: 'interno' }),
   role: user.role,
   permissions: user.permissions,
   quickActions: parseQuickActions(user.quickActions),
@@ -3633,6 +3639,9 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingUsuarioColumns.includes('quickActions')) {
     await db.exec('ALTER TABLE usuarios ADD COLUMN quickActions TEXT');
   }
+  if (!existingUsuarioColumns.includes('whatsappConfirmed')) {
+    await db.exec('ALTER TABLE usuarios ADD COLUMN whatsappConfirmed INTEGER DEFAULT 0');
+  }
   for (const [field, definition] of emailVerificationColumns) {
     if (!existingUsuarioColumns.includes(field)) {
       await db.exec(`ALTER TABLE usuarios ADD COLUMN ${field} ${definition}`);
@@ -4227,6 +4236,40 @@ app.get('/api/me', authRequired, async (req, res) => {
 
   const permissions = req.user.role === 'ADM' ? ADMIN_PERMISSIONS : mergePermissions();
   res.json({ user: { id: req.user.id, nome: req.user.nome, email: req.user.email, role: req.user.role, userType: 'cliente', permissions, emailVerified: hasVerifiedEmail(req.user), requiresEmailVerification: requiresEmailVerification(req.user) } });
+});
+
+// Consultor cadastra/confirma o próprio WhatsApp (modal de primeiro acesso).
+app.put('/api/me/whatsapp', authRequired, async (req, res) => {
+  if (req.user.userType !== 'interno') {
+    return res.status(403).json({ message: 'Apenas usuários internos cadastram WhatsApp de atendimento.' });
+  }
+
+  const phone = normalizeWhatsAppPhone(req.body?.whatsapp);
+  if (!phone || !isPlausibleContactPhone(phone) || !phone.startsWith('55')) {
+    return res.status(400).json({ message: 'Informe um número de WhatsApp válido com DDD (ex: 99 99999-9999).' });
+  }
+
+  // Verifica se o número realmente existe no WhatsApp (quando a sessão está ativa).
+  if (whatsappRuntime.connected && whatsappRuntime.socket) {
+    try {
+      const results = await whatsappRuntime.socket.onWhatsApp(phone);
+      const match = Array.isArray(results) ? results.find(r => r?.exists) : null;
+      if (!match) {
+        return res.status(400).json({ message: 'Esse número não foi encontrado no WhatsApp. Confira e tente novamente.' });
+      }
+    } catch (error) {
+      console.error('Erro ao verificar número no WhatsApp:', error?.message || error);
+      // Não bloqueia se a checagem falhar por instabilidade da sessão.
+    }
+  }
+
+  await db.run(
+    'UPDATE usuarios SET whatsapp = ?, whatsappConfirmed = 1 WHERE id = ?',
+    phone,
+    req.user.id
+  );
+  const updated = await db.get('SELECT * FROM usuarios WHERE id = ?', req.user.id);
+  res.json({ user: sanitizeUser({ ...updated, permissions: parsePermissions(updated.permissions) }) });
 });
 
 app.get('/api/admin/quick-actions', authRequired, async (req, res) => {

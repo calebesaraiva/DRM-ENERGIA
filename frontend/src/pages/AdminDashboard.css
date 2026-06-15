@@ -13429,3 +13429,85 @@
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px) + 4px);
   }
 }
+
+/* ── Modal de cadastro de WhatsApp do consultor ── */
+.wa-setup-modal {
+  width: min(440px, 92vw);
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 32px 28px 26px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+}
+
+.wa-setup-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  background: #fff7ed;
+  color: #f97316;
+}
+
+.wa-setup-modal h3 {
+  margin: 0 0 8px;
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.wa-setup-modal p {
+  margin: 0 0 18px;
+  color: #64748b;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.wa-setup-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  text-align: center;
+  letter-spacing: 0.5px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.wa-setup-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.wa-setup-error {
+  display: block;
+  margin-top: 8px;
+  color: #dc2626;
+  font-size: 0.82rem;
+}
+
+.wa-setup-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #f97316;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.wa-setup-btn:hover:not(:disabled) { background: #ea580c; }
+.wa-setup-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.wa-setup-hint {
+  display: block;
+  margin-top: 14px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}

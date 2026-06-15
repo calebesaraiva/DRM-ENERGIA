@@ -568,6 +568,10 @@ const AdminDashboard = () => {
   const [waChatActionsOpen, setWaChatActionsOpen] = useState(false);
   const [whatsappConnectOpen, setWhatsappConnectOpen] = useState(false);
   const [whatsappConnectLoading, setWhatsappConnectLoading] = useState(false);
+  const [whatsappSetupOpen, setWhatsappSetupOpen] = useState(false);
+  const [whatsappSetupNumber, setWhatsappSetupNumber] = useState('');
+  const [whatsappSetupLoading, setWhatsappSetupLoading] = useState(false);
+  const [whatsappSetupError, setWhatsappSetupError] = useState('');
   const [orcamentoSearch, setOrcamentoSearch] = useState('');
   const [orcClientSearch, setOrcClientSearch] = useState('');
   const [orcClientPage, setOrcClientPage] = useState(1);
@@ -1260,6 +1264,11 @@ const AdminDashboard = () => {
       return;
     }
 
+    if (loggedInUser.needsWhatsappSetup) {
+      setWhatsappSetupNumber(loggedInUser.whatsapp || '');
+      setWhatsappSetupOpen(true);
+    }
+
     loadData(loggedInUser).catch(err => {
       setError(err.message);
       showToast(err.message, 'error');
@@ -1478,6 +1487,31 @@ const AdminDashboard = () => {
       showToast(err.message, 'error');
     } finally {
       setWhatsappConnectLoading(false);
+    }
+  };
+
+  const submitWhatsappSetup = async (event) => {
+    event?.preventDefault?.();
+    setWhatsappSetupError('');
+    const digits = String(whatsappSetupNumber || '').replace(/\D/g, '');
+    if (digits.length < 10) {
+      setWhatsappSetupError('Informe o número com DDD. Ex: 99 99999-9999');
+      return;
+    }
+    setWhatsappSetupLoading(true);
+    try {
+      const { user } = await request('/api/me/whatsapp', {
+        method: 'PUT',
+        body: JSON.stringify({ whatsapp: whatsappSetupNumber }),
+      });
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      localStorage.setItem('user', JSON.stringify({ ...currentUser, ...user }));
+      setWhatsappSetupOpen(false);
+      showToast('Número de WhatsApp confirmado!', 'success');
+    } catch (err) {
+      setWhatsappSetupError(err.message || 'Não foi possível salvar o número.');
+    } finally {
+      setWhatsappSetupLoading(false);
     }
   };
 
@@ -5983,6 +6017,33 @@ const AdminDashboard = () => {
           )}
         </div>
       </main>
+
+      {whatsappSetupOpen && (
+        <div className="contract-modal-backdrop whatsapp-connect-backdrop">
+          <div className="wa-setup-modal" role="dialog" aria-modal="true" aria-labelledby="wa-setup-title">
+            <div className="wa-setup-icon">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </div>
+            <h3 id="wa-setup-title">Cadastre seu WhatsApp</h3>
+            <p>Para receber avisos quando o cliente que você atende responder, confirme o número de WhatsApp que é seu (com DDD).</p>
+            <form onSubmit={submitWhatsappSetup}>
+              <input
+                type="tel"
+                className="wa-setup-input"
+                placeholder="Ex: 99 99999-9999"
+                value={whatsappSetupNumber}
+                onChange={(e) => setWhatsappSetupNumber(e.target.value)}
+                autoFocus
+              />
+              {whatsappSetupError && <span className="wa-setup-error">{whatsappSetupError}</span>}
+              <button type="submit" className="wa-setup-btn" disabled={whatsappSetupLoading}>
+                {whatsappSetupLoading ? 'Verificando número...' : 'Confirmar número'}
+              </button>
+            </form>
+            <span className="wa-setup-hint">Vamos verificar se o número existe no WhatsApp antes de salvar.</span>
+          </div>
+        </div>
+      )}
 
       {whatsappConnectOpen && (
         <div className="contract-modal-backdrop whatsapp-connect-backdrop">
