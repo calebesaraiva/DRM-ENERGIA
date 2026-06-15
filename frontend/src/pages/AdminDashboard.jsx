@@ -3533,7 +3533,9 @@ const AdminDashboard = () => {
                               )}
                               <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
                               <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
-                              <button type="button" className="wa-more-danger" onClick={() => { archiveWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Não é lead (arquivar)</button>
+                              {(isMasterAdmin || String(adminUser.username || '').toLowerCase() === 'renejr') && (
+                                <button type="button" className="wa-more-danger" onClick={() => { archiveWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Não é lead (arquivar)</button>
+                              )}
                             </div>
                           )}
                         </div>
