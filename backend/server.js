@@ -514,6 +514,10 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       notifyConsultantsAboutNewWhatsAppLead({ conversation: updatedConversation, text })
         .catch(error => console.error('Erro ao enviar avisos de lead novo:', error));
       io.emit('whatsapp_new_lead_waiting', { conversation: updatedConversation });
+    } else if (updatedConversation?.status === 'Em atendimento' && updatedConversation?.assignedUserId) {
+      // Cliente respondeu numa conversa em atendimento: avisa o consultor responsável.
+      notifyAssignedConsultantAboutReply({ conversation: updatedConversation, text })
+        .catch(error => console.error('Erro ao avisar consultor sobre resposta do cliente:', error));
     }
   } catch (error) {
     console.error('Erro ao processar mensagem WhatsApp QR:', error);
@@ -914,6 +918,99 @@ const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', 
     status: result.status === 'fulfilled' ? result.value?.status : 'erro',
     error: result.status === 'rejected' ? result.reason?.message || 'Falha ao enviar aviso.' : '',
   }));
+};
+
+// Aviso ao consultor responsável quando o cliente em atendimento responde.
+// Throttle por conversa para não enviar um aviso a cada mensagem de uma rajada.
+const consultantReplyNotifiedAt = new Map();
+const CONSULTANT_REPLY_NOTIFY_THROTTLE_MS = 2 * 60 * 1000;
+
+const buildConsultantReplyNotice = ({ consultantName, clienteNome, telefone, mensagem }) => [
+  '*DRM ENERGIA SOLAR*',
+  '',
+  `Olá, ${consultantName}! O cliente que você está atendendo respondeu.`,
+  '',
+  `Cliente: ${clienteNome || 'Sem nome'}`,
+  `WhatsApp: ${telefone || '-'}`,
+  mensagem ? `Mensagem: ${String(mensagem).slice(0, 280)}` : '',
+  '',
+  'Abra o painel > WhatsApp para continuar o atendimento.',
+].filter(Boolean).join('\n');
+
+const sendConsultantReplyEmail = async ({ to, consultantName, clienteNome, telefone, mensagem }) => {
+  const from = process.env.SMTP_FROM || `DRM ENERGIA SOLAR <${process.env.SMTP_USER}>`;
+  const safeName = escapeHtml(consultantName || 'consultor');
+  const safeCliente = escapeHtml(clienteNome || 'Cliente');
+  const safeTel = escapeHtml(telefone || '-');
+  const safeMsg = escapeHtml(String(mensagem || '').slice(0, 500));
+
+  await getMailTransporter().sendMail({
+    from,
+    to,
+    subject: `Cliente respondeu: ${clienteNome || telefone || 'atendimento WhatsApp'}`,
+    text: [
+      `Olá, ${consultantName}.`,
+      '',
+      'O cliente que você está atendendo respondeu pelo WhatsApp.',
+      '',
+      `Cliente: ${clienteNome || 'Sem nome'}`,
+      `WhatsApp: ${telefone || '-'}`,
+      mensagem ? `Mensagem: ${String(mensagem).slice(0, 500)}` : '',
+      '',
+      'Abra o painel > WhatsApp para continuar o atendimento.',
+      '',
+      'DRM ENERGIA SOLAR',
+    ].filter(Boolean).join('\n'),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#111827">
+        <h2 style="color:#f97316;margin-bottom:8px">DRM ENERGIA SOLAR</h2>
+        <p>Olá, <strong>${safeName}</strong>.</p>
+        <p>O cliente que você está atendendo respondeu pelo WhatsApp:</p>
+        <p style="margin:6px 0"><strong>Cliente:</strong> ${safeCliente}<br/><strong>WhatsApp:</strong> ${safeTel}</p>
+        ${safeMsg ? `<blockquote style="margin:16px 0;padding:12px 16px;background:#f8fafc;border-left:4px solid #f97316;color:#334155">${safeMsg}</blockquote>` : ''}
+        <p>Abra o painel &gt; WhatsApp para continuar o atendimento.</p>
+      </div>
+    `,
+  });
+};
+
+const notifyAssignedConsultantAboutReply = async ({ conversation, text = '' }) => {
+  if (!conversation?.assignedUserId) return;
+
+  const last = consultantReplyNotifiedAt.get(conversation.id) || 0;
+  if (Date.now() - last < CONSULTANT_REPLY_NOTIFY_THROTTLE_MS) return;
+  consultantReplyNotifiedAt.set(conversation.id, Date.now());
+
+  const consultant = await db.get('SELECT * FROM usuarios WHERE id = ? AND active = 1', conversation.assignedUserId);
+  if (!consultant) return;
+
+  const consultantName = getConsultantDisplayName(consultant);
+  const payload = {
+    consultantName,
+    clienteNome: conversation.clienteNome,
+    telefone: conversation.clienteTelefone,
+    mensagem: text,
+  };
+
+  // WhatsApp privado do consultor — evita enviar para o próprio número conectado.
+  const consultantPhone = normalizeWhatsAppPhone(consultant.whatsapp);
+  const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
+  if (consultantPhone && consultantPhone !== businessPhone) {
+    try {
+      await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload));
+    } catch (error) {
+      console.error(`Erro ao avisar consultor ${consultant.username} por WhatsApp:`, error?.message || error);
+    }
+  }
+
+  // E-mail do consultor (apenas se for um e-mail real).
+  if (isRealEmail(consultant.email)) {
+    try {
+      await sendConsultantReplyEmail({ to: consultant.email, ...payload });
+    } catch (error) {
+      console.error(`Erro ao avisar consultor ${consultant.username} por e-mail:`, error?.message || error);
+    }
+  }
 };
 
 const getAppUrl = () => String(process.env.APP_URL || 'http://127.0.0.1:5173').replace(/\/+$/, '');
