@@ -436,13 +436,11 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
   try {
     const remoteJid = resolveIncomingRemoteJid(message.key || {});
     if (message.key?.fromMe || message.key?.participant || !isSupportedIncomingWhatsAppJid(remoteJid)) {
-      console.log(`[WhatsApp] msg DESCARTADA — jid=${remoteJid} (orig=${message.key?.remoteJid}) fromMe=${message.key?.fromMe} participant=${message.key?.participant || '-'} suportado=${isSupportedIncomingWhatsAppJid(remoteJid)}`);
       return;
     }
 
     const timestampMs = getBaileysMessageTimestampMs(message);
     if (whatsappRuntime.acceptIncomingAfter && timestampMs && timestampMs < whatsappRuntime.acceptIncomingAfter) {
-      console.log(`[WhatsApp] msg IGNORADA por tempo — ts=${timestampMs} limite=${whatsappRuntime.acceptIncomingAfter}`);
       return;
     }
 
@@ -840,9 +838,7 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
       throw new Error('Contato do WhatsApp inválido para envio.');
     }
     const jid = await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
-    console.log(`[WhatsApp] Enviando para JID: ${jid} (original: ${to})`);
     const result = await whatsappRuntime.socket.sendMessage(jid, { text });
-    console.log(`[WhatsApp] Mensagem enviada — id: ${result?.key?.id}, status: ${result?.status}`);
     return {
       configured: true,
       mode: 'qrcode',
