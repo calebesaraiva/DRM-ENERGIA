@@ -613,6 +613,7 @@ const AdminDashboard = () => {
   const [clientes, setClientes] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
   const [leads, setLeads] = useState([]);
+  const [leadOwners, setLeadOwners] = useState([]);
   const [leadSearch, setLeadSearch] = useState('');
   const [leadOwnerFilter, setLeadOwnerFilter] = useState('todos');
   const [leadTabFilter, setLeadTabFilter] = useState('todos');
@@ -1231,6 +1232,7 @@ const AdminDashboard = () => {
     if (user.role === 'ADM' || user.permissions?.leads) {
       calls.push(request('/api/admin/leads').then(setLeads));
       calls.push(request('/api/admin/atividades').then(setAtividades));
+      calls.push(request('/api/admin/lead-owners').then(setLeadOwners));
     }
     if (user.role === 'ADM' || user.permissions?.whatsapp || user.permissions?.leads) {
       calls.push(request('/api/admin/whatsapp/status').then(setWhatsappStatus));
@@ -1871,7 +1873,12 @@ const AdminDashboard = () => {
       setShowManualLeadForm(false);
       setLeadTabFilter('todos');
       request('/api/admin/resumo').then(setResumo).catch(() => {});
-      showToast(`Lead manual #${lead.id} cadastrado com sucesso.`, 'success');
+      showToast(
+        lead.assignedUserName
+          ? `Lead manual #${lead.id} cadastrado para ${lead.assignedUserName}.`
+          : `Lead manual #${lead.id} cadastrado com sucesso.`,
+        'success'
+      );
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -6687,17 +6694,15 @@ const AdminDashboard = () => {
                   {LEAD_STATUS_PRESETS.map(status => <option key={status}>{status}</option>)}
                 </select>
               </div>
-              {isMasterAdmin && (
-                <div className="rc-field">
-                  <label className="rc-label">Responsável</label>
-                  <select className="rc-input" value={manualLeadForm.assignedUserId} onChange={(event) => setManualLeadForm(prev => ({ ...prev, assignedUserId: event.target.value }))}>
-                    <option value="">Eu mesmo</option>
-                    {usuarios.filter(item => item.active !== 0 && item.permissions?.leads).map(item => (
-                      <option key={item.id} value={item.id}>{item.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div className="rc-field">
+                <label className="rc-label">Designar para</label>
+                <select className="rc-input" value={manualLeadForm.assignedUserId} onChange={(event) => setManualLeadForm(prev => ({ ...prev, assignedUserId: event.target.value }))}>
+                  <option value="">Eu mesmo</option>
+                  {leadOwners.map(item => (
+                    <option key={item.id} value={item.id}>{item.nome}</option>
+                  ))}
+                </select>
+              </div>
               <div className="rc-field manual-lead-notes">
                 <label className="rc-label">Observação inicial</label>
                 <textarea className="rc-input" value={manualLeadForm.observacoes} onChange={(event) => setManualLeadForm(prev => ({ ...prev, observacoes: event.target.value }))} placeholder="Ex: cliente pediu retorno no fim da tarde" />

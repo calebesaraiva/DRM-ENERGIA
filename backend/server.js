@@ -5186,6 +5186,19 @@ app.get('/api/admin/leads', authRequired, requirePermission('leads'), async (req
   res.json(leads);
 });
 
+app.get('/api/admin/lead-owners', authRequired, requirePermission('leads'), async (req, res) => {
+  const users = await db.all('SELECT * FROM usuarios WHERE active = 1 ORDER BY nome ASC');
+  const owners = users
+    .map(user => ({ ...user, permissions: parsePermissions(user.permissions) }))
+    .filter(user => user.role !== 'ADM' && can(user, 'leads'));
+  res.json(owners.map(owner => ({
+    id: owner.id,
+    nome: owner.nome,
+    username: owner.username,
+    whatsapp: owner.whatsapp,
+  })));
+});
+
 app.post('/api/admin/leads', authRequired, requirePermission('leads'), async (req, res) => {
   const nome = String(req.body.nome || '').trim();
   const telefone = String(req.body.telefone || '').trim();
@@ -5201,9 +5214,14 @@ app.post('/api/admin/leads', authRequired, requirePermission('leads'), async (re
   }
 
   let owner = { id: req.user.id, nome: req.user.nome };
-  if (isMasterAdminUser(req.user) && requestedOwnerId) {
-    const requestedOwner = await db.get('SELECT id, nome FROM usuarios WHERE id = ? AND active = 1', requestedOwnerId);
-    if (requestedOwner) owner = requestedOwner;
+  let requestedOwnerUser = null;
+  if (requestedOwnerId) {
+    const requestedOwner = await db.get('SELECT * FROM usuarios WHERE id = ? AND active = 1', requestedOwnerId);
+    if (!requestedOwner || requestedOwner.role === 'ADM' || !parsePermissions(requestedOwner.permissions).leads) {
+      return res.status(400).json({ message: 'O consultor selecionado não está disponível para receber leads.' });
+    }
+    requestedOwnerUser = requestedOwner;
+    owner = { id: requestedOwner.id, nome: requestedOwner.nome };
   }
 
   const dataCadastro = new Date().toISOString().split('T')[0];
@@ -5228,7 +5246,19 @@ app.post('/api/admin/leads', authRequired, requirePermission('leads'), async (re
 
   const lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
   io.emit('novo_lead', lead);
-  res.status(201).json(lead);
+  let notification = { sent: false };
+  if (requestedOwnerUser && Number(requestedOwnerUser.id) !== Number(req.user.id)) {
+    try {
+      notification = await notifyConsultantAboutTransfer({
+        consultant: requestedOwnerUser,
+        conversation: { clienteNome: lead.nome, clienteTelefone: lead.telefone },
+        transferredBy: getConsultantDisplayName(req.user),
+      });
+    } catch (error) {
+      notification = { sent: false, reason: error?.message || 'Falha ao enviar aviso privado.' };
+    }
+  }
+  res.status(201).json({ ...lead, assignmentNotification: notification });
 });
 
 app.put('/api/admin/leads/:id/responsavel', authRequired, requirePermission('leads'), async (req, res) => {
