@@ -5571,7 +5571,21 @@ app.post('/api/admin/whatsapp/conversations/:id/messages', authRequired, require
 
   let activeConversation = conversation;
   let autoClaimedConversation = false;
-  if (conversation.status === 'Aguardando atendimento' || !conversation.assignedUserId) {
+  if (conversation.status === 'Finalizada') {
+    const ownerId = conversation.assignedUserId || req.user.id;
+    const ownerName = conversation.assignedUserName || req.user.nome || req.user.username;
+    await db.run(
+      `UPDATE whatsapp_conversations
+       SET assignedUserId = ?, assignedUserName = ?, status = 'Em atendimento', updatedAt = ?
+       WHERE id = ?`,
+      ownerId,
+      ownerName,
+      new Date().toISOString(),
+      conversation.id
+    );
+    activeConversation = await getWhatsAppConversationById(conversation.id);
+    io.emit('whatsapp_conversation_updated', activeConversation);
+  } else if (conversation.status === 'Aguardando atendimento' || !conversation.assignedUserId) {
     const claimResult = await db.run(
       `UPDATE whatsapp_conversations
        SET assignedUserId = ?, assignedUserName = ?, status = 'Em atendimento', updatedAt = ?
