@@ -268,6 +268,40 @@ const normalizeWhatsAppRemoteJid = (value) => {
 
 const getPhoneFromWhatsAppJid = (jid) => normalizeWhatsAppPhone(String(jid || '').split('@')[0].split(':')[0]);
 
+// Gera variantes de um número brasileiro (com/sem 55, com/sem 9º dígito)
+// para casar leads/conversas independente de como o número foi cadastrado.
+const whatsAppPhoneVariants = (value) => {
+  const p = normalizeWhatsAppPhone(value);
+  const variants = new Set();
+  if (!p) return [];
+  variants.add(p);
+  variants.add(p.replace(/^55/, ''));
+  if (p.startsWith('55') && p.length >= 12) {
+    const ddd = p.slice(2, 4);
+    const local = p.slice(4);
+    if (local.length === 9 && local.startsWith('9')) {
+      const without9 = local.slice(1);
+      variants.add(`55${ddd}${without9}`);
+      variants.add(`${ddd}${without9}`);
+    } else if (local.length === 8) {
+      const with9 = `9${local}`;
+      variants.add(`55${ddd}${with9}`);
+      variants.add(`${ddd}${with9}`);
+    }
+  }
+  return [...variants].filter(Boolean);
+};
+
+// Para mensagens com endereçamento LID (@lid), o número real vem em remoteJidAlt.
+const resolveIncomingRemoteJid = (key = {}) => {
+  const remoteJid = key.remoteJid || '';
+  if (remoteJid.endsWith('@lid')) {
+    const alt = key.remoteJidAlt || '';
+    if (alt && alt.endsWith('@s.whatsapp.net')) return alt;
+  }
+  return remoteJid;
+};
+
 const mapBaileysMessageStatus = (status) => {
   const code = Number(status);
   if (code >= 4) return 'lida';
@@ -374,9 +408,9 @@ const extractIncomingWhatsAppText = (content = {}) => {
 
 const handleIncomingWhatsAppWebMessage = async (message) => {
   try {
-    const remoteJid = message.key?.remoteJid || '';
+    const remoteJid = resolveIncomingRemoteJid(message.key || {});
     if (message.key?.fromMe || message.key?.participant || !isSupportedIncomingWhatsAppJid(remoteJid)) {
-      console.log(`[WhatsApp] msg DESCARTADA — jid=${remoteJid} fromMe=${message.key?.fromMe} participant=${message.key?.participant || '-'} suportado=${isSupportedIncomingWhatsAppJid(remoteJid)}`);
+      console.log(`[WhatsApp] msg DESCARTADA — jid=${remoteJid} (orig=${message.key?.remoteJid}) fromMe=${message.key?.fromMe} participant=${message.key?.participant || '-'} suportado=${isSupportedIncomingWhatsAppJid(remoteJid)}`);
       return;
     }
 
@@ -393,7 +427,9 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     const text = extractIncomingWhatsAppText(content);
     if (!text) return;
 
-    let lead = await db.get('SELECT * FROM leads WHERE telefone = ? OR telefone = ?', phone, phone.replace(/^55/, ''));
+    const phoneVariants = whatsAppPhoneVariants(phone);
+    const leadPlaceholders = phoneVariants.map(() => '?').join(', ');
+    let lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
     let owner = null;
 
     if (!lead) {
@@ -528,17 +564,8 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
     });
 
     socket.ev.on('messages.upsert', async ({ messages = [], type }) => {
-      console.log(`[WhatsApp] messages.upsert type=${type} count=${messages.length}`);
       if (type !== 'notify') return;
       for (const message of messages) {
-        console.log(`[WhatsApp] msg recebida — remoteJid=${message.key?.remoteJid} fromMe=${message.key?.fromMe} participant=${message.key?.participant || '-'}`);
-        if (String(message.key?.remoteJid || '').endsWith('@lid')) {
-          console.log(`[WhatsApp][LID] key=${JSON.stringify(message.key)}`);
-          try {
-            const pn = whatsappRuntime.socket?.signalRepository?.lidMapping?.getPNForLID?.(message.key.remoteJid);
-            console.log(`[WhatsApp][LID] getPNForLID=${pn}`);
-          } catch (e) { console.log('[WhatsApp][LID] getPNForLID erro:', e?.message); }
-        }
         await handleIncomingWhatsAppWebMessage(message);
       }
     });
@@ -646,7 +673,12 @@ const upsertWhatsAppConversation = async ({
   const phone = normalizeWhatsAppPhone(telefone);
   if (!phone) return null;
 
-  let conversation = await db.get('SELECT * FROM whatsapp_conversations WHERE clienteTelefone = ?', phone);
+  const phoneVariants = whatsAppPhoneVariants(phone);
+  const placeholders = phoneVariants.map(() => '?').join(', ');
+  let conversation = await db.get(
+    `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${placeholders}) ORDER BY updatedAt DESC LIMIT 1`,
+    ...phoneVariants
+  );
   const now = new Date().toISOString();
   if (conversation) {
     const nextLeadId = conversation.leadId || leadId || null;
