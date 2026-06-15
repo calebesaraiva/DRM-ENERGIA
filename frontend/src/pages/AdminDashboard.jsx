@@ -1332,13 +1332,18 @@ const AdminDashboard = () => {
       if (conversation.status === 'Arquivada') {
         setWhatsappConversations(prev => prev.filter(item => item.id !== conversation.id));
         setSelectedWhatsappConversation(prev => prev?.id === conversation.id ? null : prev);
+        setWhatsappMobileChatOpen(prev => selectedWhatsappConversation?.id === conversation.id ? false : prev);
         return;
       }
       const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson')
         || Number(conversation.assignedUserId) === Number(loggedInUser.id)
-        || !conversation.assignedUserId
-        || conversation.status === 'Aguardando atendimento';
-      if (!canSee) return;
+        || (!conversation.assignedUserId && conversation.status === 'Aguardando atendimento');
+      if (!canSee) {
+        setWhatsappConversations(prev => prev.filter(item => item.id !== conversation.id));
+        setSelectedWhatsappConversation(prev => prev?.id === conversation.id ? null : prev);
+        setWhatsappMobileChatOpen(prev => selectedWhatsappConversation?.id === conversation.id ? false : prev);
+        return;
+      }
       setWhatsappConversations(prev => {
         const exists = prev.some(item => item.id === conversation.id);
         const next = exists ? prev.map(item => item.id === conversation.id ? conversation : item) : [conversation, ...prev];
@@ -1379,6 +1384,12 @@ const AdminDashboard = () => {
     socket.on('projeto_foto_criada', handleProjetoFotoCriada);
     socket.on('os_atualizada', handleOsAtualizada);
     socket.on('whatsapp_conversation_updated', handleWhatsappConversation);
+    socket.on('whatsapp_conversation_archived', ({ id } = {}) => {
+      if (!id) return;
+      setWhatsappConversations(prev => prev.filter(item => item.id !== id));
+      setSelectedWhatsappConversation(prev => prev?.id === id ? null : prev);
+      setWhatsappMobileChatOpen(prev => selectedWhatsappConversation?.id === id ? false : prev);
+    });
     socket.on('whatsapp_message_created', handleWhatsappMessage);
     socket.on('whatsapp_message_status_updated', handleWhatsappMessageStatus);
     socket.on('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
@@ -1393,6 +1404,7 @@ const AdminDashboard = () => {
       socket.off('projeto_foto_criada', handleProjetoFotoCriada);
       socket.off('os_atualizada', handleOsAtualizada);
       socket.off('whatsapp_conversation_updated', handleWhatsappConversation);
+      socket.off('whatsapp_conversation_archived');
       socket.off('whatsapp_message_created', handleWhatsappMessage);
       socket.off('whatsapp_message_status_updated', handleWhatsappMessageStatus);
       socket.off('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
@@ -3539,7 +3551,7 @@ const AdminDashboard = () => {
                               )}
                               <button type="button" onClick={() => { setActiveTab('orcamentos'); setWaChatActionsOpen(false); }}>Criar orçamento</button>
                               <a href={`https://wa.me/${selectedWhatsappConversation.clienteTelefone}`} target="_blank" rel="noopener noreferrer" onClick={() => setWaChatActionsOpen(false)}>Abrir no WhatsApp</a>
-                              {(isMasterAdmin || String(adminUser.username || '').toLowerCase() === 'renejr') && (
+                              {isMasterAdmin && (
                                 <button type="button" className="wa-more-danger" onClick={() => { archiveWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Não é lead (arquivar)</button>
                               )}
                             </div>

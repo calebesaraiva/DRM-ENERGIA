@@ -694,8 +694,7 @@ const getWhatsAppProviderStatus = () => {
 const canAccessWhatsAppConversation = (user, conversation = {}) => (
   isMasterAdminUser(user)
     || Number(conversation.assignedUserId) === Number(user?.id)
-    || !conversation.assignedUserId
-    || conversation.status === 'Aguardando atendimento'
+    || (!conversation.assignedUserId && conversation.status === 'Aguardando atendimento')
 );
 
 const getWhatsAppConversationById = async (id) => db.get('SELECT * FROM whatsapp_conversations WHERE id = ?', id);
@@ -5075,7 +5074,10 @@ app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('wh
     : await db.all(
       `SELECT * FROM whatsapp_conversations
        WHERE ${visibleWhere}
-         AND (assignedUserId = ? OR assignedUserId IS NULL OR status = 'Aguardando atendimento')
+         AND (
+           assignedUserId = ?
+           OR (assignedUserId IS NULL AND status = 'Aguardando atendimento')
+         )
        ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC`,
       req.user.id
     );
@@ -5170,9 +5172,9 @@ app.post('/api/admin/whatsapp/conversations/:id/close', authRequired, requirePer
 // Arquiva uma conversa que não é lead (pós-venda, manutenção, instalação etc.).
 // Não envia nada ao cliente — apenas some da lista de atendimento para todos.
 app.post('/api/admin/whatsapp/conversations/:id/archive', authRequired, requirePermission('whatsapp'), async (req, res) => {
-  // Apenas o ADM master e o renejr podem arquivar conversas (marcar "não é lead").
-  if (!isMasterAdminUser(req.user) && String(req.user.username || '').toLowerCase() !== 'renejr') {
-    return res.status(403).json({ message: 'Apenas o administrador e o Renê Junior podem arquivar conversas.' });
+  // Apenas o Deivson (ADM master) pode arquivar conversas como "não é lead".
+  if (!isMasterAdminUser(req.user)) {
+    return res.status(403).json({ message: 'Apenas o Deivson pode arquivar conversas como não lead.' });
   }
   const conversation = await getWhatsAppConversationById(req.params.id);
   if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
