@@ -13,6 +13,9 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const ffmpegPath = require('ffmpeg-static');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
 const pino = require('pino');
@@ -29,6 +32,7 @@ const PORT = Number(process.env.PORT) || 3001;
 const DEFAULT_WHATSAPP_PHONE = '559985127056';
 const WHATSAPP_AUTH_DIR = path.join(__dirname, 'whatsapp-session');
 const WHATSAPP_MEDIA_DIR = path.join(__dirname, 'uploads', 'whatsapp');
+const execFileAsync = promisify(execFile);
 const WHATSAPP_NEW_LEAD_NOTIFY_PHONES = [
   '559991675608',
   '559985127056',
@@ -1101,6 +1105,36 @@ const sendWhatsAppAudioMessage = async (to, buffer, mimeType = 'audio/webm', opt
     providerMessageId: result?.key?.id || '',
     payload: result,
   };
+};
+
+const convertAudioToWhatsAppVoice = async (buffer, inputMimeType = 'audio/webm') => {
+  if (!ffmpegPath) throw new Error('Conversor de áudio indisponível no servidor.');
+  fs.mkdirSync(WHATSAPP_MEDIA_DIR, { recursive: true });
+  const token = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
+  const inputPath = path.join(WHATSAPP_MEDIA_DIR, `${token}.${getMediaExtension(inputMimeType, 'webm')}`);
+  const outputPath = path.join(WHATSAPP_MEDIA_DIR, `${token}.ogg`);
+  try {
+    await fs.promises.writeFile(inputPath, buffer);
+    await execFileAsync(ffmpegPath, [
+      '-y',
+      '-i', inputPath,
+      '-vn',
+      '-c:a', 'libopus',
+      '-b:a', '32k',
+      '-vbr', 'on',
+      '-application', 'voip',
+      '-f', 'ogg',
+      outputPath,
+    ], { timeout: 30000, windowsHide: true });
+    return {
+      buffer: await fs.promises.readFile(outputPath),
+      mimeType: 'audio/ogg; codecs=opus',
+      fileName: path.basename(outputPath),
+      absolutePath: outputPath,
+    };
+  } finally {
+    await fs.promises.rm(inputPath, { force: true }).catch(() => {});
+  }
 };
 
 const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', test = false } = {}) => {
@@ -5703,22 +5737,19 @@ app.post('/api/admin/whatsapp/conversations/:id/audio', authRequired, requirePer
   }
 
   try {
-    const provider = await sendWhatsAppAudioMessage(activeConversation.clienteTelefone, buffer, mimeType, {
+    const voice = await convertAudioToWhatsAppVoice(buffer, mimeType);
+    const provider = await sendWhatsAppAudioMessage(activeConversation.clienteTelefone, voice.buffer, voice.mimeType, {
       remoteJid: activeConversation.remoteJid,
     });
-    fs.mkdirSync(WHATSAPP_MEDIA_DIR, { recursive: true });
-    const extension = getMediaExtension(mimeType, 'audio');
-    const fileName = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}.${extension}`;
-    await fs.promises.writeFile(path.join(WHATSAPP_MEDIA_DIR, fileName), buffer);
     const message = await createWhatsAppMessage({
       conversationId: activeConversation.id,
       direction: 'outgoing',
       messageType: 'audio',
       text: 'Áudio enviado',
-      mediaUrl: `/api/whatsapp/media/${fileName}`,
-      mimeType,
-      fileName,
-      fileSize: buffer.length,
+      mediaUrl: `/api/whatsapp/media/${voice.fileName}`,
+      mimeType: voice.mimeType,
+      fileName: voice.fileName,
+      fileSize: voice.buffer.length,
       providerMessageId: provider.providerMessageId,
       status: provider.status,
       senderId: req.user.id,
