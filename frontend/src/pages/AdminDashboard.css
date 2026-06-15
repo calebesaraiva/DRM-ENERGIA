@@ -12077,16 +12077,6 @@
   .wa-redesign .whatsapp-messages {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    scroll-behavior: smooth;
-  }
-
-  /* Compose: ficar fixo no fundo acima do teclado */
-  .wa-redesign .whatsapp-compose {
-    position: sticky;
-    bottom: 0;
-    padding-bottom: max(0.72rem, env(safe-area-inset-bottom));
-    background: #fff;
-    z-index: 10;
   }
 
   /* Touch targets mínimos de 44px */
@@ -12097,19 +12087,46 @@
     min-height: 44px;
   }
 
-  /* Botão de enviar — tamanho de toque confortável */
+  /* Compose: layout limpo no mobile — 3 colunas (+ | textarea | enviar) */
+  .wa-redesign .whatsapp-compose {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 0.42rem;
+    padding: 0.6rem 0.62rem;
+    padding-bottom: max(0.6rem, env(safe-area-inset-bottom, 0px) + 4px);
+    border-top: 1px solid #e2e8f0;
+    background: #fff;
+  }
+
+  /* Esconder o segundo botão de ferramenta (templates) */
+  .wa-redesign .whatsapp-compose .wa-compose-tool:nth-of-type(2) {
+    display: none;
+  }
+
+  /* Botão de enviar — quadrado 44×44px com ícone */
   .wa-redesign .whatsapp-compose .btn {
-    min-width: 56px;
+    width: 44px;
+    min-width: 44px;
     min-height: 44px;
     padding: 0;
     display: grid;
     place-items: center;
     border-radius: 14px;
+    box-shadow: none;
   }
 
-  /* Esconder o botão de templates (segundo wa-compose-tool) no mobile */
-  .wa-redesign .whatsapp-compose .wa-compose-tool:nth-of-type(2) {
-    display: none;
+  /* Botão + também 44×44px */
+  .wa-redesign .whatsapp-compose .wa-compose-tool {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Textarea começa em 1 linha e cresce até 80px */
+  .wa-redesign .whatsapp-compose textarea {
+    min-height: 44px;
+    max-height: 80px;
+    padding: 0.68rem 0.76rem;
+    font-size: 0.95rem;
+    line-height: 1.4;
   }
 
   /* Inbox head mais compacto */
@@ -12192,12 +12209,7 @@
   bottom: max(24px, env(safe-area-inset-bottom, 0px) + 16px);
 }
 
-/* 3. Safe area para compose no chat */
-@media (max-width: 820px) {
-  .wa-redesign .whatsapp-compose {
-    padding-bottom: max(0.72rem, env(safe-area-inset-bottom, 0px) + 8px);
-  }
-}
+/* 3. Safe area adicional para iPhones com home bar — já no bloco acima */
 
 /* 4. Toque mais suave em todo o sistema no mobile */
 @media (max-width: 820px) {
@@ -12226,8 +12238,9 @@
     font-size: 0.9rem;
   }
   .wa-redesign .whatsapp-compose {
-    gap: 0.38rem;
-    padding: 0.5rem 0.48rem;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    gap: 0.32rem;
+    padding: 0.5rem 0.44rem;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px) + 6px);
   }
   .wa-redesign .whatsapp-compose textarea {
@@ -12274,18 +12287,21 @@
   font-weight: 900;
 }
 
-/* 9. Botão Enviar compacto no mobile — texto escondido, só ícone */
+/* 9. Botão Enviar: ícone sempre visível, label escondida no mobile */
+.wa-send-icon {
+  display: none;
+  stroke: currentColor;
+}
+
 @media (max-width: 820px) {
   .wa-send-label {
     display: none;
   }
   .wa-send-icon {
     display: block;
+    width: 18px;
+    height: 18px;
   }
-}
-
-.wa-send-icon {
-  display: none;
 }
 
 /* 10. Skeleton loading mais fluído */
