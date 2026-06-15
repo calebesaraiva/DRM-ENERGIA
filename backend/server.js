@@ -19,6 +19,7 @@ const pino = require('pino');
 const {
   default: makeWASocket,
   DisconnectReason,
+  downloadMediaMessage,
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
 } = require('@whiskeysockets/baileys');
@@ -27,6 +28,7 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const DEFAULT_WHATSAPP_PHONE = '559985127056';
 const WHATSAPP_AUTH_DIR = path.join(__dirname, 'whatsapp-session');
+const WHATSAPP_MEDIA_DIR = path.join(__dirname, 'uploads', 'whatsapp');
 const WHATSAPP_NEW_LEAD_NOTIFY_PHONES = [
   '559991675608',
   '559985127056',
@@ -100,6 +102,11 @@ app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '25mb' }));
 app.use('/assets', express.static(path.join(__dirname, '../frontend/public/assets')));
+app.use('/uploads/whatsapp', express.static(WHATSAPP_MEDIA_DIR, {
+  maxAge: '7d',
+  immutable: true,
+  fallthrough: false,
+}));
 
 // Limita tentativas de login para mitigar força bruta (por IP).
 const loginRateLimiter = rateLimit({
@@ -428,16 +435,86 @@ const extractIncomingWhatsAppText = (content = {}) => {
     || '';
 
   if (String(text).trim()) return String(text).trim();
-  if (
-    content.imageMessage
-    || content.videoMessage
-    || content.audioMessage
-    || content.documentMessage
-    || content.stickerMessage
-  ) {
-    return '[midia recebida]';
-  }
   return '';
+};
+
+const getWhatsAppMediaInfo = (content = {}) => {
+  const entries = [
+    ['image', content.imageMessage],
+    ['video', content.videoMessage],
+    ['audio', content.audioMessage],
+    ['document', content.documentMessage],
+    ['sticker', content.stickerMessage],
+  ];
+  const entry = entries.find(([, value]) => value);
+  if (!entry) return null;
+  const [type, media] = entry;
+  return {
+    type,
+    mimeType: media.mimetype || '',
+    fileName: media.fileName || media.title || '',
+    fileSize: Number(media.fileLength || media.fileLength?.low || 0) || null,
+    caption: media.caption || '',
+  };
+};
+
+const getMediaExtension = (mimeType = '', type = '') => {
+  const clean = String(mimeType || '').split(';')[0].toLowerCase();
+  const known = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'video/mp4': 'mp4',
+    'audio/ogg': 'ogg',
+    'audio/mpeg': 'mp3',
+    'audio/mp4': 'm4a',
+    'application/pdf': 'pdf',
+  };
+  if (known[clean]) return known[clean];
+  const subtype = clean.split('/')[1];
+  if (subtype && /^[a-z0-9.+-]+$/.test(subtype)) return subtype.replace('jpeg', 'jpg').replace(/\+/g, '-');
+  return type || 'bin';
+};
+
+const buildWhatsAppMediaText = (mediaInfo) => {
+  if (!mediaInfo) return '';
+  const labels = {
+    image: 'Imagem recebida',
+    video: 'Vídeo recebido',
+    audio: 'Áudio recebido',
+    document: 'Documento recebido',
+    sticker: 'Figurinha recebida',
+  };
+  const base = labels[mediaInfo.type] || 'Mídia recebida';
+  return mediaInfo.caption ? `${base}: ${mediaInfo.caption}` : base;
+};
+
+const saveIncomingWhatsAppMedia = async (message, mediaInfo) => {
+  if (!message || !mediaInfo) return null;
+  try {
+    fs.mkdirSync(WHATSAPP_MEDIA_DIR, { recursive: true });
+    const buffer = await downloadMediaMessage(
+      message,
+      'buffer',
+      {},
+      {
+        logger: pino({ level: 'silent' }),
+        reuploadRequest: whatsappRuntime.socket?.updateMediaMessage,
+      }
+    );
+    if (!buffer?.length) return null;
+    const ext = getMediaExtension(mediaInfo.mimeType, mediaInfo.type);
+    const fileName = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}.${ext}`;
+    const absolutePath = path.join(WHATSAPP_MEDIA_DIR, fileName);
+    await fs.promises.writeFile(absolutePath, buffer);
+    return {
+      mediaUrl: `/uploads/whatsapp/${fileName}`,
+      fileSize: buffer.length,
+    };
+  } catch (error) {
+    console.error('Erro ao baixar mídia do WhatsApp:', error.message || error);
+    return null;
+  }
 };
 
 const handleIncomingWhatsAppWebMessage = async (message) => {
@@ -456,7 +533,9 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     if (!phone || !isPlausibleContactPhone(phone)) return;
 
     const content = message.message || {};
-    const text = extractIncomingWhatsAppText(content);
+    const mediaInfo = getWhatsAppMediaInfo(content);
+    const mediaFile = await saveIncomingWhatsAppMedia(message, mediaInfo);
+    const text = extractIncomingWhatsAppText(content) || buildWhatsAppMediaText(mediaInfo);
     if (!text) return;
 
     const phoneVariants = whatsAppPhoneVariants(phone);
@@ -501,8 +580,12 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     const savedMessage = await createWhatsAppMessage({
       conversationId: conversation.id,
       direction: 'incoming',
-      messageType: 'text',
+      messageType: mediaInfo?.type || 'text',
       text,
+      mediaUrl: mediaFile?.mediaUrl || '',
+      mimeType: mediaInfo?.mimeType || '',
+      fileName: mediaInfo?.fileName || '',
+      fileSize: mediaFile?.fileSize || mediaInfo?.fileSize || null,
       providerMessageId: message.key?.id || '',
       status: 'recebida',
       rawPayload: message,
@@ -765,6 +848,10 @@ const createWhatsAppMessage = async ({
   direction = 'incoming',
   messageType = 'text',
   text = '',
+  mediaUrl = '',
+  mimeType = '',
+  fileName = '',
+  fileSize = null,
   providerMessageId = '',
   status = 'recebida',
   senderId = null,
@@ -774,12 +861,16 @@ const createWhatsAppMessage = async ({
   const now = new Date().toISOString();
   const result = await db.run(
     `INSERT INTO whatsapp_messages
-      (conversationId, direction, messageType, text, providerMessageId, status, senderId, senderName, createdAt, rawPayload)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (conversationId, direction, messageType, text, mediaUrl, mimeType, fileName, fileSize, providerMessageId, status, senderId, senderName, createdAt, rawPayload)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     conversationId,
     direction,
     messageType,
     text,
+    mediaUrl,
+    mimeType,
+    fileName,
+    fileSize,
     providerMessageId,
     status,
     senderId,
@@ -3311,6 +3402,10 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       direction TEXT NOT NULL,
       messageType TEXT DEFAULT 'text',
       text TEXT,
+      mediaUrl TEXT,
+      mimeType TEXT,
+      fileName TEXT,
+      fileSize INTEGER,
       providerMessageId TEXT,
       status TEXT,
       senderId INTEGER,
@@ -3549,6 +3644,19 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   const existingWhatsappConversationColumns = whatsappConversationColumns.map(column => column.name);
   if (!existingWhatsappConversationColumns.includes('remoteJid')) {
     await db.exec('ALTER TABLE whatsapp_conversations ADD COLUMN remoteJid TEXT');
+  }
+  const whatsappMessageColumns = await db.all('PRAGMA table_info(whatsapp_messages)');
+  const existingWhatsappMessageColumns = whatsappMessageColumns.map(column => column.name);
+  const whatsappMediaColumns = [
+    ['mediaUrl', 'TEXT'],
+    ['mimeType', 'TEXT'],
+    ['fileName', 'TEXT'],
+    ['fileSize', 'INTEGER'],
+  ];
+  for (const [column, definition] of whatsappMediaColumns) {
+    if (!existingWhatsappMessageColumns.includes(column)) {
+      await db.exec(`ALTER TABLE whatsapp_messages ADD COLUMN ${column} ${definition}`);
+    }
   }
   await db.exec(`
     UPDATE whatsapp_conversations

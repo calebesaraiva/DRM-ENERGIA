@@ -12991,6 +12991,93 @@
   flex-shrink: 0;
 }
 
+.wc2-media {
+  display: grid;
+  gap: 0.45rem;
+  max-width: min(100%, 360px);
+}
+
+.wc2-media img,
+.wc2-media video {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: #0f172a;
+}
+
+.wc2-media audio {
+  width: min(320px, 100%);
+  min-width: 240px;
+}
+
+.wc2-media-image-link,
+.wc2-media-sticker-link {
+  display: block;
+  color: inherit;
+}
+
+.wc2-media-sticker-link img {
+  width: 150px;
+  max-height: 150px;
+  background: transparent;
+}
+
+.wc2-media-file {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: min(280px, 100%);
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #0f172a;
+  text-decoration: none;
+}
+
+.wc2-media-file[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.wc2-media-file-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: #fff7ed;
+  color: #f97316;
+}
+
+.wc2-media-file-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.wc2-media-file strong,
+.wc2-media-file small {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc2-media-file strong {
+  font-size: 0.92rem;
+}
+
+.wc2-media-file small {
+  margin-top: 0.16rem;
+  color: #64748b;
+  font-size: 0.76rem;
+}
+
 /* Card de assumir atendimento */
 .wc2-claim-card {
   display: flex;

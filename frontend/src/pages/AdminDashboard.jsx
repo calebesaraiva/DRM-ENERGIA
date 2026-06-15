@@ -2710,6 +2710,26 @@ const AdminDashboard = () => {
   const selectedWhatsappIsPending = selectedWhatsappConversation?.status === 'Aguardando atendimento' && !selectedWhatsappConversation?.assignedUserId;
   const selectedWhatsappIsMine = Number(selectedWhatsappConversation?.assignedUserId) === Number(adminUser.id);
   const canReplyWhatsapp = Boolean(selectedWhatsappConversation) && whatsappStatus?.connected && selectedWhatsappConversation.status !== 'Finalizada' && (selectedWhatsappIsMine || isMasterAdmin) && !selectedWhatsappIsPending;
+  const getWhatsappMediaUrl = (message) => (
+    message?.mediaUrl ? withApiBase(message.mediaUrl) : ''
+  );
+  const getWhatsappMediaLabel = (message) => {
+    const labels = {
+      image: 'Imagem',
+      video: 'Video',
+      audio: 'Audio',
+      document: 'Documento',
+      sticker: 'Figurinha',
+    };
+    return labels[message?.messageType] || 'Midia';
+  };
+  const formatWhatsappFileSize = (value) => {
+    const size = Number(value || 0);
+    if (!size) return '';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1).replace('.', ',')} KB`;
+    return `${(size / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+  };
 
   return (
     <div className={`admin-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
@@ -3618,11 +3638,53 @@ const AdminDashboard = () => {
                           const currentDate = message.createdAt ? new Date(message.createdAt).toLocaleDateString('pt-BR') : '';
                           const previousDate = whatsappMessages[index - 1]?.createdAt ? new Date(whatsappMessages[index - 1].createdAt).toLocaleDateString('pt-BR') : '';
                           const isSystem = String(message.senderName || '').toLowerCase().includes('drm energia solar') || String(message.text || '').includes('*DRM ENERGIA SOLAR*');
+                          const mediaUrl = getWhatsappMediaUrl(message);
+                          const mediaLabel = getWhatsappMediaLabel(message);
+                          const hasMedia = Boolean(message.mediaUrl || ['image', 'video', 'audio', 'document', 'sticker'].includes(message.messageType));
+                          const textIsMediaLabel = ['Imagem recebida', 'Video recebido', 'Vídeo recebido', 'Audio recebido', 'Áudio recebido', 'Documento recebido', 'Figurinha recebida', 'Midia recebida', 'Mídia recebida'].includes(String(message.text || '').trim());
                           return (
                             <div key={message.id} className="wa-message-group">
                               {currentDate && currentDate !== previousDate && <div className="wa-date-separator">{currentDate}</div>}
                               <div className={`wc2-msg ${message.direction === 'outgoing' ? 'sent' : 'received'} ${isSystem ? 'system' : ''}`}>
-                                <p>{message.text}</p>
+                                {hasMedia && (
+                                  <div className={`wc2-media ${message.messageType || 'media'}`}>
+                                    {mediaUrl && message.messageType === 'image' && (
+                                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="wc2-media-image-link">
+                                        <img src={mediaUrl} alt={message.fileName || 'Imagem recebida'} loading="lazy" />
+                                      </a>
+                                    )}
+                                    {mediaUrl && message.messageType === 'sticker' && (
+                                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="wc2-media-sticker-link">
+                                        <img src={mediaUrl} alt={message.fileName || 'Figurinha recebida'} loading="lazy" />
+                                      </a>
+                                    )}
+                                    {mediaUrl && message.messageType === 'video' && (
+                                      <video src={mediaUrl} controls preload="metadata" />
+                                    )}
+                                    {mediaUrl && message.messageType === 'audio' && (
+                                      <audio src={mediaUrl} controls preload="metadata" />
+                                    )}
+                                    {(!mediaUrl || message.messageType === 'document') && (
+                                      <a
+                                        className="wc2-media-file"
+                                        href={mediaUrl || undefined}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        aria-disabled={!mediaUrl}
+                                        onClick={(event) => { if (!mediaUrl) event.preventDefault(); }}
+                                      >
+                                        <span className="wc2-media-file-icon">
+                                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+                                        </span>
+                                        <span>
+                                          <strong>{message.fileName || mediaLabel}</strong>
+                                          <small>{message.mimeType || mediaLabel}{message.fileSize ? ` • ${formatWhatsappFileSize(message.fileSize)}` : ''}</small>
+                                        </span>
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                                {message.text && (!hasMedia || !textIsMediaLabel) && <p>{message.text}</p>}
                                 <time>
                                   {message.createdAt ? new Date(message.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
                                   {message.direction === 'outgoing' && (
