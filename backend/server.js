@@ -1,6 +1,8 @@
 require('dotenv').config({ quiet: true });
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const http = require('http');
 const { Server } = require('socket.io');
 const sqlite3 = require('sqlite3').verbose();
@@ -92,12 +94,28 @@ const corsOptions = {
     return callback(new Error('Not allowed by CORS'));
   }
 };
+// Cabeçalhos de segurança. crossOriginResourcePolicy desligado para não
+// bloquear o carregamento de assets/imagens por outras origens (front separado).
+app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false }));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '25mb' }));
 app.use('/assets', express.static(path.join(__dirname, '../frontend/public/assets')));
 
-// Chave secreta para o JWT. Em produção, isso DEVE estar em uma variável de ambiente.
-const JWT_SECRET = 'seu-segredo-super-secreto-e-dificil-de-adivinhar';
+// Limita tentativas de login para mitigar força bruta (por IP).
+const loginRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Muitas tentativas de login. Aguarde um minuto e tente novamente.' },
+});
+
+// Chave secreta para o JWT. DEVE vir de variável de ambiente em produção.
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('ERRO: variável de ambiente JWT_SECRET não definida. Configure-a antes de iniciar o servidor.');
+  process.exit(1);
+}
 const RESET_TOKEN_TTL_MINUTES = 24 * 60;
 const EMAIL_VERIFICATION_TTL_MINUTES = 15;
 
@@ -241,7 +259,8 @@ const parseQuickActions = (value) => {
 };
 
 const can = (user, permission) => user?.permissions?.[permission] === true;
-const isMasterAdminUser = (user) => user?.role === 'ADM' && String(user?.username || '').toLowerCase() === 'deivson';
+const MASTER_ADMIN_USERNAME = String(process.env.MASTER_ADMIN_USERNAME || 'deivson').toLowerCase();
+const isMasterAdminUser = (user) => user?.role === 'ADM' && String(user?.username || '').toLowerCase() === MASTER_ADMIN_USERNAME;
 
 const normalizeWhatsAppPhone = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
@@ -1735,9 +1754,8 @@ const mergeManualWithEquipamento = (manual = {}, equipamento = {}) => ({
   formaPagamento: firstFilled(manual.formaPagamento, equipamento?.formaPagamento),
 });
 
-const isMasterAdmin = (user = {}) => (
-  user.role === 'ADM' && String(user.username || '').toLowerCase() === String(process.env.MASTER_ADMIN_USERNAME || 'deivson').toLowerCase()
-);
+// Alias mantido por compatibilidade — usa a mesma fonte única de verdade.
+const isMasterAdmin = isMasterAdminUser;
 
 const numberOrNull = (value) => {
   if (value === '' || typeof value === 'undefined' || value === null) return null;
@@ -3919,7 +3937,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // Rota de Login
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginRateLimiter, async (req, res) => {
   const { email, password } = req.body;
   const identifier = String(email || '').trim();
 
