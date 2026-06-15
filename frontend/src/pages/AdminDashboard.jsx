@@ -1385,11 +1385,12 @@ const AdminDashboard = () => {
     socket.on('projeto_foto_criada', handleProjetoFotoCriada);
     socket.on('os_atualizada', handleOsAtualizada);
     socket.on('whatsapp_conversation_updated', handleWhatsappConversation);
-    socket.on('whatsapp_conversation_archived', ({ id } = {}) => {
-      if (!id) return;
-      setWhatsappConversations(prev => prev.filter(item => item.id !== id));
-      setSelectedWhatsappConversation(prev => prev?.id === id ? null : prev);
-      setWhatsappMobileChatOpen(prev => selectedWhatsappConversation?.id === id ? false : prev);
+    socket.on('whatsapp_conversation_archived', ({ id, ids } = {}) => {
+      const archivedIds = Array.isArray(ids) && ids.length ? ids : [id].filter(Boolean);
+      if (archivedIds.length === 0) return;
+      setWhatsappConversations(prev => prev.filter(item => !archivedIds.includes(item.id)));
+      setSelectedWhatsappConversation(prev => archivedIds.includes(prev?.id) ? null : prev);
+      setWhatsappMobileChatOpen(prev => archivedIds.includes(selectedWhatsappConversation?.id) ? false : prev);
     });
     socket.on('whatsapp_message_created', handleWhatsappMessage);
     socket.on('whatsapp_message_status_updated', handleWhatsappMessageStatus);
@@ -1505,9 +1506,10 @@ const AdminDashboard = () => {
     setWhatsappMobileChatOpen(false);
     setWaChatActionsOpen(false);
     try {
-      await request(`/api/admin/whatsapp/conversations/${archivedId}/archive`, { method: 'POST' });
+      const archived = await request(`/api/admin/whatsapp/conversations/${archivedId}/archive`, { method: 'POST' });
+      const archivedIds = Array.isArray(archived?.archivedIds) && archived.archivedIds.length ? archived.archivedIds : [archivedId];
       const conversations = await request('/api/admin/whatsapp/conversations');
-      setWhatsappConversations(conversations);
+      setWhatsappConversations(conversations.filter(item => !archivedIds.includes(item.id)));
       showToast('Conversa arquivada (não é lead).', 'success');
     } catch (err) {
       setWhatsappConversations(prev => (

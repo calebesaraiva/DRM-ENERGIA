@@ -5180,15 +5180,33 @@ app.post('/api/admin/whatsapp/conversations/:id/archive', authRequired, requireP
   const conversation = await getWhatsAppConversationById(req.params.id);
   if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
 
+  const phoneVariants = whatsAppPhoneVariants(conversation.clienteTelefone);
+  const remoteJidVariants = phoneVariants.map(phone => `${phone}@s.whatsapp.net`);
+  const phonePlaceholders = phoneVariants.map(() => '?').join(', ');
+  const remotePlaceholders = remoteJidVariants.map(() => '?').join(', ');
+  const matchingConversations = await db.all(
+    `SELECT id FROM whatsapp_conversations
+     WHERE id = ?
+        OR clienteTelefone IN (${phonePlaceholders})
+        OR remoteJid IN (${remotePlaceholders})`,
+    conversation.id,
+    ...phoneVariants,
+    ...remoteJidVariants
+  );
+  const archivedIds = matchingConversations.map(item => item.id);
+  const idPlaceholders = archivedIds.map(() => '?').join(', ');
+
   await db.run(
-    `UPDATE whatsapp_conversations SET status = 'Arquivada', unreadCount = 0, updatedAt = ? WHERE id = ?`,
+    `UPDATE whatsapp_conversations
+     SET status = 'Arquivada', unreadCount = 0, updatedAt = ?
+     WHERE id IN (${idPlaceholders})`,
     new Date().toISOString(),
-    conversation.id
+    ...archivedIds
   );
   const updated = await getWhatsAppConversationById(conversation.id);
   io.emit('whatsapp_conversation_updated', updated);
-  io.emit('whatsapp_conversation_archived', { id: conversation.id });
-  res.json(updated);
+  io.emit('whatsapp_conversation_archived', { id: conversation.id, ids: archivedIds });
+  res.json({ ...updated, archivedIds });
 });
 
 app.get('/api/admin/whatsapp/conversations/:id/messages', authRequired, requirePermission('whatsapp'), async (req, res) => {
