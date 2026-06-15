@@ -1277,9 +1277,12 @@ const AdminDashboard = () => {
   }, [openLeadMenu]);
   useEffect(() => {
     if (!waChatActionsOpen) return;
-    const close = () => setWaChatActionsOpen(false);
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
+    const closeOnOutsidePointer = (event) => {
+      if (event.target instanceof Element && event.target.closest('.wa-more-wrap')) return;
+      setWaChatActionsOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer, true);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
   }, [waChatActionsOpen]);
   useEffect(() => { setOrcClientPage(1); }, [orcClientSearch]);
   useEffect(() => { setContratoPage(1); }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo]);
@@ -3699,11 +3702,20 @@ const AdminDashboard = () => {
                           </button>
                         )}
                         <div className="wa-more-wrap">
-                          <button type="button" className="wc2-more-btn" onClick={() => setWaChatActionsOpen(v => !v)} aria-label="Mais ações">
+                          <button
+                            type="button"
+                            className="wc2-more-btn"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setWaChatActionsOpen(value => !value);
+                            }}
+                            aria-label="Mais ações"
+                          >
                             <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
                           </button>
                           {waChatActionsOpen && (
-                            <div className="wa-more-dropdown">
+                            <div className="wa-more-dropdown" onClick={(event) => event.stopPropagation()}>
                               {selectedWhatsappIsPending && (
                                 <button type="button" onClick={() => { claimWhatsappConversation(); setWaChatActionsOpen(false); }} disabled={whatsappLoading}>Assumir atendimento</button>
                               )}
