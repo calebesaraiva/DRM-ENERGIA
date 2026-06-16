@@ -7589,10 +7589,10 @@ const AdminDashboard = () => {
                                 signatureDrawingRef.current.lastX = x;
                                 signatureDrawingRef.current.lastY = y;
                               }}
-                              onMouseUp={(e) => {
+                              onMouseUp={() => {
                                 signatureDrawingRef.current.isDrawing = false;
                               }}
-                              onMouseLeave={(e) => {
+                              onMouseLeave={() => {
                                 signatureDrawingRef.current.isDrawing = false;
                               }}
                               onTouchStart={(e) => {

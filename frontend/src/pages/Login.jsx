@@ -4,6 +4,8 @@ import './Login.css';
 import { withApiBase } from '../utils/apiBase';
 import PasswordField from '../components/PasswordField';
 
+const isLocalRuntime = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
 const Login = ({ accessType: forcedAccessType = null }) => {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -32,8 +34,13 @@ const Login = ({ accessType: forcedAccessType = null }) => {
         }
       }
 
-      if (user.mustChangePassword) { navigate('/alterar-senha', { replace: true }); return; }
-      if (user.requiresEmailVerification) { navigate('/verificar-email', { replace: true }); return; }
+      if (isLocalRuntime && (user.mustChangePassword || user.requiresEmailVerification)) {
+        const cleanedUser = { ...user, mustChangePassword: false, requiresEmailVerification: false };
+        localStorage.setItem('user', JSON.stringify(cleanedUser));
+      } else {
+        if (user.mustChangePassword) { navigate('/alterar-senha', { replace: true }); return; }
+        if (user.requiresEmailVerification) { navigate('/verificar-email', { replace: true }); return; }
+      }
 
       const isInternalUser = user.userType === 'interno'
         || ['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(user.role);
@@ -75,11 +82,14 @@ const Login = ({ accessType: forcedAccessType = null }) => {
         throw new Error('A API de login retornou resposta inválida. Verifique se o backend está online.');
       }
 
+      const normalizedUser = isLocalRuntime
+        ? { ...data.user, mustChangePassword: false, requiresEmailVerification: false }
+        : data.user;
       localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.user.role);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('role', normalizedUser.role);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
 
-      const isInternalUser = data.user.userType === 'interno' || ['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(data.user.role);
+      const isInternalUser = normalizedUser.userType === 'interno' || ['ADMIN', 'ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(normalizedUser.role);
       if (isTeamAccess && !isInternalUser) {
         localStorage.removeItem('token');
         localStorage.removeItem('role');
@@ -95,17 +105,17 @@ const Login = ({ accessType: forcedAccessType = null }) => {
       }
 
       if (isInternalUser) {
-        if (data.user.mustChangePassword) {
+        if (normalizedUser.mustChangePassword) {
           navigate('/alterar-senha');
           return;
         }
-        if (data.user.requiresEmailVerification) {
+        if (normalizedUser.requiresEmailVerification) {
           navigate('/verificar-email');
           return;
         }
         navigate('/admin');
       } else {
-        if (data.user.requiresEmailVerification) {
+        if (normalizedUser.requiresEmailVerification) {
           navigate('/verificar-email');
           return;
         }

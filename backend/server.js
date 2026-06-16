@@ -33,12 +33,6 @@ const DEFAULT_WHATSAPP_PHONE = '559985127056';
 const WHATSAPP_AUTH_DIR = path.join(__dirname, 'whatsapp-session');
 const WHATSAPP_MEDIA_DIR = path.join(__dirname, 'uploads', 'whatsapp');
 const execFileAsync = promisify(execFile);
-const WHATSAPP_NEW_LEAD_NOTIFY_PHONES = [
-  '559991675608',
-  '559985127056',
-  '559984632324',
-  '559992276744',
-];
 const ROUND_ROBIN_SELLERS = [
   { position: 1, phone: '5599984632324', name: 'Vendedor 1' },
   { position: 2, phone: '5599992276744', name: 'Vendedor 2' },
@@ -362,6 +356,23 @@ const whatsAppPhoneVariants = (value) => {
   return [...variants].filter(Boolean);
 };
 
+const buildNormalizedPhoneInSql = (column, count) => (
+  `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${column}, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') IN (${Array.from({ length: count }, () => '?').join(', ')})`
+);
+
+const isKnownBusinessPhone = async (phoneVariants = []) => {
+  if (!phoneVariants.length) return false;
+  const whereUsuarios = buildNormalizedPhoneInSql('whatsapp', phoneVariants.length);
+  const whereClientes = buildNormalizedPhoneInSql('whatsapp', phoneVariants.length);
+  const whereContratos = buildNormalizedPhoneInSql('clienteTelefone', phoneVariants.length);
+  const [usuario, cliente, contrato] = await Promise.all([
+    db.get(`SELECT id FROM usuarios WHERE ${whereUsuarios} LIMIT 1`, ...phoneVariants),
+    db.get(`SELECT id FROM clientes WHERE ${whereClientes} LIMIT 1`, ...phoneVariants),
+    db.get(`SELECT id FROM contratos WHERE ${whereContratos} LIMIT 1`, ...phoneVariants),
+  ]);
+  return Boolean(usuario || cliente || contrato);
+};
+
 // Um contato individual real tem telefone de 10 a 13 dígitos. IDs de grupo,
 // canal/newsletter e artefatos de LID têm 14+ dígitos e não são telefones —
 // nunca devem virar conversa.
@@ -614,17 +625,22 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
       ...phoneVariants
     );
-    // Contatos salvos podem chegar como LID. Eles só atualizam conversas já
-    // existentes e nunca entram como um lead novo na fila.
-    if (!allowNewLead && !previousConversation) return;
-
     const leadPlaceholders = phoneVariants.map(() => '?').join(', ');
     let lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
+    const rescuedUnknownLidLead = !allowNewLead
+      && !previousConversation
+      && !lead
+      && !(await isKnownBusinessPhone(phoneVariants));
+    const effectiveAllowNewLead = allowNewLead || rescuedUnknownLidLead;
+    // Contatos salvos/LID conhecidos não entram como lead novo. Se o número não
+    // for conhecido no sistema, liberamos a captura para não perder lead real.
+    if (!effectiveAllowNewLead && !previousConversation) return;
+
     let owner = previousConversation?.assignedUserId
       ? { id: previousConversation.assignedUserId, nome: previousConversation.assignedUserName }
       : null;
 
-    if (!lead && allowNewLead) {
+    if (!lead && effectiveAllowNewLead) {
       owner = await getNextLeadOwner();
       const result = await db.run(
         `INSERT INTO leads
@@ -647,7 +663,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       io.emit('novo_lead', lead);
     }
 
-    const shouldNotifyNewLead = allowNewLead && (!previousConversation || ['Finalizada', 'Arquivada'].includes(previousConversation.status));
+    const shouldNotifyNewLead = effectiveAllowNewLead && (!previousConversation || ['Finalizada', 'Arquivada'].includes(previousConversation.status));
     const conversation = await upsertWhatsAppConversation({
       leadId: lead?.id || previousConversation?.leadId || null,
       nome: lead?.nome || previousConversation?.clienteNome || message.pushName || phone,
@@ -1139,6 +1155,37 @@ const convertAudioToWhatsAppVoice = async (buffer, inputMimeType = 'audio/webm')
   }
 };
 
+const getNewLeadNotificationRecipients = async (conversation = {}, options = {}) => {
+  const recipients = [];
+  const seenPhones = new Set();
+  const pushRecipient = (user, roleLabel) => {
+    const phone = normalizeWhatsAppPhone(user?.whatsapp);
+    if (!phone || seenPhones.has(phone)) return;
+    seenPhones.add(phone);
+    recipients.push({
+      phone,
+      nome: user?.nome || user?.username || roleLabel || 'Equipe DRM',
+      role: roleLabel || user?.role || '',
+    });
+  };
+
+  let assignedUser = null;
+  if (conversation?.assignedUserId) {
+    assignedUser = await db.get('SELECT id, nome, username, whatsapp, role FROM usuarios WHERE id = ? AND active = 1', conversation.assignedUserId);
+  } else if (options?.assignedUsername) {
+    assignedUser = await db.get('SELECT id, nome, username, whatsapp, role FROM usuarios WHERE username = ? AND active = 1', options.assignedUsername);
+  }
+  if (!assignedUser && options?.fallbackToRoundRobin) {
+    assignedUser = await getNextLeadOwner();
+  }
+  if (assignedUser) pushRecipient(assignedUser, 'consultor');
+
+  const masterUser = await db.get('SELECT id, nome, username, whatsapp, role FROM usuarios WHERE lower(username) = ? AND active = 1', MASTER_ADMIN_USERNAME);
+  if (masterUser) pushRecipient(masterUser, 'master');
+
+  return recipients;
+};
+
 const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', test = false } = {}) => {
   const notice = buildWhatsAppNewLeadNotice({
     nome: conversation?.clienteNome,
@@ -1146,16 +1193,25 @@ const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', 
     mensagem: text,
     teste: test,
   });
+  const recipients = await getNewLeadNotificationRecipients(conversation, {
+    assignedUsername: conversation?.assignedUsername,
+    fallbackToRoundRobin: test,
+  });
+  if (!recipients.length) {
+    throw new Error('Nenhum destinatário válido para o aviso de lead novo.');
+  }
   const results = await Promise.allSettled(
-    WHATSAPP_NEW_LEAD_NOTIFY_PHONES.map(phone => sendWhatsAppTextMessage(phone, notice))
+    recipients.map(item => sendWhatsAppTextMessage(item.phone, notice))
   );
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
-      console.error(`Erro ao avisar consultor ${WHATSAPP_NEW_LEAD_NOTIFY_PHONES[index]} sobre lead novo:`, result.reason?.message || result.reason);
+      console.error(`Erro ao avisar ${recipients[index]?.phone} sobre lead novo:`, result.reason?.message || result.reason);
     }
   });
   return results.map((result, index) => ({
-    phone: WHATSAPP_NEW_LEAD_NOTIFY_PHONES[index],
+    phone: recipients[index]?.phone,
+    nome: recipients[index]?.nome || '',
+    role: recipients[index]?.role || '',
     ok: result.status === 'fulfilled',
     status: result.status === 'fulfilled' ? result.value?.status : 'erro',
     error: result.status === 'rejected' ? result.reason?.message || 'Falha ao enviar aviso.' : '',
@@ -1281,6 +1337,7 @@ const hashResetToken = (token) => crypto.createHash('sha256').update(token).dige
 const createResetToken = () => crypto.randomBytes(32).toString('hex');
 
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
+const isLocalDevelopment = process.env.NODE_ENV !== 'production';
 
 const isRealEmail = (value = '') => {
   const email = normalizeEmail(value);
@@ -1295,7 +1352,8 @@ const hasVerifiedEmail = (user = {}) => isRealEmail(user.email) && Boolean(user.
 const isInternalStaffUser = (user = {}) => user.userType === 'interno'
   || ['ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(user.role);
 
-const requiresEmailVerification = (user = {}) => !isInternalStaffUser(user) && !hasVerifiedEmail(user);
+const requiresEmailVerification = (user = {}) => !isLocalDevelopment && !isInternalStaffUser(user) && !hasVerifiedEmail(user);
+const shouldForcePasswordChange = (user = {}) => !isLocalDevelopment && Boolean(user.mustChangePassword);
 
 const createEmailCode = () => String(crypto.randomInt(100000, 1000000));
 
@@ -1693,7 +1751,7 @@ const sanitizeUser = (user) => ({
   role: user.role,
   permissions: user.permissions,
   quickActions: parseQuickActions(user.quickActions),
-  mustChangePassword: Boolean(user.mustChangePassword),
+  mustChangePassword: shouldForcePasswordChange(user),
   emailVerified: hasVerifiedEmail(user),
   requiresEmailVerification: requiresEmailVerification(user),
 });
@@ -1720,7 +1778,7 @@ const authRequired = async (req, res, next) => {
         userType: 'interno',
         permissions: parsePermissions(user.permissions),
       };
-      if (Boolean(req.user.mustChangePassword) && !isPasswordChangeRoute) {
+      if (shouldForcePasswordChange(req.user) && !isPasswordChangeRoute) {
         return res.status(403).json({ message: 'Troque a senha temporária para liberar o painel.', mustChangePassword: true });
       }
       if (requiresEmailVerification(req.user) && !isEmailVerificationRoute && !isPasswordChangeRoute) {
@@ -2320,8 +2378,32 @@ const appendProjetoTimeline = (projeto, event) => [
 
 const parseOs = (os = {}) => ({
   ...os,
+  numeroOs: os.numeroOs || (os.id ? `OS-${String(os.id).padStart(5, '0')}` : ''),
+  dados: parseJsonField(os.dados, {}),
   fotos: Array.isArray(os.fotos) ? os.fotos : parseJsonField(os.fotos, []),
 });
+
+const loadOsComFotos = async (osId) => {
+  const os = await db.get('SELECT * FROM ordens_servico WHERE id = ?', osId);
+  if (!os) return null;
+  const fotos = await db.all('SELECT * FROM os_fotos WHERE osId = ? ORDER BY id DESC', osId);
+  return parseOs({ ...os, fotos });
+};
+
+const loadOrdensServicoComFotos = async (user) => {
+  const rows = can(user, 'verTodosLeads')
+    ? await db.all('SELECT * FROM ordens_servico ORDER BY id DESC')
+    : await db.all('SELECT * FROM ordens_servico WHERE responsavelId = ? OR responsavelId IS NULL ORDER BY id DESC', user.id);
+  if (!rows.length) return [];
+  const ids = rows.map((item) => item.id);
+  const fotos = await db.all(`SELECT * FROM os_fotos WHERE osId IN (${ids.map(() => '?').join(',')}) ORDER BY id DESC`, ...ids);
+  const fotosPorOs = fotos.reduce((acc, foto) => {
+    acc[foto.osId] = acc[foto.osId] || [];
+    acc[foto.osId].push(foto);
+    return acc;
+  }, {});
+  return rows.map((os) => parseOs({ ...os, fotos: fotosPorOs[os.id] || [] }));
+};
 
 const isClientUser = (user = {}) => user.userType === 'cliente' || user.role === 'CLIENTE';
 
@@ -3478,6 +3560,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
 
     CREATE TABLE IF NOT EXISTS ordens_servico (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      numeroOs TEXT,
       clienteNome TEXT NOT NULL,
       clienteTelefone TEXT,
       contratoId INTEGER,
@@ -3490,6 +3573,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       responsavelNome TEXT,
       solucao TEXT,
       observacoes TEXT,
+      dados TEXT,
       dataAbertura TEXT,
       dataAtualizacao TEXT,
       dataFechamento TEXT
@@ -3499,6 +3583,8 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       osId INTEGER NOT NULL,
       dataUrl TEXT NOT NULL,
+      tipo TEXT,
+      mimeType TEXT,
       descricao TEXT,
       criadoPorId INTEGER,
       criadoPorNome TEXT,
@@ -3935,6 +4021,28 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   const existingAtividadeColumns = atividadeColumns.map(column => column.name);
   if (!existingAtividadeColumns.includes('origem')) {
     await db.exec('ALTER TABLE atividades ADD COLUMN origem TEXT');
+  }
+
+  const osColumns = await db.all('PRAGMA table_info(ordens_servico)');
+  const existingOsColumns = osColumns.map(column => column.name);
+  for (const [field, definition] of [
+    ['numeroOs', 'TEXT'],
+    ['dados', 'TEXT'],
+  ]) {
+    if (!existingOsColumns.includes(field)) {
+      await db.exec(`ALTER TABLE ordens_servico ADD COLUMN ${field} ${definition}`);
+    }
+  }
+
+  const osFotosColumns = await db.all('PRAGMA table_info(os_fotos)');
+  const existingOsFotosColumns = osFotosColumns.map(column => column.name);
+  for (const [field, definition] of [
+    ['tipo', 'TEXT'],
+    ['mimeType', 'TEXT'],
+  ]) {
+    if (!existingOsFotosColumns.includes(field)) {
+      await db.exec(`ALTER TABLE os_fotos ADD COLUMN ${field} ${definition}`);
+    }
   }
 
   const usuarioColumns = await db.all('PRAGMA table_info(usuarios)');
@@ -5380,9 +5488,14 @@ app.post('/api/admin/whatsapp/test-new-lead-notifications', authRequired, requir
   if (!isMasterAdminUser(req.user)) {
     return res.status(403).json({ message: 'Apenas o ADM master pode enviar teste de aviso para os consultores.' });
   }
+  const assignedUser = req.body?.assignedUserId
+    ? await db.get('SELECT id, username FROM usuarios WHERE id = ? AND active = 1', req.body.assignedUserId)
+    : null;
   const fakeConversation = {
     clienteNome: 'Teste DRM Energia Solar',
     clienteTelefone: normalizeWhatsAppPhone(req.body?.telefone || DEFAULT_WHATSAPP_PHONE),
+    assignedUserId: assignedUser?.id || null,
+    assignedUsername: assignedUser?.username || '',
   };
   const results = await notifyConsultantsAboutNewWhatsAppLead({
     conversation: fakeConversation,
@@ -7120,9 +7233,7 @@ const canAccessOs = (user, os) => (
 );
 
 app.get('/api/admin/ordens-servico', authRequired, requirePermission('ordensServico'), async (req, res) => {
-  const rows = can(req.user, 'verTodosLeads')
-    ? await db.all('SELECT * FROM ordens_servico ORDER BY id DESC')
-    : await db.all('SELECT * FROM ordens_servico WHERE responsavelId = ? OR responsavelId IS NULL ORDER BY id DESC', req.user.id);
+  const rows = await loadOrdensServicoComFotos(req.user);
   res.json(rows);
 });
 
@@ -7137,6 +7248,7 @@ app.post('/api/admin/ordens-servico', authRequired, requirePermission('ordensSer
     prioridade = 'Normal',
     responsavelId = null,
     observacoes = '',
+    dados = {},
   } = req.body;
 
   if (!String(clienteNome || '').trim() || !String(problema || '').trim()) {
@@ -7151,8 +7263,9 @@ app.post('/api/admin/ordens-servico', authRequired, requirePermission('ordensSer
   const now = new Date().toISOString();
   const result = await db.run(
     `INSERT INTO ordens_servico
-      (clienteNome, clienteTelefone, contratoId, origem, problema, categoria, prioridade, status, responsavelId, responsavelNome, observacoes, dataAbertura, dataAtualizacao)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (numeroOs, clienteNome, clienteTelefone, contratoId, origem, problema, categoria, prioridade, status, responsavelId, responsavelNome, observacoes, dados, dataAbertura, dataAtualizacao)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    null,
     clienteNome,
     clienteTelefone,
     contratoId || null,
@@ -7164,11 +7277,14 @@ app.post('/api/admin/ordens-servico', authRequired, requirePermission('ordensSer
     responsavel?.id || null,
     responsavel?.nome || null,
     observacoes,
+    JSON.stringify(dados || {}),
     now,
     now
   );
 
-  const os = await db.get('SELECT * FROM ordens_servico WHERE id = ?', result.lastID);
+  const numeroOs = `OS-${String(result.lastID).padStart(5, '0')}`;
+  await db.run('UPDATE ordens_servico SET numeroOs = ? WHERE id = ?', numeroOs, result.lastID);
+  const os = await loadOsComFotos(result.lastID);
   io.emit('os_atualizada', os);
   res.status(201).json(os);
 });
@@ -7178,40 +7294,108 @@ app.put('/api/admin/ordens-servico/:id', authRequired, requirePermission('ordens
   if (!os) return res.status(404).json({ message: 'O.S não encontrada.' });
   if (!canAccessOs(req.user, os)) return res.status(403).json({ message: 'Você não pode alterar esta O.S.' });
 
-  const { status, prioridade, responsavelId, solucao, observacoes, categoria } = req.body;
+  const has = (field) => Object.prototype.hasOwnProperty.call(req.body, field);
+  const {
+    status,
+    prioridade,
+    responsavelId,
+    solucao,
+    observacoes,
+    categoria,
+    dados,
+    clienteNome,
+    clienteTelefone,
+    contratoId,
+    origem,
+    problema,
+  } = req.body;
   let responsavelNome = null;
-  if (responsavelId) {
+  if (has('responsavelId') && responsavelId) {
     const user = await db.get('SELECT nome FROM usuarios WHERE id = ?', responsavelId);
     responsavelNome = user?.nome || null;
+  } else if (!has('responsavelId')) {
+    responsavelNome = os.responsavelNome;
   }
   const nextStatus = status || os.status;
   const now = new Date().toISOString();
+  const mergedDados = dados ? { ...parseJsonField(os.dados, {}), ...dados } : null;
 
   await db.run(
     `UPDATE ordens_servico
-     SET status = COALESCE(?, status),
-         prioridade = COALESCE(?, prioridade),
-         categoria = COALESCE(?, categoria),
-         responsavelId = COALESCE(?, responsavelId),
-         responsavelNome = COALESCE(?, responsavelNome),
-         solucao = COALESCE(?, solucao),
-         observacoes = COALESCE(?, observacoes),
+     SET clienteNome = ?,
+         clienteTelefone = ?,
+         contratoId = ?,
+         origem = ?,
+         problema = ?,
+         status = ?,
+         prioridade = ?,
+         categoria = ?,
+         responsavelId = ?,
+         responsavelNome = ?,
+         solucao = ?,
+         observacoes = ?,
+         dados = ?,
          dataAtualizacao = ?,
          dataFechamento = ?
      WHERE id = ?`,
-    status || null,
-    prioridade || null,
-    categoria || null,
-    responsavelId || null,
+    has('clienteNome') ? String(clienteNome || '').trim() || os.clienteNome : os.clienteNome,
+    has('clienteTelefone') ? String(clienteTelefone || '').trim() : os.clienteTelefone,
+    has('contratoId') ? (contratoId || null) : os.contratoId,
+    has('origem') ? String(origem || '').trim() || os.origem : os.origem,
+    has('problema') ? String(problema || '').trim() || os.problema : os.problema,
+    status || os.status,
+    prioridade || os.prioridade,
+    categoria || os.categoria,
+    has('responsavelId') ? (responsavelId || null) : os.responsavelId,
     responsavelNome,
-    solucao || null,
-    observacoes || null,
+    has('solucao') ? (solucao || '') : (os.solucao || ''),
+    has('observacoes') ? (observacoes || '') : (os.observacoes || ''),
+    mergedDados ? JSON.stringify(mergedDados) : os.dados,
     now,
-    nextStatus === 'Resolvida' || nextStatus === 'Cancelada' ? now : os.dataFechamento,
+    nextStatus === 'Resolvida' || nextStatus === 'Cancelada' || nextStatus === 'Encerrada' ? now : os.dataFechamento,
     req.params.id
   );
 
-  const updated = await db.get('SELECT * FROM ordens_servico WHERE id = ?', req.params.id);
+  const updated = await loadOsComFotos(req.params.id);
+  io.emit('os_atualizada', updated);
+  res.json(updated);
+});
+
+app.post('/api/admin/ordens-servico/:id/evidencias', authRequired, requirePermission('ordensServico'), async (req, res) => {
+  const os = await db.get('SELECT * FROM ordens_servico WHERE id = ?', req.params.id);
+  if (!os) return res.status(404).json({ message: 'O.S não encontrada.' });
+  if (!canAccessOs(req.user, os)) return res.status(403).json({ message: 'Você não pode alterar esta O.S.' });
+
+  const { dataUrl, descricao = '', tipo = 'foto', mimeType = '' } = req.body;
+  const validated = validateProjectDocumentDataUrl(dataUrl);
+  if (!validated.valid) return res.status(400).json({ message: validated.message });
+
+  const now = new Date().toISOString();
+  await db.run(
+    `INSERT INTO os_fotos (osId, dataUrl, tipo, mimeType, descricao, criadoPorId, criadoPorNome, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    req.params.id,
+    validated.dataUrl,
+    tipo,
+    mimeType || '',
+    descricao,
+    req.user.id,
+    req.user.nome || req.user.username,
+    now
+  );
+
+  const updated = await loadOsComFotos(req.params.id);
+  io.emit('os_atualizada', updated);
+  res.status(201).json(updated);
+});
+
+app.delete('/api/admin/ordens-servico/:id/evidencias/:evidenciaId', authRequired, requirePermission('ordensServico'), async (req, res) => {
+  const os = await db.get('SELECT * FROM ordens_servico WHERE id = ?', req.params.id);
+  if (!os) return res.status(404).json({ message: 'O.S não encontrada.' });
+  if (!canAccessOs(req.user, os)) return res.status(403).json({ message: 'Você não pode alterar esta O.S.' });
+
+  await db.run('DELETE FROM os_fotos WHERE id = ? AND osId = ?', req.params.evidenciaId, req.params.id);
+  const updated = await loadOsComFotos(req.params.id);
   io.emit('os_atualizada', updated);
   res.json(updated);
 });
