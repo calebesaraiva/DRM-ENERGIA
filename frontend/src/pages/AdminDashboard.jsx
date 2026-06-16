@@ -7073,29 +7073,69 @@ const AdminDashboard = () => {
                           </div>
                         )}
                         <div className="os-form-grid two" style={{ marginTop: '0.5rem' }}>
-                          <input placeholder="Contrato / referência" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
-                          <input placeholder="Sistema / potência" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
-                          <input placeholder="Data da instalação" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
-                          <input placeholder="Consultor responsável" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
+                          <div className="os-field-wrap">
+                            <label className="os-field-label">Contrato / referência</label>
+                            <input placeholder="Nº do contrato ou código interno" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
+                          </div>
+                          <div className="os-field-wrap">
+                            <label className="os-field-label">Sistema instalado (potência/painéis)</label>
+                            <input placeholder="Ex: 5kWp, 12 painéis 410W" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
+                          </div>
+                          <div className="os-field-wrap">
+                            <label className="os-field-label">Data da instalação original</label>
+                            <input placeholder="dd/mm/aaaa" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
+                          </div>
+                          <div className="os-field-wrap">
+                            <label className="os-field-label">Consultor responsável pela venda</label>
+                            <input placeholder="Nome do consultor" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
+                          </div>
                         </div>
                       </div>
                     ) : (
                       <div className="os-form-grid two">
-                        <input placeholder="Nome do cliente" value={osForm.clienteNome} onChange={(event) => setOsForm(prev => ({ ...prev, clienteNome: event.target.value }))} required />
-                        <input placeholder="Telefone / WhatsApp" value={osForm.clienteTelefone} onChange={(event) => setOsForm(prev => ({ ...prev, clienteTelefone: event.target.value }))} />
-                        <input placeholder="CPF/CNPJ" value={osForm.cpfCnpj} onChange={(event) => setOsForm(prev => ({ ...prev, cpfCnpj: event.target.value }))} />
-                        <input placeholder="Cidade" value={osForm.cidade} onChange={(event) => setOsForm(prev => ({ ...prev, cidade: event.target.value }))} />
-                        <input placeholder="Contrato / referência" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
-                        <input placeholder="Sistema / potência" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
-                        <input placeholder="Data da instalação" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
-                        <input placeholder="Consultor responsável" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
-                        <textarea className="span-2" placeholder="Endereço completo" value={osForm.endereco} onChange={(event) => setOsForm(prev => ({ ...prev, endereco: event.target.value }))} />
+                        <div className="os-field-wrap">
+                          <label className="os-field-label">Nome completo do cliente *</label>
+                          <input placeholder="Ex: João da Silva" value={osForm.clienteNome} onChange={(event) => setOsForm(prev => ({ ...prev, clienteNome: event.target.value }))} required />
+                        </div>
+                        <div className="os-field-wrap">
+                          <label className="os-field-label">Telefone / WhatsApp</label>
+                          <input placeholder="(99) 99999-9999" value={osForm.clienteTelefone} onChange={(event) => setOsForm(prev => ({ ...prev, clienteTelefone: event.target.value }))} />
+                        </div>
+                        <div className="os-field-wrap">
+                          <label className="os-field-label">CPF ou CNPJ</label>
+                          <input placeholder="000.000.000-00" value={osForm.cpfCnpj} onChange={(event) => setOsForm(prev => ({ ...prev, cpfCnpj: event.target.value }))} />
+                        </div>
+                        <div className="os-field-wrap">
+                          <label className="os-field-label">Cidade</label>
+                          <input placeholder="Ex: Imperatriz - MA" value={osForm.cidade} onChange={(event) => setOsForm(prev => ({ ...prev, cidade: event.target.value }))} />
+                        </div>
+                        <div className="os-field-wrap">
+                          <label className="os-field-label">Contrato / referência</label>
+                          <input placeholder="Nº do contrato ou código interno" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
+                        </div>
+                        <div className="os-field-wrap">
+                          <label className="os-field-label">Sistema instalado (potência/painéis)</label>
+                          <input placeholder="Ex: 5kWp, 12 painéis 410W" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
+                        </div>
+                        <div className="os-field-wrap">
+                          <label className="os-field-label">Data da instalação original</label>
+                          <input placeholder="dd/mm/aaaa" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
+                        </div>
+                        <div className="os-field-wrap">
+                          <label className="os-field-label">Consultor responsável pela venda</label>
+                          <input placeholder="Nome do consultor" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
+                        </div>
+                        <div className="os-field-wrap span-2">
+                          <label className="os-field-label">Endereço completo do cliente</label>
+                          <textarea placeholder="Rua, número, bairro, cidade - UF, CEP" value={osForm.endereco} onChange={(event) => setOsForm(prev => ({ ...prev, endereco: event.target.value }))} />
+                        </div>
                       </div>
                     )}
                   </section>
 
                   <section className="os-detail-card">
                     <strong>Motivo da O.S</strong>
+                    <label className="os-field-label">Selecione o tipo de atendimento</label>
                     <div className="os-chip-selector">
                       {OS_MOTIVO_OPTIONS.map((item) => (
                         <button
@@ -7108,8 +7148,9 @@ const AdminDashboard = () => {
                         </button>
                       ))}
                     </div>
+                    <label className="os-field-label">Descrição detalhada do problema (obrigatório)</label>
                     <textarea
-                      placeholder="Descrição detalhada do problema"
+                      placeholder="Descreva com detalhes o que o cliente relatou — erro no inversor, código de falha, comportamento do sistema..."
                       value={osForm.descricaoProblema}
                       onChange={(event) => setOsForm(prev => ({ ...prev, descricaoProblema: event.target.value, problema: event.target.value }))}
                       required
@@ -7118,6 +7159,7 @@ const AdminDashboard = () => {
 
                   <section className="os-detail-card">
                     <strong>Informações do atendimento</strong>
+                    <label className="os-field-label">Prioridade do atendimento</label>
                     <div className="os-priority-row">
                       {OS_PRIORITY_OPTIONS.map((priority) => (
                         <label key={priority} className={`os-radio-pill ${osForm.prioridade === priority ? 'active' : ''}`}>
@@ -7132,24 +7174,45 @@ const AdminDashboard = () => {
                       ))}
                     </div>
                     <div className="os-form-grid two">
-                      <input type="date" value={osForm.dataDesejada} onChange={(event) => setOsForm(prev => ({ ...prev, dataDesejada: event.target.value }))} />
-                      <input type="date" value={osForm.prazoMaximo} onChange={(event) => setOsForm(prev => ({ ...prev, prazoMaximo: event.target.value }))} />
-                      <select value={osForm.responsavelId} onChange={(event) => setOsForm(prev => ({ ...prev, responsavelId: event.target.value }))}>
-                        <option value="">Selecionar técnico / equipe</option>
-                        {usuarios.filter(user => user.active && (user.role === 'ADM' || user.permissions?.equipeTecnica || user.permissions?.ordensServico)).map(user => (
-                          <option key={user.id} value={user.id}>{user.nome}</option>
-                        ))}
-                      </select>
-                      <select value={osForm.origem} onChange={(event) => setOsForm(prev => ({ ...prev, origem: event.target.value }))}>
-                        <option>WhatsApp</option>
-                        <option>Site</option>
-                        <option>Equipe técnica</option>
-                        <option>Pós-venda</option>
-                        <option>Cliente recorrente</option>
-                      </select>
-                      <input placeholder="Materiais prévios" value={osForm.materiaisPrevios} onChange={(event) => setOsForm(prev => ({ ...prev, materiaisPrevios: event.target.value }))} />
-                      <input placeholder="Contato no local" value={osForm.contatoLocal} onChange={(event) => setOsForm(prev => ({ ...prev, contatoLocal: event.target.value }))} />
-                      <textarea className="span-2" placeholder="Observações internas" value={osForm.observacoesInternas} onChange={(event) => setOsForm(prev => ({ ...prev, observacoesInternas: event.target.value, observacoes: event.target.value }))} />
+                      <div className="os-field-wrap">
+                        <label className="os-field-label">Data desejada para o atendimento</label>
+                        <input type="date" value={osForm.dataDesejada} onChange={(event) => setOsForm(prev => ({ ...prev, dataDesejada: event.target.value }))} />
+                      </div>
+                      <div className="os-field-wrap">
+                        <label className="os-field-label">Prazo máximo (limite para concluir)</label>
+                        <input type="date" value={osForm.prazoMaximo} onChange={(event) => setOsForm(prev => ({ ...prev, prazoMaximo: event.target.value }))} />
+                      </div>
+                      <div className="os-field-wrap">
+                        <label className="os-field-label">Técnico / equipe responsável</label>
+                        <select value={osForm.responsavelId} onChange={(event) => setOsForm(prev => ({ ...prev, responsavelId: event.target.value }))}>
+                          <option value="">Selecionar técnico / equipe</option>
+                          {usuarios.filter(user => user.active && (user.role === 'ADM' || user.permissions?.equipeTecnica || user.permissions?.ordensServico)).map(user => (
+                            <option key={user.id} value={user.id}>{user.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="os-field-wrap">
+                        <label className="os-field-label">Canal de origem do chamado</label>
+                        <select value={osForm.origem} onChange={(event) => setOsForm(prev => ({ ...prev, origem: event.target.value }))}>
+                          <option>WhatsApp</option>
+                          <option>Site</option>
+                          <option>Equipe técnica</option>
+                          <option>Pós-venda</option>
+                          <option>Cliente recorrente</option>
+                        </select>
+                      </div>
+                      <div className="os-field-wrap">
+                        <label className="os-field-label">Materiais prévios (o que levar)</label>
+                        <input placeholder="Ex: Fusível CC, MC4, Cabo..." value={osForm.materiaisPrevios} onChange={(event) => setOsForm(prev => ({ ...prev, materiaisPrevios: event.target.value }))} />
+                      </div>
+                      <div className="os-field-wrap">
+                        <label className="os-field-label">Contato no local (pessoa que recebe)</label>
+                        <input placeholder="Nome e telefone de quem abre a porteira..." value={osForm.contatoLocal} onChange={(event) => setOsForm(prev => ({ ...prev, contatoLocal: event.target.value }))} />
+                      </div>
+                      <div className="os-field-wrap span-2">
+                        <label className="os-field-label">Observações internas (não visível ao cliente)</label>
+                        <textarea placeholder="Anote detalhes úteis para a equipe técnica..." value={osForm.observacoesInternas} onChange={(event) => setOsForm(prev => ({ ...prev, observacoesInternas: event.target.value, observacoes: event.target.value }))} />
+                      </div>
                     </div>
                     <button className="btn btn-primary" type="submit">Abrir O.S</button>
                   </section>

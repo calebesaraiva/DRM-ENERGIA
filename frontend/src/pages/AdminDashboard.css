@@ -3882,6 +3882,29 @@
   margin-bottom: -0.4rem;
 }
 
+.os-field-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.3rem;
+}
+
+.os-field-wrap {
+  display: grid;
+  gap: 0;
+}
+
+.os-field-wrap.span-2 {
+  grid-column: span 2;
+}
+
+.os-field-wrap input,
+.os-field-wrap select,
+.os-field-wrap textarea {
+  width: 100%;
+}
+
 .status-chip {
   display: inline-block;
   padding: 0.25rem 0.65rem;
