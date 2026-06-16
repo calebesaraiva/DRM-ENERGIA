@@ -5142,7 +5142,7 @@ app.post('/api/admin/projetos/:id/documentos', authRequired, requirePermission('
   const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
   if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
 
-  const { tipo, nome, descricao, dataUrl, arquivo, categoria } = req.body;
+  const { tipo, nome, descricao, dataUrl, arquivo, categoria, localizacaoCliente } = req.body;
   const tiposValidos = ['cliente', 'projetista', 'concessionaria'];
   if (!tiposValidos.includes(tipo)) return res.status(400).json({ message: 'Tipo de documento inválido.' });
   const validatedDocument = validateProjectDocumentDataUrl(dataUrl);
@@ -5157,6 +5157,7 @@ app.post('/api/admin/projetos/:id/documentos', authRequired, requirePermission('
     arquivo: arquivo || '',
     dataUrl: validatedDocument.dataUrl,
     categoria: categoria || tipo,
+    localizacaoCliente: localizacaoCliente || '',
     status: dataUrl ? 'Concluído' : 'Pendente',
     responsavel: req.user.nome || req.user.username,
     data: new Date().toISOString().split('T')[0],
@@ -5171,7 +5172,7 @@ app.put('/api/admin/projetos/:id/documentos/:docId', authRequired, requirePermis
   const projeto = await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id);
   if (!projeto) return res.status(404).json({ message: 'Projeto não encontrado.' });
 
-  const { tipo, status, dataUrl, arquivo } = req.body;
+  const { tipo, status, dataUrl, arquivo, localizacaoCliente } = req.body;
   const tiposValidos = ['cliente', 'projetista', 'concessionaria'];
   if (!tiposValidos.includes(tipo)) return res.status(400).json({ message: 'Tipo de documento inválido.' });
   const validatedDocument = dataUrl === undefined ? null : validateProjectDocumentDataUrl(dataUrl);
@@ -5182,7 +5183,15 @@ app.put('/api/admin/projetos/:id/documentos/:docId', authRequired, requirePermis
   const idx = docs.findIndex(d => d.id === req.params.docId);
   if (idx === -1) return res.status(404).json({ message: 'Documento não encontrado.' });
 
-  docs[idx] = { ...docs[idx], status: status || docs[idx].status, dataUrl: validatedDocument ? validatedDocument.dataUrl : docs[idx].dataUrl, arquivo: arquivo || docs[idx].arquivo, responsavel: req.user.nome || req.user.username, data: new Date().toISOString().split('T')[0] };
+  docs[idx] = {
+    ...docs[idx],
+    status: status || docs[idx].status,
+    dataUrl: validatedDocument ? validatedDocument.dataUrl : docs[idx].dataUrl,
+    arquivo: arquivo || docs[idx].arquivo,
+    localizacaoCliente: localizacaoCliente !== undefined ? localizacaoCliente : docs[idx].localizacaoCliente,
+    responsavel: req.user.nome || req.user.username,
+    data: new Date().toISOString().split('T')[0],
+  };
   await db.run(`UPDATE projetos SET ${field} = ?, updatedAt = ? WHERE id = ?`, JSON.stringify(docs), new Date().toISOString(), req.params.id);
   res.json(parseProjeto(await db.get('SELECT * FROM projetos WHERE id = ?', req.params.id)));
 });

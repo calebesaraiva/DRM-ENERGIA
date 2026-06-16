@@ -742,7 +742,7 @@ const AdminDashboard = () => {
   const [homoView, setHomoView] = useState('fila');
   const [homoDetalheTab, setHomoDetalheTab] = useState('cliente');
   const [homoStatusFilter, setHomoStatusFilter] = useState('todos');
-  const [homoDocUpload, setHomoDocUpload] = useState({ tipo: 'cliente', nome: '', descricao: '', arquivo: null });
+  const [homoDocUpload, setHomoDocUpload] = useState({ tipo: 'cliente', nome: '', descricao: '', localizacaoCliente: '', arquivo: null });
   const [homoDocUploadLoading, setHomoDocUploadLoading] = useState(false);
   const [projetoDocumentPreview, setProjetoDocumentPreview] = useState(null);
 
@@ -2455,7 +2455,7 @@ const AdminDashboard = () => {
       });
       setProjetos(prev => prev.map(p => p.id === projetoId ? updated : p));
       setSelectedProjeto(updated);
-      setHomoDocUpload({ tipo: 'cliente', nome: '', descricao: '', arquivo: null });
+      setHomoDocUpload({ tipo: 'cliente', nome: '', descricao: '', localizacaoCliente: '', arquivo: null });
       showToast('Documento adicionado.', 'success');
     } catch (err) {
       showToast(err.message, 'error');
@@ -2468,6 +2468,31 @@ const AdminDashboard = () => {
     if (isValidProjectDocumentFile(file)) return true;
     showToast('Envie um arquivo PDF, JPG ou PNG com no máximo 15 MB.', 'error');
     return false;
+  };
+
+  const getClientLocationHref = (value = '') => {
+    const location = String(value || '').trim();
+    if (!location) return '';
+    if (/^https?:\/\//i.test(location)) return location;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+  };
+
+  const attachCurrentLocationToHomoDoc = () => {
+    if (!navigator.geolocation) {
+      showToast('Este dispositivo não liberou captura de localização.', 'error');
+      return;
+    }
+    showToast('Buscando localização do cliente...', 'info');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const mapsUrl = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+        setHomoDocUpload(prev => ({ ...prev, localizacaoCliente: mapsUrl }));
+        showToast('Localização anexada ao documento.', 'success');
+      },
+      () => showToast('Não foi possível capturar a localização. Verifique a permissão do navegador.', 'error'),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
   };
 
   const updateProjetoDocumento = async (projetoId, docId, tipo, data) => {
@@ -5551,6 +5576,14 @@ const AdminDashboard = () => {
                                         <td>
                                           <strong>{doc.nome}</strong>
                                           {doc.descricao && <p className="muted-text" style={{fontSize:'0.75rem',margin:0}}>{doc.descricao}</p>}
+                                          {doc.localizacaoCliente && (
+                                            <p className="homo-location-line">
+                                              <span>Localização:</span>
+                                              <a href={getClientLocationHref(doc.localizacaoCliente)} target="_blank" rel="noopener noreferrer">
+                                                Abrir no mapa
+                                              </a>
+                                            </p>
+                                          )}
                                         </td>
                                         <td className="homo-arquivo-cell">
                                           {doc.dataUrl ? (
@@ -5600,6 +5633,17 @@ const AdminDashboard = () => {
                                 <div className="homo-add-doc-form">
                                   <input className="cc-input" placeholder="Nome do documento" value={homoDocUpload.nome} onChange={e => setHomoDocUpload(prev => ({ ...prev, nome: e.target.value }))} />
                                   <input className="cc-input" placeholder="Descrição (opcional)" value={homoDocUpload.descricao} onChange={e => setHomoDocUpload(prev => ({ ...prev, descricao: e.target.value }))} />
+                                  <div className="homo-location-field">
+                                    <input
+                                      className="cc-input"
+                                      placeholder="Localização do cliente (link do Maps ou endereço)"
+                                      value={homoDocUpload.localizacaoCliente}
+                                      onChange={e => setHomoDocUpload(prev => ({ ...prev, localizacaoCliente: e.target.value }))}
+                                    />
+                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={attachCurrentLocationToHomoDoc}>
+                                      Usar GPS
+                                    </button>
+                                  </div>
                                   <label className="homo-file-upload-btn">
                                     {homoDocUpload.arquivo ? homoDocUpload.arquivo.name : 'Selecionar arquivo'}
                                     <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => {
@@ -5613,11 +5657,16 @@ const AdminDashboard = () => {
                                   </label>
                                   <button type="button" className="btn btn-primary" disabled={!homoDocUpload.nome.trim() || homoDocUploadLoading}
                                     onClick={() => {
+                                      const docPayload = {
+                                        nome: homoDocUpload.nome,
+                                        descricao: homoDocUpload.descricao,
+                                        localizacaoCliente: homoDocUpload.localizacaoCliente,
+                                      };
                                       if (!homoDocUpload.arquivo) {
-                                        uploadProjetoDocumento(selectedProjeto.id, tipo, { nome: homoDocUpload.nome, descricao: homoDocUpload.descricao });
+                                        uploadProjetoDocumento(selectedProjeto.id, tipo, docPayload);
                                       } else {
                                         const reader = new FileReader();
-                                        reader.onload = ev => uploadProjetoDocumento(selectedProjeto.id, tipo, { nome: homoDocUpload.nome, descricao: homoDocUpload.descricao, dataUrl: ev.target.result, arquivo: homoDocUpload.arquivo.name });
+                                        reader.onload = ev => uploadProjetoDocumento(selectedProjeto.id, tipo, { ...docPayload, dataUrl: ev.target.result, arquivo: homoDocUpload.arquivo.name });
                                         reader.readAsDataURL(homoDocUpload.arquivo);
                                       }
                                     }}>
@@ -5683,7 +5732,7 @@ const AdminDashboard = () => {
                               <div className="homo-add-doc-area">
                                 <h5>Adicionar documento da concessionária</h5>
                                 <div className="homo-add-doc-form">
-                                  <input className="cc-input" placeholder="Ex: Parecer de acesso, Protocolo..." value={homoDocUpload.tipo === 'concessionaria' ? homoDocUpload.nome : ''} onChange={e => setHomoDocUpload({ tipo: 'concessionaria', nome: e.target.value, descricao: '', arquivo: null })} />
+                                  <input className="cc-input" placeholder="Ex: Parecer de acesso, Protocolo..." value={homoDocUpload.tipo === 'concessionaria' ? homoDocUpload.nome : ''} onChange={e => setHomoDocUpload({ tipo: 'concessionaria', nome: e.target.value, descricao: '', localizacaoCliente: '', arquivo: null })} />
                                   <label className="homo-file-upload-btn">
                                     {homoDocUpload.tipo === 'concessionaria' && homoDocUpload.arquivo ? homoDocUpload.arquivo.name : 'Selecionar arquivo'}
                                     <input type="file" style={{display:'none'}} accept=".pdf,.jpg,.jpeg,.png" onChange={e => {

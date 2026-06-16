@@ -10966,6 +10966,31 @@
 }
 .homo-upload-btn { cursor: pointer; }
 
+.homo-location-line {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin: 0.22rem 0 0;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.homo-location-line span {
+  font-weight: 700;
+  color: #475569;
+}
+
+.homo-location-line a {
+  color: #ea580c;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.homo-location-line a:hover {
+  text-decoration: underline;
+}
+
 .homo-add-doc-area {
   margin-top: 1rem;
   padding-top: 1rem;
@@ -10979,6 +11004,15 @@
   align-items: flex-end;
 }
 .homo-add-doc-form .cc-input { flex: 1; min-width: 160px; }
+.homo-location-field {
+  display: flex;
+  gap: 0.45rem;
+  flex: 1 1 360px;
+  min-width: min(100%, 260px);
+}
+.homo-location-field .cc-input {
+  min-width: 0;
+}
 .homo-file-upload-btn {
   display: inline-flex;
   align-items: center;
