@@ -4206,6 +4206,133 @@
   width: fit-content;
 }
 
+.os-cliente-mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.os-mode-pills {
+  display: flex;
+  gap: 0.4rem;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.os-mode-pill {
+  padding: 0.32rem 0.9rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.os-mode-pill.active {
+  background: #fff;
+  color: #e87c1e;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.os-cliente-search-wrap {
+  display: grid;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.os-cliente-dropdown {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.os-cliente-dropdown li button {
+  display: grid;
+  width: 100%;
+  text-align: left;
+  padding: 0.6rem 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  gap: 0.1rem;
+  font: inherit;
+  transition: background 0.1s;
+}
+
+.os-cliente-dropdown li button:hover {
+  background: #f8fafc;
+}
+
+.os-cliente-dropdown li button strong {
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.os-cliente-dropdown li button span {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.os-cliente-empty {
+  font-size: 0.85rem;
+  color: #64748b;
+  padding: 0.5rem 0.25rem;
+}
+
+.os-link-btn {
+  background: none;
+  border: none;
+  color: #e87c1e;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.os-cliente-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 14px;
+}
+
+.os-cliente-selected-info {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.os-cliente-selected-info strong {
+  font-size: 0.95rem;
+  color: #15803d;
+}
+
+.os-cliente-selected-info span {
+  font-size: 0.78rem;
+  color: #4ade80;
+  color: #166534;
+}
+
 .os-signature-pad-wrap {
   display: grid;
   gap: 0.5rem;

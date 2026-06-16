@@ -906,6 +906,8 @@ const AdminDashboard = () => {
   const [osSistemaFilter, setOsSistemaFilter] = useState('');
   const [osContratoFilter, setOsContratoFilter] = useState('');
   const [osAtrasadasOnly, setOsAtrasadasOnly] = useState(false);
+  const [osClienteMode, setOsClienteMode] = useState('existente');
+  const [osClienteSearch, setOsClienteSearch] = useState('');
   const [osEvidenceUploadType, setOsEvidenceUploadType] = useState('Foto antes do serviço');
   const [priceForm, setPriceForm] = useState(emptyPriceForm);
   const [priceResult, setPriceResult] = useState(null);
@@ -7007,18 +7009,89 @@ const AdminDashboard = () => {
                 </div>
                 <div className="os-opening-grid">
                   <section className="os-detail-card">
-                    <strong>Dados do cliente</strong>
-                    <div className="os-form-grid two">
-                      <input placeholder="Nome do cliente" value={osForm.clienteNome} onChange={(event) => setOsForm(prev => ({ ...prev, clienteNome: event.target.value }))} required />
-                      <input placeholder="Telefone / WhatsApp" value={osForm.clienteTelefone} onChange={(event) => setOsForm(prev => ({ ...prev, clienteTelefone: event.target.value }))} />
-                      <input placeholder="CPF/CNPJ" value={osForm.cpfCnpj} onChange={(event) => setOsForm(prev => ({ ...prev, cpfCnpj: event.target.value }))} />
-                      <input placeholder="Cidade" value={osForm.cidade} onChange={(event) => setOsForm(prev => ({ ...prev, cidade: event.target.value }))} />
-                      <input placeholder="Contrato / referência" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
-                      <input placeholder="Sistema / potência" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
-                      <input placeholder="Data da instalação" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
-                      <input placeholder="Consultor responsável" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
-                      <textarea className="span-2" placeholder="Endereço completo" value={osForm.endereco} onChange={(event) => setOsForm(prev => ({ ...prev, endereco: event.target.value }))} />
+                    <div className="os-cliente-mode-toggle">
+                      <strong>Dados do cliente</strong>
+                      <div className="os-mode-pills">
+                        <button type="button" className={`os-mode-pill${osClienteMode === 'existente' ? ' active' : ''}`} onClick={() => setOsClienteMode('existente')}>
+                          Usar cliente cadastrado
+                        </button>
+                        <button type="button" className={`os-mode-pill${osClienteMode === 'novo' ? ' active' : ''}`} onClick={() => { setOsClienteMode('novo'); setOsClienteSearch(''); }}>
+                          Cadastro manual
+                        </button>
+                      </div>
                     </div>
+
+                    {osClienteMode === 'existente' ? (
+                      <div className="os-cliente-search-wrap">
+                        <input
+                          placeholder="Buscar cliente por nome, telefone ou CPF..."
+                          value={osClienteSearch}
+                          onChange={(event) => setOsClienteSearch(event.target.value)}
+                          autoComplete="off"
+                        />
+                        {osClienteSearch.trim().length > 0 && (() => {
+                          const q = osClienteSearch.trim().toLowerCase();
+                          const matches = clientes.filter(c =>
+                            [c.nome, c.whatsapp, c.cpfCnpj, c.cidade].some(v => String(v || '').toLowerCase().includes(q))
+                          ).slice(0, 8);
+                          return matches.length > 0 ? (
+                            <ul className="os-cliente-dropdown">
+                              {matches.map(c => (
+                                <li key={c.id}>
+                                  <button type="button" onClick={() => {
+                                    setOsForm(prev => ({
+                                      ...prev,
+                                      clienteNome: c.nome || '',
+                                      clienteTelefone: c.whatsapp || '',
+                                      cpfCnpj: c.cpfCnpj || '',
+                                      cidade: c.cidade || '',
+                                      endereco: c.endereco || '',
+                                    }));
+                                    setOsClienteSearch(c.nome || '');
+                                  }}>
+                                    <strong>{c.nome}</strong>
+                                    <span>{c.whatsapp || '—'} • {c.cidade || '—'}</span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="os-cliente-empty">
+                              Nenhum cliente encontrado.{' '}
+                              <button type="button" className="os-link-btn" onClick={() => setOsClienteMode('novo')}>Fazer cadastro manual</button>
+                            </div>
+                          );
+                        })()}
+                        {osForm.clienteNome && (
+                          <div className="os-cliente-selected">
+                            <div className="os-cliente-selected-info">
+                              <strong>{osForm.clienteNome}</strong>
+                              <span>{osForm.clienteTelefone || '—'} • {osForm.cidade || '—'}</span>
+                              {osForm.cpfCnpj && <span>CPF/CNPJ: {osForm.cpfCnpj}</span>}
+                            </div>
+                            <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setOsForm(prev => ({ ...prev, clienteNome: '', clienteTelefone: '', cpfCnpj: '', cidade: '', endereco: '' })); setOsClienteSearch(''); }}>Trocar</button>
+                          </div>
+                        )}
+                        <div className="os-form-grid two" style={{ marginTop: '0.5rem' }}>
+                          <input placeholder="Contrato / referência" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
+                          <input placeholder="Sistema / potência" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
+                          <input placeholder="Data da instalação" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
+                          <input placeholder="Consultor responsável" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="os-form-grid two">
+                        <input placeholder="Nome do cliente" value={osForm.clienteNome} onChange={(event) => setOsForm(prev => ({ ...prev, clienteNome: event.target.value }))} required />
+                        <input placeholder="Telefone / WhatsApp" value={osForm.clienteTelefone} onChange={(event) => setOsForm(prev => ({ ...prev, clienteTelefone: event.target.value }))} />
+                        <input placeholder="CPF/CNPJ" value={osForm.cpfCnpj} onChange={(event) => setOsForm(prev => ({ ...prev, cpfCnpj: event.target.value }))} />
+                        <input placeholder="Cidade" value={osForm.cidade} onChange={(event) => setOsForm(prev => ({ ...prev, cidade: event.target.value }))} />
+                        <input placeholder="Contrato / referência" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
+                        <input placeholder="Sistema / potência" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
+                        <input placeholder="Data da instalação" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
+                        <input placeholder="Consultor responsável" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
+                        <textarea className="span-2" placeholder="Endereço completo" value={osForm.endereco} onChange={(event) => setOsForm(prev => ({ ...prev, endereco: event.target.value }))} />
+                      </div>
+                    )}
                   </section>
 
                   <section className="os-detail-card">
