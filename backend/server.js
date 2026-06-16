@@ -639,6 +639,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     let owner = previousConversation?.assignedUserId
       ? { id: previousConversation.assignedUserId, nome: previousConversation.assignedUserName }
       : null;
+    let createdLeadNow = false;
 
     if (!lead && effectiveAllowNewLead) {
       owner = await getNextLeadOwner();
@@ -653,6 +654,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
         owner.nome
       );
       lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
+      createdLeadNow = true;
       io.emit('novo_lead', lead);
     } else if (lead?.assignedUserId) {
       owner = { id: lead.assignedUserId, nome: lead.assignedUserName };
@@ -663,7 +665,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       io.emit('novo_lead', lead);
     }
 
-    const shouldNotifyNewLead = effectiveAllowNewLead && (!previousConversation || ['Finalizada', 'Arquivada'].includes(previousConversation.status));
+    const shouldNotifyNewLead = createdLeadNow;
     const conversation = await upsertWhatsAppConversation({
       leadId: lead?.id || previousConversation?.leadId || null,
       nome: lead?.nome || previousConversation?.clienteNome || message.pushName || phone,
