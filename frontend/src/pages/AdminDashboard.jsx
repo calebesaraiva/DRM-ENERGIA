@@ -5766,10 +5766,14 @@ const AdminDashboard = () => {
                                       setHomoDocUpload(prev => ({ ...prev, arquivo: file }));
                                     }} />
                                   </label>
-                                  <button type="button" className="btn btn-primary" disabled={!homoDocUpload.nome.trim() || homoDocUploadLoading}
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    disabled={!(homoDocUpload.nome.trim() || homoDocUpload.localizacaoCliente.trim()) || homoDocUploadLoading}
                                     onClick={() => {
+                                      const normalizedName = homoDocUpload.nome.trim() || 'Localização do cliente';
                                       const docPayload = {
-                                        nome: homoDocUpload.nome,
+                                        nome: normalizedName,
                                         descricao: homoDocUpload.descricao,
                                         localizacaoCliente: homoDocUpload.localizacaoCliente,
                                       };
