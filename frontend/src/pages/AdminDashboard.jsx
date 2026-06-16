@@ -6994,11 +6994,29 @@ const AdminDashboard = () => {
 
                 <div className="os-quick-actions-card">
                   <strong>Ações rápidas</strong>
-                  <button type="button" className="btn btn-primary" onClick={() => document.getElementById('os-open-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>+ Nova O.S</button>
-                  <button type="button" className="btn btn-outline" onClick={() => setOsStatusFilter('Agendada')}>Agenda técnica</button>
-                  <button type="button" className="btn btn-outline" onClick={() => setOsResponsavelFilter('todos')}>Equipes</button>
-                  <button type="button" className="btn btn-outline" onClick={() => setOsStatusFilter('Aguardando material')}>Materiais</button>
-                  <button type="button" className="btn btn-outline" onClick={printOsReport}>Relatórios</button>
+                  <button type="button" className="btn btn-primary" onClick={() => {
+                    document.getElementById('os-open-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}>+ Nova O.S</button>
+                  <button type="button" className="btn btn-outline" onClick={() => {
+                    setOsStatusFilter('Agendada');
+                    setOsAtrasadasOnly(false);
+                    setTimeout(() => document.getElementById('os-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                  }}>Agenda técnica</button>
+                  <button type="button" className="btn btn-outline" onClick={() => {
+                    setOsStatusFilter('todos');
+                    setOsResponsavelFilter('todos');
+                    setOsAtrasadasOnly(false);
+                    setTimeout(() => document.getElementById('os-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                  }}>Equipes</button>
+                  <button type="button" className="btn btn-outline" onClick={() => {
+                    setOsStatusFilter('Aguardando material');
+                    setOsAtrasadasOnly(false);
+                    setTimeout(() => document.getElementById('os-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                  }}>Materiais</button>
+                  <button type="button" className="btn btn-outline" onClick={() => {
+                    setTimeout(() => document.getElementById('os-detail-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                    if (!selectedOs) document.getElementById('os-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}>Relatórios</button>
                 </div>
               </div>
 
@@ -7219,7 +7237,7 @@ const AdminDashboard = () => {
                 </div>
               </form>
 
-              <div className="os-list-card">
+              <div className="os-list-card" id="os-list-section">
                 <div className="os-panel-head">
                   <div>
                     <strong>Listagem de O.S</strong>
@@ -7291,7 +7309,7 @@ const AdminDashboard = () => {
               </div>
 
               {selectedOs && (
-                <div className="os-detail-layout" key={selectedOs.id}>
+                <div className="os-detail-layout" id="os-detail-section" key={selectedOs.id}>
                   <div className="os-section-title">
                     <span>O.S selecionada</span>
                     <h4>{selectedOs.numeroOs} • {selectedOs.clienteNome}</h4>
