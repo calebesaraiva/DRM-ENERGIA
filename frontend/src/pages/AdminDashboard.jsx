@@ -9,7 +9,13 @@ import PricingWorkbench from '../components/PricingWorkbench';
 import CurrencyInput from '../components/CurrencyInput';
 import { currencyInputToNumber } from '../utils/currency';
 
-const socket = io(getApiBaseUrl() || undefined);
+const socket = io(getApiBaseUrl() || undefined, {
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+});
 const isLocalRuntime = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 const permissionLabels = {
@@ -1844,6 +1850,14 @@ const AdminDashboard = () => {
       showToast(`Lead novo aguardando atendimento: ${conversation?.clienteNome || conversation?.clienteTelefone || 'WhatsApp'}`, 'warning');
     };
 
+    const handleSocketConnect = () => {
+      loadData(loggedInUser).catch(() => {});
+    };
+
+    const handleSocketReconnect = () => {
+      loadData(loggedInUser).catch(() => {});
+    };
+
     socket.on('novo_orcamento', handleNewOrcamento);
     socket.on('novo_lead', handleNewLead);
     socket.on('contrato_atualizado', handleContratoAtualizado);
@@ -1862,6 +1876,8 @@ const AdminDashboard = () => {
     socket.on('whatsapp_message_status_updated', handleWhatsappMessageStatus);
     socket.on('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
     socket.on('whatsapp_new_lead_waiting', handleWhatsappNewLeadWaiting);
+    socket.on('connect', handleSocketConnect);
+    socket.io.on('reconnect', handleSocketReconnect);
 
     return () => {
       socket.off('novo_orcamento', handleNewOrcamento);
@@ -1876,6 +1892,8 @@ const AdminDashboard = () => {
       socket.off('whatsapp_message_status_updated', handleWhatsappMessageStatus);
       socket.off('whatsapp_runtime_status', handleWhatsappRuntimeStatus);
       socket.off('whatsapp_new_lead_waiting', handleWhatsappNewLeadWaiting);
+      socket.off('connect', handleSocketConnect);
+      socket.io.off('reconnect', handleSocketReconnect);
     };
   }, [loadData, navigate, playNewLeadAlert, selectedWhatsappConversation?.id, showToast]);
 
