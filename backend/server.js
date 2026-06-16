@@ -2270,6 +2270,15 @@ const PROJECT_STAGES = [
   'Projeto concluído',
 ];
 
+const INSTALLATION_STAGES = [
+  'Equipamento enviado',
+  'Equipamento entregue',
+  'Instalação agendada',
+  'Instalação concluída',
+  'Pedido de ligação realizado',
+  'Ligação realizada pela concessionária',
+];
+
 const LEGACY_PROJECT_STAGE_MAP = {
   Documentação: 'Novo projeto',
   Vistoria: 'Análise inicial',
@@ -3440,7 +3449,10 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       observacoes TEXT,
       dataInicio TEXT,
       prazoPrevisto TEXT,
+      equipamentoEnviadoAt TEXT,
       instalacaoAgendada TEXT,
+      instalacaoConcluidaAt TEXT,
+      pedidoLigacaoAt TEXT,
       previsaoLigacao TEXT,
       equipamentoEntregueAt TEXT,
       medidorTrocadoAt TEXT,
@@ -3893,7 +3905,10 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   const projetoColumns = await db.all('PRAGMA table_info(projetos)');
   const existingProjetoColumns = projetoColumns.map(column => column.name);
   for (const [field, definition] of [
+    ['equipamentoEnviadoAt', 'TEXT'],
     ['instalacaoAgendada', 'TEXT'],
+    ['instalacaoConcluidaAt', 'TEXT'],
+    ['pedidoLigacaoAt', 'TEXT'],
     ['previsaoLigacao', 'TEXT'],
     ['equipamentoEntregueAt', 'TEXT'],
     ['medidorTrocadoAt', 'TEXT'],
@@ -6789,9 +6804,23 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
     return res.status(403).json({ message: 'Este projeto pertence a outro responsável.' });
   }
 
-  const { etapa, prioridade, responsavelId, observacoes, prazoPrevisto, checklist, instalacaoAgendada, previsaoLigacao, equipamentoEntregueAt, medidorTrocadoAt } = req.body;
+  const {
+    etapa,
+    prioridade,
+    responsavelId,
+    observacoes,
+    prazoPrevisto,
+    checklist,
+    equipamentoEnviadoAt,
+    instalacaoAgendada,
+    instalacaoConcluidaAt,
+    pedidoLigacaoAt,
+    previsaoLigacao,
+    equipamentoEntregueAt,
+    medidorTrocadoAt,
+  } = req.body;
   const normalizedEtapa = etapa ? normalizeProjectStage(etapa) : null;
-  if (normalizedEtapa && !PROJECT_STAGES.includes(normalizedEtapa)) {
+  if (normalizedEtapa && !PROJECT_STAGES.includes(normalizedEtapa) && !INSTALLATION_STAGES.includes(normalizedEtapa)) {
     return res.status(400).json({ message: 'Etapa de projeto inválida.' });
   }
 
@@ -6820,7 +6849,10 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
          checklist = COALESCE(?, checklist),
          observacoes = COALESCE(?, observacoes),
          prazoPrevisto = COALESCE(?, prazoPrevisto),
+         equipamentoEnviadoAt = COALESCE(?, equipamentoEnviadoAt),
          instalacaoAgendada = COALESCE(?, instalacaoAgendada),
+         instalacaoConcluidaAt = COALESCE(?, instalacaoConcluidaAt),
+         pedidoLigacaoAt = COALESCE(?, pedidoLigacaoAt),
          previsaoLigacao = COALESCE(?, previsaoLigacao),
          equipamentoEntregueAt = COALESCE(?, equipamentoEntregueAt),
          medidorTrocadoAt = COALESCE(?, medidorTrocadoAt),
@@ -6834,7 +6866,10 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
     checklist ? JSON.stringify(checklist) : null,
     observacoes || null,
     prazoPrevisto || null,
+    equipamentoEnviadoAt || null,
     instalacaoAgendada || null,
+    instalacaoConcluidaAt || null,
+    pedidoLigacaoAt || null,
     previsaoLigacao || null,
     equipamentoEntregueAt || null,
     medidorTrocadoAt || null,
@@ -6847,7 +6882,10 @@ app.put('/api/admin/projetos/:id', authRequired, requirePermission('equipeTecnic
   const changeMessages = [];
   if (normalizedEtapa && normalizedEtapa !== normalizeProjectStage(projeto.etapa)) changeMessages.push(`Seu projeto avançou para a etapa: ${normalizedEtapa}.`);
   if (prazoPrevisto && prazoPrevisto !== projeto.prazoPrevisto) changeMessages.push(`A previsão de entrega foi atualizada para ${new Date(prazoPrevisto).toLocaleDateString('pt-BR')}.`);
+  if (equipamentoEnviadoAt && equipamentoEnviadoAt !== projeto.equipamentoEnviadoAt) changeMessages.push('O envio do equipamento foi registrado.');
   if (instalacaoAgendada && instalacaoAgendada !== projeto.instalacaoAgendada) changeMessages.push(`Sua instalação foi agendada para ${new Date(instalacaoAgendada).toLocaleString('pt-BR')}.`);
+  if (instalacaoConcluidaAt && instalacaoConcluidaAt !== projeto.instalacaoConcluidaAt) changeMessages.push('A instalação do sistema foi marcada como concluída.');
+  if (pedidoLigacaoAt && pedidoLigacaoAt !== projeto.pedidoLigacaoAt) changeMessages.push('O pedido de ligação foi registrado.');
   if (previsaoLigacao && previsaoLigacao !== projeto.previsaoLigacao) changeMessages.push(`A previsão da ligação pela Equatorial foi atualizada para ${new Date(previsaoLigacao).toLocaleDateString('pt-BR')}.`);
   if (changeMessages.length) {
     await notifyClientByContract(projeto.contratoId, {

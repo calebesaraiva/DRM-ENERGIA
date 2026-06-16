@@ -493,32 +493,72 @@ const projectStages = [
   'Vistoria concluída',
   'Projeto concluído',
 ];
+
+const installationStages = [
+  'Equipamento enviado',
+  'Equipamento entregue',
+  'Instalação agendada',
+  'Instalação concluída',
+  'Pedido de ligação realizado',
+  'Ligação realizada pela concessionária',
+];
+
+const getInstallationStage = (projeto = {}) => {
+  if (projeto.medidorTrocadoAt || projeto.checklist?.sistemaLigado || projeto.etapa === 'Projeto concluído') {
+    return 'Ligação realizada pela concessionária';
+  }
+  if (projeto.pedidoLigacaoAt) {
+    return 'Pedido de ligação realizado';
+  }
+  if (projeto.instalacaoConcluidaAt || projeto.checklist?.instalacao || projeto.checklist?.vistoriaFinal) {
+    return 'Instalação concluída';
+  }
+  if (projeto.instalacaoAgendada) {
+    return 'Instalação agendada';
+  }
+  if (projeto.equipamentoEntregueAt || projeto.checklist?.equipamentoEntregue) {
+    return 'Equipamento entregue';
+  }
+  return 'Equipamento enviado';
+};
+
 const projectOperationColumns = [
   {
-    id: 'homologacao',
-    label: 'Em homologação',
-    matches: (projeto) => !projeto.checklist?.instalacao && !['Solicitar vistoria', 'Aguardando protocolo de vistoria', 'Vistoria em prazo', 'Vistoria atrasada', 'Vistoria reprovada', 'Vistoria concluída', 'Projeto concluído'].includes(projeto.etapa),
+    id: 'equipamento-enviado',
+    label: 'Equipamento enviado',
+    matches: (projeto) => getInstallationStage(projeto) === 'Equipamento enviado',
   },
   {
-    id: 'vistoria',
-    label: 'Vistoria',
-    matches: (projeto) => !projeto.checklist?.instalacao && ['Solicitar vistoria', 'Aguardando protocolo de vistoria', 'Vistoria em prazo', 'Vistoria atrasada', 'Vistoria reprovada', 'Vistoria concluída'].includes(projeto.etapa),
+    id: 'equipamento-entregue',
+    label: 'Equipamento entregue',
+    matches: (projeto) => getInstallationStage(projeto) === 'Equipamento entregue',
   },
   {
-    id: 'instalacao',
-    label: 'Instalação',
-    matches: (projeto) => projeto.etapa !== 'Projeto concluído' && Boolean(projeto.instalacaoAgendada || projeto.checklist?.instalacao),
+    id: 'instalacao-agendada',
+    label: 'Instalação agendada',
+    matches: (projeto) => getInstallationStage(projeto) === 'Instalação agendada',
   },
   {
-    id: 'concluido',
-    label: 'Concluídos',
-    matches: (projeto) => projeto.etapa === 'Projeto concluído',
+    id: 'instalacao-concluida',
+    label: 'Instalação concluída',
+    matches: (projeto) => getInstallationStage(projeto) === 'Instalação concluída',
+  },
+  {
+    id: 'pedido-ligacao',
+    label: 'Pedido de ligação realizado',
+    matches: (projeto) => getInstallationStage(projeto) === 'Pedido de ligação realizado',
+  },
+  {
+    id: 'ligacao-realizada',
+    label: 'Ligação realizada',
+    matches: (projeto) => getInstallationStage(projeto) === 'Ligação realizada pela concessionária',
   },
 ];
 const projectChecklistLabels = {
   documentacaoRecebida: 'Documentação recebida',
   documentacaoCorrigida: 'Documentação corrigida',
   vistoriaRealizada: 'Vistoria realizada',
+  equipamentoEntregue: 'Equipamento entregue',
   artGerada: 'ART gerada',
   trtPaga: 'TRT paga',
   projetoTecnico: 'Projeto técnico',
@@ -532,14 +572,14 @@ const projectChecklistLabels = {
   vistoriaSolicitada: 'Vistoria solicitada',
   protocoloVistoria: 'Protocolo de vistoria recebido',
   vistoriaReprovada: 'Vistoria reprovada',
-  homologacao: 'Homologação',
+  homologacao: 'Pedido de ligação realizado',
   instalacao: 'Instalação',
   vistoriaFinal: 'Vistoria final',
   medidorTrocado: 'Medidor trocado pela Equatorial',
   sistemaLigado: 'Sistema ligado',
 };
 
-const streetChecklistKeys = ['vistoriaRealizada', 'instalacao', 'vistoriaFinal', 'vistoriaSolicitada', 'protocoloVistoria', 'vistoriaReprovada', 'medidorTrocado', 'sistemaLigado'];
+const streetChecklistKeys = ['equipamentoEntregue', 'instalacao', 'vistoriaFinal', 'homologacao', 'medidorTrocado', 'sistemaLigado'];
 const officeChecklistKeys = ['documentacaoRecebida', 'documentacaoCorrigida', 'artGerada', 'trtPaga', 'projetoTecnico', 'projetoParaEnvio', 'projetoEnviado', 'pendenciaConcessionaria', 'projetoCorrigido', 'projetoReenviado', 'parecerAcesso', 'obraConcessionaria', 'homologacao'];
 const emptyPendenciaForm = {
   tipo: 'Pendência da concessionária',
@@ -1003,7 +1043,7 @@ const AdminDashboard = () => {
     { id: 'qa-contratos', label: 'Aprovar contrato', tab: 'contratos', permission: 'contratos', group: 'Ações diretas', description: 'Ir para contratos pendentes.', badge: contratos.filter(item => item.status === 'Pendente').length },
     { id: 'qa-procuracoes', label: 'Procurações', tab: 'procuracoes', permission: 'contratos', group: 'Comercial', description: 'Documentos de procuração e aprovação.', badge: procuracoes.filter(item => item.status === 'Pendente').length },
     { id: 'qa-homologacao', label: 'Homologação', tab: 'homologacao', permission: 'equipeTecnica', group: 'Operação', description: 'Rotina de documentação técnica.', badge: projetos.filter(item => ['Pendência da concessionária', 'Reenviar projeto', 'Aguardando parecer de acesso', 'Vistoria reprovada'].includes(item.etapa)).length },
-    { id: 'qa-instalacoes', label: 'Instalações', tab: 'projetos', permission: 'equipeTecnica', group: 'Operação', description: 'Projetos e andamento de instalação.', badge: projetos.filter(item => item.etapa !== 'Projeto concluído').length },
+    { id: 'qa-instalacoes', label: 'Instalações', tab: 'projetos', permission: 'equipeTecnica', group: 'Operação', description: 'Projetos e andamento de instalação.', badge: projetos.filter(item => getInstallationStage(item) !== 'Ligação realizada pela concessionária').length },
     { id: 'qa-os', label: 'O.S abertas', tab: 'ordensServico', permission: 'ordensServico', group: 'Operação', description: 'Abrir e acompanhar suporte técnico.', badge: ordensServico.filter(item => item.status === 'Aberta').length },
     { id: 'qa-produtos', label: 'Produtos e kits', tab: 'produtosPacotes', permission: 'contratos', group: 'Catálogo', description: 'Kits e equipamentos cadastrados.', badge: equipamentos.filter(item => item.active).length },
     { id: 'qa-precos', label: 'Preço dos sistemas', tab: 'precosSistemas', permission: 'precosSistemas', group: 'Catálogo', description: 'Calculadora e tabelas de preço.' },
@@ -2041,6 +2081,77 @@ const AdminDashboard = () => {
     } catch (err) {
       showToast(err.message, 'error');
     }
+  };
+
+  const buildInstallationStagePayload = (projeto, stage) => {
+    const now = new Date();
+    const iso = now.toISOString();
+    const dateOnly = iso.slice(0, 10);
+    const checklist = { ...(projeto.checklist || {}) };
+
+    if (stage === 'Equipamento enviado') {
+      return {
+        equipamentoEnviadoAt: projeto.equipamentoEnviadoAt || iso,
+        checklist,
+      };
+    }
+
+    if (stage === 'Equipamento entregue') {
+      return {
+        equipamentoEnviadoAt: projeto.equipamentoEnviadoAt || iso,
+        equipamentoEntregueAt: projeto.equipamentoEntregueAt || iso,
+        checklist: { ...checklist, equipamentoEntregue: true },
+      };
+    }
+
+    if (stage === 'Instalação agendada') {
+      return {
+        equipamentoEnviadoAt: projeto.equipamentoEnviadoAt || iso,
+        equipamentoEntregueAt: projeto.equipamentoEntregueAt || iso,
+        instalacaoAgendada: projeto.instalacaoAgendada || iso.slice(0, 16),
+        checklist: { ...checklist, equipamentoEntregue: true },
+      };
+    }
+
+    if (stage === 'Instalação concluída') {
+      return {
+        equipamentoEnviadoAt: projeto.equipamentoEnviadoAt || iso,
+        equipamentoEntregueAt: projeto.equipamentoEntregueAt || iso,
+        instalacaoAgendada: projeto.instalacaoAgendada || iso.slice(0, 16),
+        instalacaoConcluidaAt: projeto.instalacaoConcluidaAt || iso,
+        checklist: { ...checklist, equipamentoEntregue: true, instalacao: true, vistoriaFinal: true },
+      };
+    }
+
+    if (stage === 'Pedido de ligação realizado') {
+      return {
+        equipamentoEnviadoAt: projeto.equipamentoEnviadoAt || iso,
+        equipamentoEntregueAt: projeto.equipamentoEntregueAt || iso,
+        instalacaoAgendada: projeto.instalacaoAgendada || iso.slice(0, 16),
+        instalacaoConcluidaAt: projeto.instalacaoConcluidaAt || iso,
+        pedidoLigacaoAt: projeto.pedidoLigacaoAt || dateOnly,
+        checklist: { ...checklist, equipamentoEntregue: true, instalacao: true, vistoriaFinal: true, homologacao: true },
+      };
+    }
+
+    if (stage === 'Ligação realizada pela concessionária') {
+      return {
+        equipamentoEnviadoAt: projeto.equipamentoEnviadoAt || iso,
+        equipamentoEntregueAt: projeto.equipamentoEntregueAt || iso,
+        instalacaoAgendada: projeto.instalacaoAgendada || iso.slice(0, 16),
+        instalacaoConcluidaAt: projeto.instalacaoConcluidaAt || iso,
+        pedidoLigacaoAt: projeto.pedidoLigacaoAt || dateOnly,
+        medidorTrocadoAt: projeto.medidorTrocadoAt || dateOnly,
+        checklist: { ...checklist, equipamentoEntregue: true, instalacao: true, vistoriaFinal: true, homologacao: true, sistemaLigado: true, medidorTrocado: true },
+      };
+    }
+
+    return {};
+  };
+
+  const updateProjetoInstalacao = async (projeto, stage) => {
+    if (!projeto || !stage) return;
+    await updateProjeto(projeto.id, buildInstallationStagePayload(projeto, stage));
   };
 
   const registerHomologacaoPendencia = async (event) => {
@@ -5976,8 +6087,8 @@ const AdminDashboard = () => {
                     </div>
                     <div className="section-stats">
                       <div><strong>{projetos.length}</strong><span>projetos</span></div>
-                      <div><strong>{projetos.filter(item => item.etapa !== 'Projeto concluído').length}</strong><span>ativos</span></div>
-                      <div><strong>{projetos.filter(item => item.etapa === 'Projeto concluído').length}</strong><span>concluídos</span></div>
+                      <div><strong>{projetos.filter(item => getInstallationStage(item) !== 'Ligação realizada pela concessionária').length}</strong><span>em andamento</span></div>
+                      <div><strong>{projetos.filter(item => getInstallationStage(item) === 'Ligação realizada pela concessionária').length}</strong><span>ligados</span></div>
                     </div>
                   </div>
 
@@ -6008,7 +6119,7 @@ const AdminDashboard = () => {
                               <span>{projeto.prioridade || 'Normal'}</span>
                             </div>
                             <p>Contrato #{projeto.contratoId} • {getResponsibleName(projeto.responsavelNome)}</p>
-                            <p>Prazo {dateBr(projeto.prazoPrevisto)} • {projectPhotos[projeto.id]?.length || 0} foto{(projectPhotos[projeto.id]?.length || 0) === 1 ? '' : 's'}</p>
+                            <p>{getInstallationStage(projeto)} • {projectPhotos[projeto.id]?.length || 0} foto{(projectPhotos[projeto.id]?.length || 0) === 1 ? '' : 's'}</p>
                             <strong className="project-value">{money(projeto.valorProjeto)}</strong>
                             <span className="project-open-hint">Abrir projeto</span>
                           </button>
@@ -6034,7 +6145,7 @@ const AdminDashboard = () => {
                     <div>
                       <span className="section-kicker">Cadastro da instalação</span>
                       <h3>{selectedProjeto.clienteNome}</h3>
-                      <p>Atualize agenda, etapa, checklist, fotos e observações do cliente.</p>
+                      <p>Atualize o andamento da instalação, agenda, fotos e observações do cliente.</p>
                     </div>
                   </div>
 
@@ -6049,18 +6160,18 @@ const AdminDashboard = () => {
 
                     <div className="project-detail-grid">
                       <div className="detalhe-item highlight"><span className="detalhe-titulo">Valor</span><span className="detalhe-valor">{money(selectedProjeto.valorProjeto)}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Etapa</span><span className="detalhe-valor">{selectedProjeto.etapa}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Status da instalação</span><span className="detalhe-valor">{getInstallationStage(selectedProjeto)}</span></div>
                       <div className="detalhe-item"><span className="detalhe-titulo">Prazo</span><span className="detalhe-valor">{dateBr(selectedProjeto.prazoPrevisto)}</span></div>
                       <div className="detalhe-item"><span className="detalhe-titulo">Prioridade</span><span className="detalhe-valor">{selectedProjeto.prioridade || 'Normal'}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Pendências</span><span className="detalhe-valor">{selectedProjeto.pendenciasHomologacao?.filter(item => !['Corrigida', 'Concluída', 'Cancelada'].includes(item.status)).length || 0} abertas</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Envios</span><span className="detalhe-valor">{selectedProjeto.enviosHomologacao?.length || 0}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Equipamento enviado</span><span className="detalhe-valor">{dateBr(selectedProjeto.equipamentoEnviadoAt) || 'Pendente'}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Ligação</span><span className="detalhe-valor">{dateBr(selectedProjeto.medidorTrocadoAt) || 'Aguardando concessionária'}</span></div>
                     </div>
 
                     <div className="project-modal-controls">
                       <label>
-                        Etapa atual
-                        <select value={selectedProjeto.etapa} onChange={(event) => updateProjeto(selectedProjeto.id, { etapa: event.target.value })}>
-                          {projectStages.map(option => <option key={option}>{option}</option>)}
+                        Status atual
+                        <select value={getInstallationStage(selectedProjeto)} onChange={(event) => updateProjetoInstalacao(selectedProjeto, event.target.value)}>
+                          {installationStages.map(option => <option key={option}>{option}</option>)}
                         </select>
                       </label>
                       <label>
@@ -6068,8 +6179,24 @@ const AdminDashboard = () => {
                         <input type="date" value={selectedProjeto.prazoPrevisto || ''} onChange={(event) => updateProjeto(selectedProjeto.id, { prazoPrevisto: event.target.value })} />
                       </label>
                       <label>
+                        Equipamento enviado em
+                        <input type="datetime-local" value={selectedProjeto.equipamentoEnviadoAt ? String(selectedProjeto.equipamentoEnviadoAt).slice(0, 16) : ''} onChange={(event) => updateProjeto(selectedProjeto.id, { equipamentoEnviadoAt: event.target.value })} />
+                      </label>
+                      <label>
+                        Equipamento entregue em
+                        <input type="datetime-local" value={selectedProjeto.equipamentoEntregueAt ? String(selectedProjeto.equipamentoEntregueAt).slice(0, 16) : ''} onChange={(event) => updateProjeto(selectedProjeto.id, { equipamentoEntregueAt: event.target.value, checklist: { ...(selectedProjeto.checklist || {}), equipamentoEntregue: Boolean(event.target.value) } })} />
+                      </label>
+                      <label>
                         Instalação agendada
                         <input type="datetime-local" value={selectedProjeto.instalacaoAgendada ? String(selectedProjeto.instalacaoAgendada).slice(0, 16) : ''} onChange={(event) => updateProjeto(selectedProjeto.id, { instalacaoAgendada: event.target.value })} />
+                      </label>
+                      <label>
+                        Instalação concluída em
+                        <input type="date" value={selectedProjeto.instalacaoConcluidaAt ? String(selectedProjeto.instalacaoConcluidaAt).slice(0, 10) : ''} onChange={(event) => updateProjeto(selectedProjeto.id, { instalacaoConcluidaAt: event.target.value, checklist: { ...(selectedProjeto.checklist || {}), instalacao: Boolean(event.target.value), vistoriaFinal: Boolean(event.target.value) } })} />
+                      </label>
+                      <label>
+                        Pedido de ligação em
+                        <input type="date" value={selectedProjeto.pedidoLigacaoAt ? String(selectedProjeto.pedidoLigacaoAt).slice(0, 10) : ''} onChange={(event) => updateProjeto(selectedProjeto.id, { pedidoLigacaoAt: event.target.value, checklist: { ...(selectedProjeto.checklist || {}), homologacao: Boolean(event.target.value) } })} />
                       </label>
                       <label>
                         Previsão Equatorial
@@ -6082,10 +6209,10 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="quick-actions">
-                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Análise inicial', checklist: { ...(selectedProjeto.checklist || {}), vistoriaRealizada: true } })}>Vistoria feita</button>
-                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto para envio', checklist: { ...(selectedProjeto.checklist || {}), projetoTecnico: true, projetoParaEnvio: true } })}>Projeto pronto</button>
-                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Parecer emitido', checklist: { ...(selectedProjeto.checklist || {}), parecerAcesso: true, homologacao: true } })}>Parecer emitido</button>
-                      <button type="button" onClick={() => updateProjeto(selectedProjeto.id, { etapa: 'Projeto concluído', checklist: { ...(selectedProjeto.checklist || {}), sistemaLigado: true } })}>Concluir</button>
+                      <button type="button" onClick={() => updateProjetoInstalacao(selectedProjeto, 'Equipamento enviado')}>Marcar envio</button>
+                      <button type="button" onClick={() => updateProjetoInstalacao(selectedProjeto, 'Equipamento entregue')}>Marcar entrega</button>
+                      <button type="button" onClick={() => updateProjetoInstalacao(selectedProjeto, 'Instalação concluída')}>Concluir instalação</button>
+                      <button type="button" onClick={() => updateProjetoInstalacao(selectedProjeto, 'Ligação realizada pela concessionária')}>Confirmar ligação</button>
                     </div>
 
                     <div className="project-role-grid">
@@ -7047,19 +7174,19 @@ const AdminDashboard = () => {
 
             {quickModal === 'projetos' && (
               <div className="quick-modal-list">
-                {projetos.filter(item => item.etapa !== 'Projeto concluído').slice(0, 8).map(projeto => (
+                {projetos.filter(item => getInstallationStage(item) !== 'Ligação realizada pela concessionária').slice(0, 8).map(projeto => (
                   <div className="quick-modal-item quick-project-item" key={projeto.id}>
                     <div className="quick-project-head">
                       <div>
                       <strong>{projeto.clienteNome}</strong>
-                      <span>Contrato #{projeto.contratoId} • {projeto.etapa} • {projectPhotos[projeto.id]?.length || 0} fotos</span>
+                      <span>Contrato #{projeto.contratoId} • {getInstallationStage(projeto)} • {projectPhotos[projeto.id]?.length || 0} fotos</span>
                       </div>
                       <button className="btn btn-outline btn-sm-admin" onClick={() => { navigatePanel({ activeTab: 'projetos', selectedProjetoId: projeto.id }); setSelectedProjeto(projeto); setQuickModal(null); }}>Detalhes</button>
                     </div>
                     <div className="quick-project-actions">
-                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Análise inicial', checklist: { ...(projeto.checklist || {}), vistoriaRealizada: true } })}>Vistoria feita</button>
-                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Solicitar vistoria', checklist: { ...(projeto.checklist || {}), homologacao: true, parecerAcesso: true } })}>Liberar vistoria</button>
-                      <button type="button" onClick={() => updateProjeto(projeto.id, { etapa: 'Projeto concluído', checklist: { ...(projeto.checklist || {}), sistemaLigado: true } })}>Concluir</button>
+                      <button type="button" onClick={() => updateProjetoInstalacao(projeto, 'Equipamento entregue')}>Confirmar entrega</button>
+                      <button type="button" onClick={() => updateProjetoInstalacao(projeto, 'Instalação agendada')}>Agendar instalação</button>
+                      <button type="button" onClick={() => updateProjetoInstalacao(projeto, 'Ligação realizada pela concessionária')}>Concluir</button>
                       <label>
                         Enviar fotos
                         <input type="file" accept="image/*" capture="environment" multiple onChange={(event) => { uploadProjetoFotos(projeto.id, event.target.files); event.target.value = ''; }} />
