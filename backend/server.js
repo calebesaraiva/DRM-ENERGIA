@@ -39,6 +39,8 @@ const ROUND_ROBIN_SELLERS = [
   { position: 3, phone: '5599985127056', name: 'Vendedor 3' },
 ];
 
+const whatsappKnownContacts = new Map();
+
 // Configuração do Servidor HTTP para suportar o Socket.io
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -373,6 +375,32 @@ const isKnownBusinessPhone = async (phoneVariants = []) => {
   return Boolean(usuario || cliente || contrato);
 };
 
+const rememberWhatsAppContacts = (contacts = []) => {
+  for (const contact of Array.isArray(contacts) ? contacts : []) {
+    const jid = String(contact?.id || '').trim();
+    const phone = normalizeWhatsAppPhone(getPhoneFromWhatsAppJid(jid));
+    if (!phone) continue;
+    const previous = whatsappKnownContacts.get(phone) || {};
+    whatsappKnownContacts.set(phone, {
+      ...previous,
+      id: jid,
+      name: String(contact?.name || previous.name || '').trim(),
+      notify: String(contact?.notify || previous.notify || '').trim(),
+      verifiedName: String(contact?.verifiedName || previous.verifiedName || '').trim(),
+      short: String(contact?.short || previous.short || '').trim(),
+    });
+  }
+};
+
+const isSavedWhatsAppContact = (phoneVariants = []) => {
+  for (const variant of phoneVariants) {
+    const phone = normalizeWhatsAppPhone(variant);
+    const contact = phone ? whatsappKnownContacts.get(phone) : null;
+    if (contact?.name) return true;
+  }
+  return false;
+};
+
 // Um contato individual real tem telefone de 10 a 13 dígitos. IDs de grupo,
 // canal/newsletter e artefatos de LID têm 14+ dígitos e não são telefones —
 // nunca devem virar conversa.
@@ -620,6 +648,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     if (!text) return;
 
     const phoneVariants = whatsAppPhoneVariants(phone);
+    const savedWhatsAppContact = isSavedWhatsAppContact(phoneVariants);
     const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
     const previousConversation = await db.get(
       `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
@@ -630,8 +659,9 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     const rescuedUnknownLidLead = !allowNewLead
       && !previousConversation
       && !lead
+      && !savedWhatsAppContact
       && !(await isKnownBusinessPhone(phoneVariants));
-    const effectiveAllowNewLead = allowNewLead || rescuedUnknownLidLead;
+    const effectiveAllowNewLead = (allowNewLead && !savedWhatsAppContact) || rescuedUnknownLidLead;
     // Contatos salvos/LID conhecidos não entram como lead novo. Se o número não
     // for conhecido no sistema, liberamos a captura para não perder lead real.
     if (!effectiveAllowNewLead && !previousConversation) return;
@@ -695,7 +725,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       notifyConsultantsAboutNewWhatsAppLead({ conversation: updatedConversation, text })
         .catch(error => console.error('Erro ao enviar avisos de lead novo:', error));
       io.emit('whatsapp_new_lead_waiting', { conversation: updatedConversation });
-    } else if (updatedConversation?.status === 'Em atendimento' && updatedConversation?.assignedUserId) {
+    } else if (!savedWhatsAppContact && updatedConversation?.status === 'Em atendimento' && updatedConversation?.assignedUserId) {
       // Cliente respondeu numa conversa em atendimento: avisa o consultor responsável.
       notifyAssignedConsultantAboutReply({ conversation: updatedConversation, text })
         .catch(error => console.error('Erro ao avisar consultor sobre resposta do cliente:', error));
@@ -788,6 +818,18 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
       }
     });
 
+    socket.ev.on('contacts.upsert', (contacts = []) => {
+      rememberWhatsAppContacts(contacts);
+    });
+
+    socket.ev.on('contacts.update', (contacts = []) => {
+      rememberWhatsAppContacts(contacts);
+    });
+
+    socket.ev.on('messaging-history.set', ({ contacts = [] } = {}) => {
+      rememberWhatsAppContacts(contacts);
+    });
+
     socket.ev.on('messages.update', async (updates = []) => {
       for (const update of updates) {
         const providerMessageId = update.key?.id || '';
@@ -837,6 +879,7 @@ const disconnectWhatsAppQrSession = async () => {
   whatsappRuntime.message = 'WhatsApp desconectado. Clique em conectar para gerar novo QR Code.';
   whatsappRuntime.phone = '';
   whatsappRuntime.lastUpdate = new Date().toISOString();
+  whatsappKnownContacts.clear();
   fs.rmSync(WHATSAPP_AUTH_DIR, { recursive: true, force: true });
   emitWhatsAppRuntimeStatus();
   return getWhatsAppProviderStatus();
