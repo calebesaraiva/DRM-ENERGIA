@@ -725,10 +725,6 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       notifyConsultantsAboutNewWhatsAppLead({ conversation: updatedConversation, text })
         .catch(error => console.error('Erro ao enviar avisos de lead novo:', error));
       io.emit('whatsapp_new_lead_waiting', { conversation: updatedConversation });
-    } else if (!savedWhatsAppContact && updatedConversation?.status === 'Em atendimento' && updatedConversation?.assignedUserId) {
-      // Cliente respondeu numa conversa em atendimento: avisa o consultor responsável.
-      notifyAssignedConsultantAboutReply({ conversation: updatedConversation, text })
-        .catch(error => console.error('Erro ao avisar consultor sobre resposta do cliente:', error));
     }
   } catch (error) {
     console.error('Erro ao processar mensagem WhatsApp QR:', error);
@@ -5573,6 +5569,75 @@ app.post('/api/admin/whatsapp/debug-classify-contact', authRequired, requirePerm
   const leadPlaceholders = phoneVariants.map(() => '?').join(', ');
   const lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
 
+  const allowNewLead = req.body?.allowNewLead !== false;
+  const rescuedUnknownLidLead = !allowNewLead
+    && !previousConversation
+    && !lead
+    && !savedWhatsAppContact
+    && !knownBusinessPhone;
+  const effectiveAllowNewLead = (allowNewLead && !savedWhatsAppContact) || rescuedUnknownLidLead;
+  const wouldCreateLead = !lead && effectiveAllowNewLead;
+  const wouldNotifyNewLead = wouldCreateLead;
+  const wouldNotifyAssignedReply = !savedWhatsAppContact
+    && Boolean(previousConversation?.assignedUserId)
+    && previousConversation?.status === 'Em atendimento';
+
+  res.json({
+    phone,
+    phoneVariants,
+    savedWhatsAppContact,
+    knownBusinessPhone,
+    allowNewLead,
+    rescuedUnknownLidLead,
+    effectiveAllowNewLead,
+    leadExists: Boolean(lead),
+    previousConversationExists: Boolean(previousConversation),
+    previousConversationStatus: previousConversation?.status || null,
+    previousConversationAssignedUserId: previousConversation?.assignedUserId || null,
+    wouldCreateLead,
+    wouldNotifyNewLead,
+    wouldNotifyAssignedReply,
+    matchedLead: lead ? {
+      id: lead.id,
+      nome: lead.nome,
+      assignedUserId: lead.assignedUserId,
+      assignedUserName: lead.assignedUserName,
+      status: lead.status,
+      origem: lead.origem,
+    } : null,
+    matchedConversation: previousConversation ? {
+      id: previousConversation.id,
+      clienteNome: previousConversation.clienteNome,
+      status: previousConversation.status,
+      assignedUserId: previousConversation.assignedUserId,
+      assignedUserName: previousConversation.assignedUserName,
+      lastMessageAt: previousConversation.lastMessageAt,
+    } : null,
+  });
+});
+
+app.post('/api/internal/whatsapp/debug-classify-contact', async (req, res) => {
+  const ip = String(req.ip || req.connection?.remoteAddress || '');
+  const isLocalRequest = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  if (!isLocalRequest) {
+    return res.status(403).json({ message: 'Diagnóstico interno disponível apenas no localhost.' });
+  }
+
+  const phone = normalizeWhatsAppPhone(req.body?.telefone || '');
+  if (!phone) {
+    return res.status(400).json({ message: 'Informe um telefone válido para diagnóstico.' });
+  }
+
+  const phoneVariants = whatsAppPhoneVariants(phone);
+  const savedWhatsAppContact = isSavedWhatsAppContact(phoneVariants);
+  const knownBusinessPhone = await isKnownBusinessPhone(phoneVariants);
+  const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
+  const previousConversation = await db.get(
+    `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
+    ...phoneVariants
+  );
+  const leadPlaceholders = phoneVariants.map(() => '?').join(', ');
+  const lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
   const allowNewLead = req.body?.allowNewLead !== false;
   const rescuedUnknownLidLead = !allowNewLead
     && !previousConversation
