@@ -1959,24 +1959,13 @@ const getNextLeadOwner = async () => {
 
   if (eligible.length === 0) return null;
 
-  const leadCounts = await db.all(
-    `SELECT assignedUserId, COUNT(*) as total
-     FROM leads
-     WHERE assignedUserId IS NOT NULL
-     GROUP BY assignedUserId`
-  );
-  const countsByUser = leadCounts.reduce((acc, row) => {
-    acc[row.assignedUserId] = row.total;
-    return acc;
-  }, {});
-
-  const lowestTotal = Math.min(...eligible.map(user => countsByUser[user.id] || 0));
-  const leastLoaded = eligible.filter(user => (countsByUser[user.id] || 0) === lowestTotal);
-  const currentIndex = Number(await getSetting('leadRoundRobinIndex', -1));
-  const nextIndex = (currentIndex + 1) % leastLoaded.length;
+  const currentIndexRaw = Number(await getSetting('leadRoundRobinIndex', 0));
+  const currentIndex = Number.isFinite(currentIndexRaw) && currentIndexRaw >= 0 ? currentIndexRaw : 0;
+  const owner = eligible[currentIndex % eligible.length];
+  const nextIndex = (currentIndex + 1) % eligible.length;
 
   await setSetting('leadRoundRobinIndex', nextIndex);
-  return leastLoaded[nextIndex];
+  return owner;
 };
 
 const getLeadOwners = async () => {
