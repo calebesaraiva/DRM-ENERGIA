@@ -797,6 +797,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
 
 const startWhatsAppQrSession = async ({ force = false } = {}) => {
   if (whatsappRuntime.starting) return getWhatsAppProviderStatus();
+  if (whatsappRuntime.socket && whatsappRuntime.connected) return getWhatsAppProviderStatus();
   if (whatsappRuntime.socket && !force) return getWhatsAppProviderStatus();
 
   whatsappRuntime.starting = true;
@@ -806,7 +807,7 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
   emitWhatsAppRuntimeStatus();
 
   try {
-    if (force && whatsappRuntime.socket) {
+    if (force && whatsappRuntime.socket && !whatsappRuntime.connected) {
       try {
         whatsappRuntime.socket.end?.();
         whatsappRuntime.socket.ws?.close?.();

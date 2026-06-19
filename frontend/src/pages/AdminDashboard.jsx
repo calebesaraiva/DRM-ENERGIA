@@ -1831,6 +1831,15 @@ const AdminDashboard = () => {
   }, [showManualLeadForm]);
 
   useEffect(() => {
+    if (!whatsappConnectOpen || typeof document === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [whatsappConnectOpen]);
+
+  useEffect(() => {
     if (!whatsappConnectOpen || !hasPermission('whatsapp')) return undefined;
     const timer = setInterval(() => {
       request('/api/admin/whatsapp/status')
@@ -2174,6 +2183,12 @@ const AdminDashboard = () => {
         body: JSON.stringify({ force: false }),
       });
       setWhatsappStatus(status);
+      if (status?.connected) {
+        showToast(
+          `Já existe um número conectado${status.phone ? ` (${status.phone})` : ''}. Use o botão "Desconectar número atual" para iniciar a troca.`,
+          'info'
+        );
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -2207,6 +2222,13 @@ const AdminDashboard = () => {
   };
 
   const refreshWhatsappQr = async () => {
+    if (whatsappStatus?.connected) {
+      showToast(
+        `O número${whatsappStatus.phone ? ` ${whatsappStatus.phone}` : ''} já está conectado. Use "Desconectar número atual" antes de conectar outro.`,
+        'warning'
+      );
+      return;
+    }
     setWhatsappConnectLoading(true);
     try {
       const status = await request('/api/admin/whatsapp/connect', {
@@ -8144,14 +8166,29 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {whatsappConnectOpen && (
-        <div className="contract-modal-backdrop whatsapp-connect-backdrop">
-          <div className="whatsapp-connect-modal" role="dialog" aria-modal="true" aria-labelledby="whatsapp-connect-title">
+      {whatsappConnectOpen && typeof document !== 'undefined' && createPortal((
+        <div
+          className="contract-modal-backdrop whatsapp-connect-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setWhatsappConnectOpen(false);
+          }}
+        >
+          <div
+            className="whatsapp-connect-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="whatsapp-connect-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <div className="whatsapp-connect-header">
               <div>
                 <span className="section-kicker">Conexão WhatsApp</span>
-                <h3 id="whatsapp-connect-title">Conectar número oficial</h3>
-                <p>Escaneie o QR Code com o WhatsApp que será usado por todos os vendedores no chatbox.</p>
+                <h3 id="whatsapp-connect-title">{whatsappStatus?.connected ? 'Número oficial conectado' : 'Conectar número oficial'}</h3>
+                <p>
+                  {whatsappStatus?.connected
+                    ? 'Se vocês forem trocar o número oficial, desconecte o atual primeiro. Só depois gere o QR Code do novo aparelho.'
+                    : 'Escaneie o QR Code com o WhatsApp que será usado por todos os vendedores no chatbox.'}
+                </p>
               </div>
               <button type="button" className="lead-modal-close" onClick={() => setWhatsappConnectOpen(false)} aria-label="Fechar">×</button>
             </div>
@@ -8180,6 +8217,17 @@ const AdminDashboard = () => {
                   <strong>{whatsappStatus?.connected ? 'Online' : whatsappStatus?.status || 'Desconectado'}</strong>
                   <span>{whatsappStatus?.message || 'Aguardando início da conexão.'}</span>
                 </div>
+                {whatsappStatus?.connected && (
+                  <div className="whatsapp-connect-alert">
+                    <strong>Número atual em uso</strong>
+                    <span>
+                      {whatsappStatus.phone
+                        ? `${whatsappStatus.phone} está ativo no painel.`
+                        : 'Já existe um número oficial ativo no painel.'}
+                    </span>
+                    <small>Para trocar com segurança, clique em "Desconectar número atual" e só então gere o QR do novo número.</small>
+                  </div>
+                )}
                 <div className="whatsapp-connect-steps">
                   <div><strong>1</strong><span>Abra o WhatsApp no celular oficial da DRM.</span></div>
                   <div><strong>2</strong><span>Vá em Aparelhos conectados e escolha conectar um aparelho.</span></div>
@@ -8195,18 +8243,24 @@ const AdminDashboard = () => {
 
             <div className="whatsapp-connect-footer">
               <button type="button" className="btn btn-outline" onClick={() => setWhatsappConnectOpen(false)}>Fechar</button>
-              <button type="button" className="btn btn-outline" onClick={refreshWhatsappQr} disabled={whatsappConnectLoading}>
-                Gerar novo QR
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={refreshWhatsappQr}
+                disabled={whatsappConnectLoading || whatsappStatus?.connected}
+                title={whatsappStatus?.connected ? 'Desconecte o número atual antes de gerar o QR do novo aparelho.' : 'Gerar QR Code para conectar o número oficial'}
+              >
+                {whatsappConnectLoading ? 'Gerando...' : (whatsappStatus?.connected ? 'Aguardando desconexão do atual' : 'Gerar QR do novo número')}
               </button>
               {isMasterAdmin && whatsappStatus?.connected && (
                 <button type="button" className="btn btn-outline danger-outline" onClick={disconnectWhatsapp} disabled={whatsappConnectLoading}>
-                  Desconectar
+                  {whatsappConnectLoading ? 'Desconectando...' : 'Desconectar número atual'}
                 </button>
               )}
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {quickActionEditorOpen && (
         <div className="contract-modal-backdrop quick-action-editor-backdrop">
