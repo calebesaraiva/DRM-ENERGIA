@@ -3487,11 +3487,14 @@
 }
 
 .whatsapp-qr-image {
-  width: min(100%, 320px);
+  width: min(100%, 360px);
   height: auto;
-  border: 10px solid #fff;
+  display: block;
+  border: 12px solid #fff;
   border-radius: 18px;
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
+  image-rendering: crisp-edges;
+  background: #fff;
 }
 
 .whatsapp-connected-state,

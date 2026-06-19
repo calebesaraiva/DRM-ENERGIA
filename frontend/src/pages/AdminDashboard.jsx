@@ -1841,13 +1841,21 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (!whatsappConnectOpen || !hasPermission('whatsapp')) return undefined;
-    const timer = setInterval(() => {
+    let cancelled = false;
+    const refreshStatus = () => {
       request('/api/admin/whatsapp/status')
-        .then(setWhatsappStatus)
+        .then((status) => {
+          if (!cancelled) setWhatsappStatus(status);
+        })
         .catch(() => {});
-    }, 3500);
-    return () => clearInterval(timer);
-  }, [hasPermission, request, whatsappConnectOpen]);
+    };
+    refreshStatus();
+    const timer = setInterval(refreshStatus, whatsappStatus?.connected ? 3000 : (whatsappStatus?.qr ? 1200 : 800));
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [hasPermission, request, whatsappConnectOpen, whatsappStatus?.connected, whatsappStatus?.qr]);
 
   useEffect(() => {
     if (!selectedWhatsappConversation) return;
@@ -8202,12 +8210,18 @@ const AdminDashboard = () => {
                     <p>{whatsappStatus.phone ? `Número conectado: ${whatsappStatus.phone}` : 'Sessão ativa e pronta para atendimento.'}</p>
                   </div>
                 ) : whatsappStatus?.qr ? (
-                  <img src={whatsappStatus.qr} alt="QR Code para conectar WhatsApp" className="whatsapp-qr-image" />
+                  <img
+                    key={whatsappStatus.qr}
+                    src={whatsappStatus.qr}
+                    alt="QR Code para conectar WhatsApp"
+                    className="whatsapp-qr-image"
+                    loading="eager"
+                  />
                 ) : (
                   <div className="whatsapp-qr-loading">
                     <span className="wa-connect-icon">QR</span>
                     <h4>{whatsappConnectLoading ? 'Gerando QR Code...' : 'QR Code ainda não gerado'}</h4>
-                    <p>Clique em gerar QR Code e escaneie pelo celular do WhatsApp oficial.</p>
+                    <p>Estamos atualizando automaticamente. Assim que o QR for liberado, ele aparece aqui sem precisar fechar o modal.</p>
                   </div>
                 )}
               </div>

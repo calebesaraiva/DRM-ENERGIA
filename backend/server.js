@@ -560,6 +560,16 @@ const emitWhatsAppRuntimeStatus = () => {
   io.emit('whatsapp_runtime_status', getWhatsAppProviderStatus());
 };
 
+const buildWhatsAppQrDataUrl = async (qrText) => {
+  const svg = await QRCode.toString(qrText, {
+    type: 'svg',
+    margin: 1,
+    width: 360,
+    errorCorrectionLevel: 'M',
+  });
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+};
+
 const getWhatsAppJid = (phone) => `${normalizeWhatsAppPhone(phone)}@s.whatsapp.net`;
 
 const getBaileysMessageTimestampMs = (message = {}) => {
@@ -835,7 +845,7 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
       const { connection, lastDisconnect, qr } = update;
       if (qr) {
         whatsappRuntime.qr = qr;
-        whatsappRuntime.qrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 320 });
+        whatsappRuntime.qrDataUrl = await buildWhatsAppQrDataUrl(qr);
         whatsappRuntime.connected = false;
         whatsappRuntime.status = 'aguardando_qrcode';
         whatsappRuntime.message = 'Escaneie o QR Code com o WhatsApp do número oficial.';
