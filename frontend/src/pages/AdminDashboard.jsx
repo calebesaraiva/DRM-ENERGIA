@@ -7638,7 +7638,7 @@ const AdminDashboard = () => {
                       )}
                     </div>
                     <div className="os-tbl-footer">
-                      <span>{filteredOrdensServico.length} ordem{filteredOrdensServico.length === 1 ? '' : 'ens'}</span>
+                      <span>{filteredOrdensServico.length} orde{filteredOrdensServico.length === 1 ? 'm' : 'ns'}</span>
                       <div className="os-pagination">
                         <button type="button" className="os-pg-btn" disabled={osPage <= 1} onClick={() => setOsPage(prev => prev - 1)}>‹</button>
                         {Array.from({length: Math.ceil(filteredOrdensServico.length / 10)}, (_, i) => i + 1).map(p => (
