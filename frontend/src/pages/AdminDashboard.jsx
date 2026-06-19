@@ -483,6 +483,14 @@ const getContractConsultantLabel = (contrato = {}) => (
   contrato.consultorNome || contrato.assignedUserName || contrato.criadoPorNome || 'Sem consultor'
 );
 const dateBr = (value) => value ? new Date(value).toLocaleDateString('pt-BR') : 'Sem data';
+const getInstStatusForNew = (p = {}) => {
+  if (p.medidorTrocadoAt || p.checklist?.sistemaLigado || p.etapa === 'Projeto concluído') return 'Concluída';
+  if (p.instalacaoConcluidaAt || p.checklist?.instalacao) return 'Concluída';
+  if (p.instalacaoAgendada) return 'Instalação agendada';
+  if (p.equipamentoEntregueAt || p.checklist?.equipamentoEntregue) return 'Equipamento entregue';
+  if (p.equipamentoEnviadoAt) return 'Em transporte';
+  return 'Aguardando envio';
+};
 const contractNumber = (contrato = {}) => (
   `CT-${String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(contrato.id || '').padStart(4, '0')}`
 );
@@ -867,6 +875,21 @@ const AdminDashboard = () => {
   const [projectPhotos, setProjectPhotos] = useState({});
   const [projectSearch, setProjectSearch] = useState('');
   const [selectedProjeto, setSelectedProjeto] = useState(null);
+  // ── Instalações redesign state ─────────────────────────────────────────────
+  const [instSearch, setInstSearch] = useState('');
+  const [instCidadeFilter, setInstCidadeFilter] = useState('');
+  const [instInstaladorFilter, setInstInstaladorFilter] = useState('');
+  const [instStatusFilter, setInstStatusFilter] = useState('');
+  const [instDataFilter, setInstDataFilter] = useState('');
+  const [instPage, setInstPage] = useState(1);
+  const [instNovaOpen, setInstNovaOpen] = useState(false);
+  const [instAgendaTab, setInstAgendaTab] = useState('hoje');
+  const [instSelectedId, setInstSelectedId] = useState(null);
+  const [instActionsOpen, setInstActionsOpen] = useState(null);
+  const [instChecklistState, setInstChecklistState] = useState({});
+  const INST_PER_PAGE = 10;
+  const INST_STATUS_FLOW = ['Aguardando envio','Em transporte','Entrega agendada','Equipamento entregue','Materiais com pendência','Aguardando instalação','Instalação agendada','Reagendada','Em instalação','Aguardando conferência técnica','Concluída','Cancelada'];
+  // ── End Instalações redesign state ─────────────────────────────────────────
   const [pendenciaForm, setPendenciaForm] = useState(emptyPendenciaForm);
   const [envioHomologacaoForm, setEnvioHomologacaoForm] = useState(emptyEnvioHomologacaoForm);
   const [novoCliente, setNovoCliente] = useState(emptyClientForm);
@@ -1520,6 +1543,65 @@ const AdminDashboard = () => {
   }, [projetos]);
 
   const filteredHomologacaoProjetos = useMemo(() => filteredProjetos, [filteredProjetos]);
+
+  // ── Instalações redesign useMemos ──────────────────────────────────────────
+  const INST_STATUS_FLOW_MEMO = ['Aguardando envio','Em transporte','Entrega agendada','Equipamento entregue','Materiais com pendência','Aguardando instalação','Instalação agendada','Reagendada','Em instalação','Aguardando conferência técnica','Concluída','Cancelada'];
+
+  const instSummary = useMemo(() => ({
+    total: projetos.length,
+    emTransporte: projetos.filter(p => getInstStatusForNew(p) === 'Em transporte').length,
+    entregue: projetos.filter(p => getInstStatusForNew(p) === 'Equipamento entregue').length,
+    aguardandoAgendamento: projetos.filter(p => getInstStatusForNew(p) === 'Aguardando instalação').length,
+    agendada: projetos.filter(p => getInstStatusForNew(p) === 'Instalação agendada').length,
+    emInstalacao: projetos.filter(p => getInstStatusForNew(p) === 'Em instalação').length,
+    reagendada: projetos.filter(p => getInstStatusForNew(p) === 'Reagendada').length,
+    concluida: projetos.filter(p => getInstStatusForNew(p) === 'Concluída').length,
+  }), [projetos]);
+
+  const filteredInstalacoes = useMemo(() => {
+    const term = instSearch.trim().toLowerCase();
+    return projetos.filter(p => {
+      const status = getInstStatusForNew(p);
+      const matchesSearch = !term || [
+        p.clienteNome, p.clienteTelefone, String(p.contratoId || ''), p.clienteCidade, p.responsavelNome
+      ].some(v => String(v || '').toLowerCase().includes(term));
+      const matchesCidade = !instCidadeFilter || (p.clienteCidade || '') === instCidadeFilter;
+      const matchesInstalador = !instInstaladorFilter || String(p.responsavelId || '') === instInstaladorFilter;
+      const matchesStatus = !instStatusFilter || status === instStatusFilter;
+      const matchesData = !instDataFilter || (p.instalacaoAgendada || '').startsWith(instDataFilter);
+      return matchesSearch && matchesCidade && matchesInstalador && matchesStatus && matchesData;
+    });
+  }, [projetos, instSearch, instCidadeFilter, instInstaladorFilter, instStatusFilter, instDataFilter]);
+
+  const paginatedInstalacoes = useMemo(
+    () => filteredInstalacoes.slice((instPage - 1) * INST_PER_PAGE, instPage * INST_PER_PAGE),
+    [filteredInstalacoes, instPage]
+  );
+
+  const instCidades = useMemo(
+    () => Array.from(new Set(projetos.map(p => p.clienteCidade || '').filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [projetos]
+  );
+
+  const instProxima = useMemo(() => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    return projetos
+      .filter(p => p.instalacaoAgendada && getInstStatusForNew(p) === 'Instalação agendada')
+      .sort((a,b) => new Date(a.instalacaoAgendada) - new Date(b.instalacaoAgendada))
+      .find(p => new Date(p.instalacaoAgendada) >= today) || null;
+  }, [projetos]);
+
+  const instAgendaList = useMemo(() => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    return projetos.filter(p => {
+      if (!p.instalacaoAgendada) return false;
+      const d = new Date(p.instalacaoAgendada); d.setHours(0,0,0,0);
+      if (instAgendaTab === 'hoje') return d.getTime() === today.getTime();
+      return d.getTime() === tomorrow.getTime();
+    }).sort((a,b) => new Date(a.instalacaoAgendada) - new Date(b.instalacaoAgendada));
+  }, [projetos, instAgendaTab]);
+  // ── End Instalações redesign useMemos ──────────────────────────────────────
 
   const osSummary = useMemo(() => {
     const overdueStatuses = new Set(['Aberta', 'Em análise', 'Aguardando triagem', 'Aguardando agendamento', 'Agendada', 'Em atendimento', 'Aguardando material', 'Retorno necessário', 'Com pendência', 'Planejada', 'Equipe a caminho']);
@@ -6616,91 +6698,347 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'projetos' && (
-            <div className="admin-section">
-              {!selectedProjeto && (
-                <>
-                  <div className="section-heading">
-                    <div>
-                      <span className="section-kicker">Operação</span>
-                      <h3>Instalações e campo</h3>
-                      <p>Pesquise o cliente, abra a instalação e registre agenda, fotos e observações em poucos toques.</p>
-                    </div>
-                    <div className="section-stats">
-                      <div><strong>{projetos.length}</strong><span>projetos</span></div>
-                      <div><strong>{projetos.filter(item => getInstallationStage(item) !== 'Ligação realizada pela concessionária').length}</strong><span>em andamento</span></div>
-                      <div><strong>{projetos.filter(item => getInstallationStage(item) === 'Ligação realizada pela concessionária').length}</strong><span>ligados</span></div>
-                    </div>
-                  </div>
+            <div className="os-page inst-page">
+              {/* Page Header */}
+              <div className="os-page-hd">
+                <div>
+                  <h3>Instalações</h3>
+                  <p>Organize entregas, fila de instalação, agenda, equipes e evidências do campo.</p>
+                </div>
+                <button type="button" className="btn btn-primary" onClick={() => setInstNovaOpen(true)}>
+                  + Nova instalação
+                </button>
+              </div>
 
-                  <div className="project-search-panel">
-                    <div>
-                      <h4>Pesquisar projeto</h4>
-                      <p>Digite nome do cliente, telefone ou número do contrato.</p>
-                    </div>
-                    <input
-                      value={projectSearch}
-                      onChange={(event) => setProjectSearch(event.target.value)}
-                      placeholder="Ex: nome do cliente, #12, 99991..."
-                    />
-                    <span>{filteredProjetos.length} resultado{filteredProjetos.length === 1 ? '' : 's'}</span>
-                  </div>
+              {/* KPI Chips */}
+              <div className="os-kpis">
+                <button type="button" className={`os-kpi${!instStatusFilter ? ' active' : ''}`} onClick={() => { setInstStatusFilter(''); setInstPage(1); }}>
+                  <span className="os-kpi-icon">📋</span>
+                  <div className="os-kpi-body"><span className="os-kpi-num">{instSummary.total}</span><span className="os-kpi-label">Projetos</span></div>
+                </button>
+                <button type="button" className={`os-kpi${instStatusFilter === 'Em transporte' ? ' active' : ''}`} onClick={() => { setInstStatusFilter('Em transporte'); setInstPage(1); }}>
+                  <span className="os-kpi-icon">🚚</span>
+                  <div className="os-kpi-body"><span className="os-kpi-num">{instSummary.emTransporte}</span><span className="os-kpi-label">Equipamento enviado</span></div>
+                </button>
+                <button type="button" className={`os-kpi${instStatusFilter === 'Equipamento entregue' ? ' active' : ''}`} onClick={() => { setInstStatusFilter('Equipamento entregue'); setInstPage(1); }}>
+                  <span className="os-kpi-icon">📦</span>
+                  <div className="os-kpi-body"><span className="os-kpi-num">{instSummary.entregue}</span><span className="os-kpi-label">Equipamento entregue</span></div>
+                </button>
+                <button type="button" className={`os-kpi${instStatusFilter === 'Aguardando instalação' ? ' active' : ''}`} onClick={() => { setInstStatusFilter('Aguardando instalação'); setInstPage(1); }}>
+                  <span className="os-kpi-icon">⏰</span>
+                  <div className="os-kpi-body"><span className="os-kpi-num">{instSummary.aguardandoAgendamento}</span><span className="os-kpi-label">Aguardando agendamento</span></div>
+                </button>
+                <button type="button" className={`os-kpi${instStatusFilter === 'Instalação agendada' ? ' active' : ''}`} onClick={() => { setInstStatusFilter('Instalação agendada'); setInstPage(1); }}>
+                  <span className="os-kpi-icon">📅</span>
+                  <div className="os-kpi-body"><span className="os-kpi-num">{instSummary.agendada}</span><span className="os-kpi-label">Instalação agendada</span></div>
+                </button>
+                <button type="button" className={`os-kpi${instStatusFilter === 'Em instalação' ? ' active' : ''}`} onClick={() => { setInstStatusFilter('Em instalação'); setInstPage(1); }}>
+                  <span className="os-kpi-icon">🔧</span>
+                  <div className="os-kpi-body"><span className="os-kpi-num">{instSummary.emInstalacao}</span><span className="os-kpi-label">Em andamento</span></div>
+                </button>
+                <button type="button" className={`os-kpi${instStatusFilter === 'Reagendada' ? ' active' : ''}`} onClick={() => { setInstStatusFilter('Reagendada'); setInstPage(1); }}>
+                  <span className="os-kpi-icon">🔄</span>
+                  <div className="os-kpi-body"><span className="os-kpi-num">{instSummary.reagendada}</span><span className="os-kpi-label">Reagendadas</span></div>
+                </button>
+                <button type="button" className={`os-kpi success${instStatusFilter === 'Concluída' ? ' active' : ''}`} onClick={() => { setInstStatusFilter('Concluída'); setInstPage(1); }}>
+                  <span className="os-kpi-icon">✅</span>
+                  <div className="os-kpi-body"><span className="os-kpi-num">{instSummary.concluida}</span><span className="os-kpi-label">Concluídas</span></div>
+                </button>
+              </div>
 
-                  <div className="project-board simple-project-board">
-                    {projectOperationColumns.map(column => (
-                      <div className="project-column" key={column.id}>
-                        <div className="project-column-header">
-                          <strong>{column.label}</strong>
-                          <span>{filteredProjetos.filter(column.matches).length}</span>
-                        </div>
-                        {filteredProjetos.filter(column.matches).map(projeto => (
-                          <button className="project-card" key={projeto.id} onClick={() => { rememberPanelStep(); setSelectedProjeto(projeto); }}>
-                            <div className="project-card-top">
-                              <strong>{projeto.clienteNome}</strong>
-                              <span>{projeto.prioridade || 'Normal'}</span>
+              {/* Filter Bar */}
+              <div className="os-hfilter">
+                <input
+                  type="text"
+                  placeholder="Pesquisar cliente, contrato ou telefone"
+                  value={instSearch}
+                  onChange={(e) => { setInstSearch(e.target.value); setInstPage(1); }}
+                />
+                <select value={instCidadeFilter} onChange={(e) => { setInstCidadeFilter(e.target.value); setInstPage(1); }}>
+                  <option value="">Cidade</option>
+                  {instCidades.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={instInstaladorFilter} onChange={(e) => { setInstInstaladorFilter(e.target.value); setInstPage(1); }}>
+                  <option value="">Instalador</option>
+                  {usuarios.filter(u => u.active && (u.role === 'ADM' || u.permissions?.equipeTecnica)).map(u => (
+                    <option key={u.id} value={String(u.id)}>{u.nome}</option>
+                  ))}
+                </select>
+                <select value={instStatusFilter} onChange={(e) => { setInstStatusFilter(e.target.value); setInstPage(1); }}>
+                  <option value="">Status</option>
+                  {INST_STATUS_FLOW_MEMO.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <input
+                  type="date"
+                  value={instDataFilter}
+                  onChange={(e) => { setInstDataFilter(e.target.value); setInstPage(1); }}
+                  title="Data da instalação"
+                />
+                <button type="button" className="os-clear-btn" onClick={() => { setInstSearch(''); setInstCidadeFilter(''); setInstInstaladorFilter(''); setInstStatusFilter(''); setInstDataFilter(''); setInstPage(1); }}>
+                  Limpar
+                </button>
+                <div style={{marginLeft:'auto'}}>
+                  <button type="button" className="btn btn-primary" onClick={() => setInstNovaOpen(true)}>+ Nova instalação</button>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="os-table-wrap inst-table-wrap">
+                <table className="os-tbl">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Cliente / Contrato</th>
+                      <th>Cidade / UF</th>
+                      <th>Placas</th>
+                      <th>Inversor</th>
+                      <th>Endereço</th>
+                      <th>Entrega</th>
+                      <th>Pres. instalação</th>
+                      <th>Equipe / Instalador</th>
+                      <th>Status</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedInstalacoes.map((p, idx) => {
+                      const instStatus = getInstStatusForNew(p);
+                      const initials = (p.clienteNome || '??').slice(0,2).toUpperCase();
+                      const avatarColors = ['#e87c1e','#3b82f6','#10b981','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899'];
+                      const avatarColor = avatarColors[idx % avatarColors.length];
+                      const mapsUrl = p.clienteEndereco ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.clienteEndereco)}` : null;
+                      const entregaOk = Boolean(p.equipamentoEntregueAt || p.checklist?.equipamentoEntregue);
+                      return (
+                        <tr key={p.id} className={instSelectedId === p.id ? 'is-selected' : ''} onClick={() => setInstSelectedId(prev => prev === p.id ? null : p.id)}>
+                          <td onClick={e => e.stopPropagation()}>
+                            <div className="inst-avatar" style={{background: avatarColor}}>{initials}</div>
+                          </td>
+                          <td>
+                            <div className="os-td-name">{p.clienteNome}</div>
+                            <div className="os-td-phone">#{p.contratoId}{p.clienteTelefone ? ` • ${p.clienteTelefone}` : ''}</div>
+                          </td>
+                          <td>{p.clienteCidade || '—'}</td>
+                          <td>
+                            <div className="inst-placas-num">{p.quantidadePlacas || '—'}</div>
+                            {p.quantidadePlacas ? <div className="os-td-phone">placas</div> : null}
+                          </td>
+                          <td>
+                            <div className="os-td-name">{p.inversor || p.potenciaInversor || '—'}</div>
+                            <div className="os-td-phone">{p.modeloInversor || ''}</div>
+                          </td>
+                          <td>
+                            {mapsUrl
+                              ? <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inst-maps-link" onClick={e => e.stopPropagation()}>📍 {p.clienteEndereco}</a>
+                              : <span style={{color:'#94a3b8'}}>—</span>
+                            }
+                          </td>
+                          <td>
+                            {p.equipamentoEnviadoAt ? (
+                              <div>
+                                <div>{dateBr(p.equipamentoEnviadoAt)}</div>
+                                {entregaOk && <span className="inst-check">✅</span>}
+                              </div>
+                            ) : '—'}
+                          </td>
+                          <td>
+                            {p.instalacaoAgendada ? (
+                              <div>
+                                <div>{dateBr(p.instalacaoAgendada)}</div>
+                                <div className="os-td-phone">{new Date(p.instalacaoAgendada).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+                              </div>
+                            ) : '—'}
+                          </td>
+                          <td>
+                            <div>
+                              <span style={{marginRight:'0.3rem'}}>👥</span>
+                              <span className="os-td-name">{p.responsavelNome || '—'}</span>
                             </div>
-                            <p>Contrato #{projeto.contratoId} • {getResponsibleName(projeto.responsavelNome)}</p>
-                            <p>{getInstallationStage(projeto)} • {projectPhotos[projeto.id]?.length || 0} foto{(projectPhotos[projeto.id]?.length || 0) === 1 ? '' : 's'}</p>
-                            <strong className="project-value">{money(projeto.valorProjeto)}</strong>
-                            <span className="project-open-hint">Abrir projeto</span>
-                          </button>
-                        ))}
-                        {filteredProjetos.filter(column.matches).length === 0 && (
-                          <div className="empty-inline">
-                            <strong>Nada nessa etapa</strong>
-                            <span>Nenhum projeto encontrado aqui.</span>
-                          </div>
-                        )}
+                          </td>
+                          <td>
+                            <span className={`inst-badge inst-badge-${instStatus.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}`}>{instStatus}</span>
+                          </td>
+                          <td onClick={e => e.stopPropagation()} style={{position:'relative'}}>
+                            <button
+                              type="button"
+                              className="os-three-dot"
+                              onClick={(e) => { e.stopPropagation(); setInstActionsOpen(prev => prev === p.id ? null : p.id); }}
+                            >···</button>
+                            {instActionsOpen === p.id && (
+                              <div className="inst-actions-dropdown">
+                                <button type="button" onClick={() => { setSelectedProjeto(p); setInstActionsOpen(null); rememberPanelStep(); }}>Ver detalhes</button>
+                                <button type="button" onClick={() => { updateProjeto(p.id, { equipamentoEntregueAt: new Date().toISOString() }); setInstActionsOpen(null); }}>Confirmar entrega</button>
+                                <button type="button" onClick={() => { const d = prompt('Data/hora da instalação (AAAA-MM-DDTHH:MM):'); if (d) updateProjeto(p.id, { instalacaoAgendada: d }); setInstActionsOpen(null); }}>Agendar</button>
+                                <button type="button" onClick={() => { const d = prompt('Nova data/hora (AAAA-MM-DDTHH:MM):'); if (d) updateProjeto(p.id, { instalacaoAgendada: d }); setInstActionsOpen(null); }}>Reagendar</button>
+                                <button type="button" onClick={() => setInstActionsOpen(null)}>Registrar pendência</button>
+                                <button type="button" onClick={() => setInstActionsOpen(null)}>Histórico</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {!filteredInstalacoes.length && (
+                  <div className="os-tbl-empty">
+                    <strong>Nenhuma instalação encontrada</strong>
+                    <span>Ajuste os filtros ou cadastre uma nova instalação.</span>
+                  </div>
+                )}
+                <div className="os-tbl-footer">
+                  <span>
+                    Mostrando {filteredInstalacoes.length === 0 ? 0 : (instPage - 1) * INST_PER_PAGE + 1} a {Math.min(instPage * INST_PER_PAGE, filteredInstalacoes.length)} de {filteredInstalacoes.length} resultados
+                  </span>
+                  <div className="os-pagination">
+                    <button type="button" className="os-pg-btn" disabled={instPage <= 1} onClick={() => setInstPage(p => p - 1)}>‹</button>
+                    {Array.from({length: Math.max(1, Math.ceil(filteredInstalacoes.length / INST_PER_PAGE))}, (_, i) => i + 1).map(pg => (
+                      <button key={pg} type="button" className={`os-pg-btn${instPage === pg ? ' active' : ''}`} onClick={() => setInstPage(pg)}>{pg}</button>
+                    ))}
+                    <button type="button" className="os-pg-btn" disabled={instPage >= Math.ceil(filteredInstalacoes.length / INST_PER_PAGE)} onClick={() => setInstPage(p => p + 1)}>›</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom 3-panel section */}
+              <div className="inst-bottom-panels">
+                {/* Panel 1: Agenda */}
+                <div className="inst-panel">
+                  <div className="inst-panel-hd">
+                    <strong>Agenda de instalações</strong>
+                    <div className="inst-agenda-tabs">
+                      <button type="button" className={instAgendaTab === 'hoje' ? 'active' : ''} onClick={() => setInstAgendaTab('hoje')}>Hoje</button>
+                      <button type="button" className={instAgendaTab === 'amanha' ? 'active' : ''} onClick={() => setInstAgendaTab('amanha')}>Amanhã</button>
+                    </div>
+                  </div>
+                  <div className="inst-agenda-list">
+                    {instAgendaList.length === 0 && (
+                      <div className="inst-empty-state">
+                        <span>📅</span>
+                        <p>Nenhuma instalação {instAgendaTab === 'hoje' ? 'hoje' : 'amanhã'}.</p>
+                      </div>
+                    )}
+                    {instAgendaList.map(p => (
+                      <div key={p.id} className="inst-agenda-item">
+                        <div className="inst-agenda-time">
+                          {p.instalacaoAgendada ? new Date(p.instalacaoAgendada).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '--:--'}
+                        </div>
+                        <div className="inst-agenda-info">
+                          <div className="inst-agenda-name">{p.clienteNome}</div>
+                          <div className="inst-agenda-addr">{p.clienteEndereco || p.clienteCidade || '—'}</div>
+                          <div className="inst-agenda-modules">{p.quantidadePlacas ? `${p.quantidadePlacas} módulos` : ''}</div>
+                        </div>
+                        <button type="button" className="inst-agenda-ver" onClick={() => { setSelectedProjeto(p); rememberPanelStep(); }}>Ver detalhes</button>
                       </div>
                     ))}
                   </div>
-                </>
-              )}
+                  {instAgendaList.length > 0 && (
+                    <div className="inst-panel-footer">
+                      <button type="button" className="inst-panel-link">Ver agenda completa &rsaquo;</button>
+                    </div>
+                  )}
+                </div>
 
+                {/* Panel 2: Checklist e evidências */}
+                <div className="inst-panel">
+                  <div className="inst-panel-hd">
+                    <strong>Checklist e evidências</strong>
+                  </div>
+                  <div className="inst-checklist-list">
+                    {[
+                      { key: 'fachada', label: 'Fachada' },
+                      { key: 'telhado', label: 'Telhado' },
+                      { key: 'medidor', label: 'Medidor da concessionária' },
+                      { key: 'antesInstalacao', label: 'Antes da instalação' },
+                      { key: 'depoisInstalacao', label: 'Depois da instalação' },
+                      { key: 'inversor', label: 'Inversor' },
+                      { key: 'quadroEletrico', label: 'Quadro elétrico' },
+                    ].map(item => (
+                      <label key={item.key} className="inst-check-row">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(instChecklistState[item.key])}
+                          onChange={e => setInstChecklistState(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                        />
+                        <span>{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="inst-photo-gallery">
+                    {['Fachada','Telhado','Medidor','Área de instalação','Inversor'].map(lbl => (
+                      <div key={lbl} className="inst-photo-thumb">
+                        <div className="inst-photo-placeholder">🖼</div>
+                        <span>{lbl}</span>
+                      </div>
+                    ))}
+                    <button type="button" className="inst-photo-add">
+                      <span>+</span>
+                      <span>Adicionar foto</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Panel 3: Próxima instalação */}
+                <div className="inst-panel">
+                  <div className="inst-panel-hd">
+                    <strong>Próxima instalação</strong>
+                  </div>
+                  {instProxima ? (
+                    <div className="inst-proxima">
+                      <div className="inst-proxima-tag">
+                        {(() => {
+                          const today = new Date(); today.setHours(0,0,0,0);
+                          const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+                          const d = new Date(instProxima.instalacaoAgendada); d.setHours(0,0,0,0);
+                          if (d.getTime() === today.getTime()) return 'Hoje';
+                          if (d.getTime() === tomorrow.getTime()) return 'Amanhã';
+                          return dateBr(instProxima.instalacaoAgendada);
+                        })()}
+                      </div>
+                      <div className="inst-proxima-name">{instProxima.clienteNome}</div>
+                      <div className="inst-proxima-addr">📍 {instProxima.clienteEndereco || instProxima.clienteCidade || '—'}</div>
+                      <div className="inst-proxima-sys">
+                        {instProxima.quantidadePlacas ? `${instProxima.quantidadePlacas} módulos` : ''}
+                        {instProxima.inversor ? ` • ${instProxima.inversor}` : ''}
+                      </div>
+                      <div className="inst-proxima-team">
+                        <span>👥</span>
+                        <span>{instProxima.responsavelNome || '—'}</span>
+                        {instProxima.clienteTelefone && <span> • {instProxima.clienteTelefone}</span>}
+                      </div>
+                      {instProxima.observacoes && (
+                        <div className="inst-proxima-obs">
+                          <div className="inst-proxima-obs-label">Observações da equipe</div>
+                          <p>{instProxima.observacoes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="inst-empty-state">
+                      <span>📅</span>
+                      <p>Nenhuma instalação agendada.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Detail view (reuses existing project detail, shown below panels) */}
               {selectedProjeto && (
-                <div className="project-detail-page">
+                <div className="project-detail-page inst-detail-overlay">
                   <div className="project-detail-toolbar">
-                    <button type="button" className="btn btn-outline" onClick={handlePanelBack}>
-                      Voltar para instalações
+                    <button type="button" className="btn btn-outline" onClick={() => { setSelectedProjeto(null); setInstSelectedId(null); }}>
+                      ← Voltar para instalações
                     </button>
                     <div>
-                      <span className="section-kicker">Cadastro da instalação</span>
+                      <span className="section-kicker">Contrato #{selectedProjeto.contratoId}</span>
                       <h3>{selectedProjeto.clienteNome}</h3>
-                      <p>Atualize o andamento da instalação, agenda, fotos e observações do cliente.</p>
+                      <p>{selectedProjeto.clienteCidade || 'Cidade não informada'} • {getResponsibleName(selectedProjeto.responsavelNome)}</p>
                     </div>
                   </div>
 
                   <div className="project-detail-modal project-detail-inline">
-                    <div className="contract-modal-header">
-                      <div>
-                        <span className="section-kicker">Contrato #{selectedProjeto.contratoId}</span>
-                        <h3>{selectedProjeto.clienteNome}</h3>
-                        <p>{selectedProjeto.clienteCidade || 'Cidade não informada'} • {getResponsibleName(selectedProjeto.responsavelNome)}</p>
-                      </div>
-                    </div>
-
                     <div className="project-detail-grid">
                       <div className="detalhe-item highlight"><span className="detalhe-titulo">Valor</span><span className="detalhe-valor">{money(selectedProjeto.valorProjeto)}</span></div>
-                      <div className="detalhe-item"><span className="detalhe-titulo">Status da instalação</span><span className="detalhe-valor">{getInstallationStage(selectedProjeto)}</span></div>
+                      <div className="detalhe-item"><span className="detalhe-titulo">Status</span><span className="detalhe-valor">{getInstallationStage(selectedProjeto)}</span></div>
                       <div className="detalhe-item"><span className="detalhe-titulo">Prazo</span><span className="detalhe-valor">{dateBr(selectedProjeto.prazoPrevisto)}</span></div>
                       <div className="detalhe-item"><span className="detalhe-titulo">Prioridade</span><span className="detalhe-valor">{selectedProjeto.prioridade || 'Normal'}</span></div>
                       <div className="detalhe-item"><span className="detalhe-titulo">Equipamento enviado</span><span className="detalhe-valor">{dateBr(selectedProjeto.equipamentoEnviadoAt) || 'Pendente'}</span></div>
@@ -6821,7 +7159,36 @@ const AdminDashboard = () => {
                         }}
                       />
                     </div>
+                  </div>
+                </div>
+              )}
 
+              {/* Nova Instalação modal */}
+              {instNovaOpen && (
+                <div className="inst-modal-backdrop" onClick={() => setInstNovaOpen(false)}>
+                  <div className="inst-modal" onClick={e => e.stopPropagation()}>
+                    <div className="inst-modal-hd">
+                      <strong>Nova Instalação</strong>
+                      <button type="button" className="os-panel-close" onClick={() => setInstNovaOpen(false)}>✕</button>
+                    </div>
+                    <div className="inst-modal-body">
+                      <p style={{color:'#64748b',fontSize:'0.9rem'}}>Selecione um contrato existente para criar o registro de instalação.</p>
+                      <div className="os-info-grid" style={{marginTop:'1rem'}}>
+                        <div className="os-info-item">
+                          <label>Cliente / Contrato</label>
+                          <select style={{width:'100%',height:38,borderRadius:10,border:'1px solid #dce2ea',padding:'0 0.75rem',fontSize:'0.87rem',background:'#f8fafc'}}>
+                            <option value="">Selecione um contrato...</option>
+                            {contratos.filter(c => c.status === 'Aprovado').map(c => (
+                              <option key={c.id} value={c.id}>{c.clienteNome} — #{c.id}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{marginTop:'1.5rem',display:'flex',justifyContent:'flex-end',gap:'0.5rem'}}>
+                        <button type="button" className="btn btn-outline" onClick={() => setInstNovaOpen(false)}>Cancelar</button>
+                        <button type="button" className="btn btn-primary" onClick={() => setInstNovaOpen(false)}>Criar instalação</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

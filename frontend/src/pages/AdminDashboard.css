@@ -15180,3 +15180,115 @@
     max-width: 65%;
   }
 }
+
+/* ── Instalações redesign ─────────────────────────────────────────────────── */
+.inst-page { display: grid; gap: 1rem; }
+.inst-table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow-x: auto; }
+
+/* Avatar */
+.inst-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 0.82rem; flex-shrink: 0; }
+
+/* Plates count */
+.inst-placas-num { font-size: 1.3rem; font-weight: 800; line-height: 1; color: #0f172a; }
+
+/* Maps link */
+.inst-maps-link { color: #3b82f6; text-decoration: none; font-size: 0.85rem; white-space: nowrap; }
+.inst-maps-link:hover { text-decoration: underline; }
+
+/* Delivery checkmark */
+.inst-check { color: #16a34a; font-size: 0.9rem; margin-left: 0.3rem; }
+
+/* Status badges */
+.inst-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.inst-badge-aguardando-envio { background: #f1f5f9; color: #64748b; }
+.inst-badge-em-transporte { background: #dbeafe; color: #1d4ed8; }
+.inst-badge-entrega-agendada { background: #cffafe; color: #0e7490; }
+.inst-badge-equipamento-entregue { background: #dcfce7; color: #15803d; }
+.inst-badge-materiais-com-pendncia { background: #ffedd5; color: #c2410c; }
+.inst-badge-aguardando-instalao { background: #fef9c3; color: #854d0e; }
+.inst-badge-instalao-agendada { background: #ede9fe; color: #6d28d9; }
+.inst-badge-reagendada { background: #fce7f3; color: #9d174d; }
+.inst-badge-em-instalao { background: #e0e7ff; color: #3730a3; }
+.inst-badge-aguardando-conferncia-tcnica { background: #ccfbf1; color: #0f766e; }
+.inst-badge-concluda { background: #dcfce7; color: #166534; }
+.inst-badge-cancelada { background: #fee2e2; color: #991b1b; }
+
+/* 3-dot actions dropdown */
+.inst-actions-dropdown { position: absolute; right: 0; top: calc(100% + 4px); z-index: 200; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(15,23,42,.12); min-width: 180px; overflow: hidden; }
+.inst-actions-dropdown button { display: block; width: 100%; padding: 0.65rem 1rem; border: 0; border-bottom: 1px solid #f1f5f9; background: transparent; color: #0f172a; font-size: 0.87rem; text-align: left; cursor: pointer; transition: background 0.1s; }
+.inst-actions-dropdown button:last-child { border-bottom: 0; }
+.inst-actions-dropdown button:hover { background: #f8fafc; }
+
+/* Bottom 3 panels */
+.inst-bottom-panels { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.inst-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; min-height: 280px; }
+.inst-panel-hd { display: flex; align-items: center; justify-content: space-between; }
+.inst-panel-hd strong { font-size: 1rem; font-weight: 700; color: #0f172a; }
+.inst-panel-footer { border-top: 1px solid #f1f5f9; padding-top: 0.5rem; text-align: center; }
+.inst-panel-link { background: none; border: none; color: #e87c1e; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.inst-panel-link:hover { text-decoration: underline; }
+
+/* Agenda tabs */
+.inst-agenda-tabs { display: flex; gap: 0.25rem; background: #f1f5f9; border-radius: 8px; padding: 2px; }
+.inst-agenda-tabs button { padding: 4px 12px; border: none; border-radius: 6px; background: transparent; font-size: 0.8rem; font-weight: 600; color: #64748b; cursor: pointer; transition: all 0.15s; }
+.inst-agenda-tabs button.active { background: #fff; color: #e87c1e; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+
+/* Agenda items */
+.inst-agenda-list { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; overflow-y: auto; }
+.inst-agenda-item { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.6rem; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; }
+.inst-agenda-time { font-size: 0.95rem; font-weight: 800; color: #e87c1e; width: 44px; flex-shrink: 0; }
+.inst-agenda-info { flex: 1; }
+.inst-agenda-name { font-weight: 700; font-size: 0.87rem; color: #0f172a; }
+.inst-agenda-addr { font-size: 0.78rem; color: #64748b; }
+.inst-agenda-modules { font-size: 0.75rem; color: #94a3b8; }
+.inst-agenda-ver { font-size: 0.75rem; color: #e87c1e; font-weight: 600; background: none; border: 1px solid #fdd5b1; border-radius: 6px; padding: 2px 8px; cursor: pointer; flex-shrink: 0; }
+.inst-agenda-ver:hover { background: #fff8f2; }
+
+/* Checklist */
+.inst-checklist-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.inst-check-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.87rem; color: #0f172a; cursor: pointer; }
+.inst-check-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #e87c1e; }
+
+/* Photo gallery */
+.inst-photo-gallery { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.inst-photo-thumb { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+.inst-photo-placeholder { width: 52px; height: 52px; background: #f1f5f9; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: #94a3b8; border: 1px solid #e2e8f0; }
+.inst-photo-thumb span { font-size: 0.65rem; color: #94a3b8; text-align: center; max-width: 52px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inst-photo-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.2rem; width: 52px; height: 52px; border: 1.5px dashed #cbd5e1; border-radius: 8px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.75rem; }
+.inst-photo-add span:first-child { font-size: 1.2rem; line-height: 1; }
+.inst-photo-add:hover { border-color: #e87c1e; color: #e87c1e; }
+
+/* Empty state */
+.inst-empty-state { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 1.5rem; color: #94a3b8; font-size: 0.87rem; text-align: center; }
+.inst-empty-state span { font-size: 2rem; }
+
+/* Proxima instalação */
+.inst-proxima { display: flex; flex-direction: column; gap: 0.5rem; }
+.inst-proxima-tag { display: inline-block; padding: 3px 10px; background: #e87c1e; color: #fff; border-radius: 20px; font-size: 0.75rem; font-weight: 700; width: fit-content; }
+.inst-proxima-name { font-size: 1.1rem; font-weight: 800; color: #0f172a; }
+.inst-proxima-addr { font-size: 0.87rem; color: #64748b; }
+.inst-proxima-sys { font-size: 0.82rem; color: #475569; font-weight: 600; }
+.inst-proxima-team { display: flex; align-items: center; gap: 0.4rem; font-size: 0.87rem; color: #0f172a; }
+.inst-proxima-obs { margin-top: 0.5rem; }
+.inst-proxima-obs-label { font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
+.inst-proxima-obs p { font-size: 0.85rem; color: #475569; margin: 0; line-height: 1.5; }
+
+/* Detail overlay */
+.inst-detail-overlay { margin-top: 1rem; border-top: 2px solid #e2e8f0; padding-top: 1rem; }
+
+/* Nova instalação modal */
+.inst-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.inst-modal { background: #fff; border-radius: 16px; width: min(520px, 100%); max-height: 90dvh; overflow-y: auto; box-shadow: 0 24px 70px rgba(15,23,42,.28); }
+.inst-modal-hd { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
+.inst-modal-hd strong { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
+.inst-modal-body { padding: 1.25rem 1.5rem; }
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .inst-bottom-panels { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 720px) {
+  .inst-bottom-panels { grid-template-columns: 1fr; }
+  .inst-table-wrap { border-radius: 10px; }
+}
+/* ── End Instalações redesign ──────────────────────────────────────────────── */
