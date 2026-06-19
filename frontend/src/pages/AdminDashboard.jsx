@@ -6094,39 +6094,6 @@ const AdminDashboard = () => {
               </div>
 
               {renderProdutosPacotes()}
-
-              <div className="pkit-regua">
-                <div className="pkit-regua-info">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  <span>Apenas itens com status <strong>"Ativo"</strong> são utilizados na criação de orçamentos e na geração automática de contratos.</span>
-                </div>
-                <div className="pkit-regua-steps">
-                  <div className="pkit-regua-step">
-                    <span className="pkit-regua-num">1</span>
-                    <div>
-                      <strong>Cadastro técnico</strong>
-                      <small>Modelos de placas, inversores e configurações básicas</small>
-                    </div>
-                  </div>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cbd5e1" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                  <div className="pkit-regua-step">
-                    <span className="pkit-regua-num">2</span>
-                    <div>
-                      <strong>Orçamento</strong>
-                      <small>Seleção dos itens ativos para o orçamento</small>
-                    </div>
-                  </div>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cbd5e1" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                  <div className="pkit-regua-step">
-                    <span className="pkit-regua-num">3</span>
-                    <div>
-                      <strong>Contrato</strong>
-                      <small>Geração automática com os dados técnicos exatos</small>
-                    </div>
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
