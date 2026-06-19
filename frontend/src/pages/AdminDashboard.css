@@ -12954,7 +12954,7 @@
 
 /* KPI INDICATORS */
 .os-kpis { display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.25rem; }
-.os-kpi { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.1rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; white-space: nowrap; min-width: 0; }
+.os-kpi { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.1rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; white-space: nowrap; flex-shrink: 0; }
 .os-kpi:hover { border-color: #e87c1e; }
 .os-kpi.active { border-color: #e87c1e; background: #fff8f2; }
 .os-kpi-icon { font-size: 1.4rem; line-height: 1; }
