@@ -919,6 +919,8 @@ const AdminDashboard = () => {
   const [equipamentoForm, setEquipamentoForm] = useState(emptyEquipamentoForm);
   const [editingEquipamentoId, setEditingEquipamentoId] = useState(null);
   const [produtoSearch, setProdutoSearch] = useState('');
+  const [produtoTipoFilter, setProdutoTipoFilter] = useState('todos');
+  const [produtoStatusFilter, setProdutoStatusFilter] = useState('todos');
   const equipamentoNomeRef = useRef(null);
   const signatureCanvasRef = useRef(null);
   const signatureDrawingRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
@@ -1494,17 +1496,13 @@ const AdminDashboard = () => {
 
   const filteredProdutosPacotes = useMemo(() => {
     const search = produtoSearch.trim().toLowerCase();
-    if (!search) return equipamentos;
-
-    return equipamentos.filter(item => [
-      item.nome,
-      item.tipo,
-      item.placaModelo,
-      item.inversorModelo,
-      item.observacoes,
-      item.formaPagamento,
-    ].some(value => String(value || '').toLowerCase().includes(search)));
-  }, [equipamentos, produtoSearch]);
+    return equipamentos.filter(item => {
+      const matchSearch = !search || [item.nome, item.tipo, item.placaModelo, item.inversorModelo, item.observacoes].some(v => String(v || '').toLowerCase().includes(search));
+      const matchTipo = produtoTipoFilter === 'todos' || item.tipo === produtoTipoFilter;
+      const matchStatus = produtoStatusFilter === 'todos' || (produtoStatusFilter === 'ativo' ? item.active : !item.active);
+      return matchSearch && matchTipo && matchStatus;
+    });
+  }, [equipamentos, produtoSearch, produtoTipoFilter, produtoStatusFilter]);
 
   const activeProdutosTotal = useMemo(
     () => equipamentos.filter(item => item.active).length,
@@ -2800,191 +2798,137 @@ const AdminDashboard = () => {
   };
 
   const renderProdutosPacotes = () => (
-    <div className="products-catalog-layout">
-      <aside className="products-catalog-list">
-        <div className="catalog-list-header">
-          <div>
-            <strong>Catálogo</strong>
-            <span>{filteredProdutosPacotes.length} de {equipamentos.length} item{equipamentos.length === 1 ? '' : 's'}</span>
-          </div>
-          <button type="button" className="btn btn-primary btn-sm-admin" onClick={startNewEquipamento}>Novo item</button>
+    <div className="pkit-body">
+      <aside className="pkit-catalog-panel">
+        <div className="pkit-catalog-hd">
+          <strong>Catálogo</strong>
+          <button
+            type="button"
+            className={`pkit-active-toggle ${produtoStatusFilter === 'ativo' ? 'on' : ''}`}
+            onClick={() => setProdutoStatusFilter(prev => prev === 'ativo' ? 'todos' : 'ativo')}
+          >
+            <span className="pkit-dot" />
+            {produtoStatusFilter === 'ativo' ? 'Mostrando itens ativos' : 'Todos os itens'}
+          </button>
         </div>
-        <input
-          className="catalog-search"
-          value={produtoSearch}
-          onChange={(event) => setProdutoSearch(event.target.value)}
-          placeholder="Buscar por nome, placa, inversor..."
-        />
-        <div className="catalog-items">
+        <div className="pkit-catalog-items">
           {filteredProdutosPacotes.map(item => (
             <button
               type="button"
               key={item.id}
-              className={`catalog-item ${editingEquipamentoId === item.id ? 'active' : ''} ${item.active ? '' : 'disabled'}`}
+              className={`pkit-catalog-item ${editingEquipamentoId === item.id ? 'selected' : ''} ${!item.active ? 'inactive' : ''}`}
               onClick={() => editEquipamento(item)}
             >
-              <div>
+              <div className="pkit-item-top">
                 <strong>{item.nome}</strong>
-                <span>{item.tipo || 'Kit solar'} • {item.valorSistema ? money(item.valorSistema) : 'sem valor'}</span>
+                <span className={`pkit-badge ${item.active ? 'pkit-badge-ativo' : 'pkit-badge-inativo'}`}>
+                  {item.active ? 'Ativo' : 'Inativo'}
+                </span>
               </div>
-              <small>{item.potenciaKwp ? `${item.potenciaKwp} kWp` : 'Sem potência'} · {item.geracaoKwh ? `${item.geracaoKwh} kWh/mês` : 'Sem geração'}</small>
+              <div className="pkit-item-specs">
+                {item.placaModelo && <span>Placa: {item.placaModelo}</span>}
+                {item.inversorModelo && <><span className="pkit-sep">·</span><span>Inversor: {item.inversorModelo}</span></>}
+                {item.quantidadeCabo && <><span className="pkit-sep">·</span><span>Cabo: {item.quantidadeCabo} m</span></>}
+              </div>
             </button>
           ))}
           {filteredProdutosPacotes.length === 0 && (
             <div className="catalog-empty">
               <strong>Nenhum item encontrado</strong>
-              <span>Limpe a busca ou crie um novo produto.</span>
+              <span>Ajuste os filtros ou crie um novo cadastro.</span>
             </div>
           )}
         </div>
+        {equipamentos.length > 0 && (
+          <button type="button" className="pkit-ver-todos" onClick={() => { setProdutoSearch(''); setProdutoTipoFilter('todos'); setProdutoStatusFilter('todos'); }}>
+            Ver todos os itens →
+          </button>
+        )}
       </aside>
 
-      <form className="product-editor" onSubmit={saveEquipamento}>
+      <form className="product-editor pkit-form-panel" onSubmit={saveEquipamento}>
         <div className="product-editor-header">
           <div>
             <span className="section-kicker">{editingEquipamentoId ? `Editando #${editingEquipamentoId}` : 'Novo cadastro'}</span>
-            <h3>{editingEquipamentoId ? 'Editar produto/pacote' : 'Criar produto/pacote'}</h3>
+            <h3>Cadastro técnico</h3>
           </div>
           <div className="product-editor-actions">
             {editingEquipamentoId && (
               <>
-                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => duplicateEquipamento(equipamentos.find(item => item.id === editingEquipamentoId))}>Duplicar</button>
-                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => toggleEquipamentoActive(equipamentos.find(item => item.id === editingEquipamentoId))}>
-                  {equipamentos.find(item => item.id === editingEquipamentoId)?.active ? 'Desativar' : 'Ativar'}
+                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => duplicateEquipamento(equipamentos.find(i => i.id === editingEquipamentoId))}>Duplicar</button>
+                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => toggleEquipamentoActive(equipamentos.find(i => i.id === editingEquipamentoId))}>
+                  {equipamentos.find(i => i.id === editingEquipamentoId)?.active ? 'Desativar' : 'Ativar'}
                 </button>
               </>
             )}
-            <button type="button" className="btn btn-outline btn-sm-admin" onClick={startNewEquipamento}>Limpar</button>
           </div>
         </div>
 
         <section className="product-editor-section">
-          <div className="editor-section-title">
-            <strong>Identificação</strong>
-            <span>Como o item aparece para a equipe na seleção do contrato.</span>
-          </div>
-          <div className="equipment-form product-editor-grid">
-            <label className="span-2">
-              Nome do produto ou pacote
-              <input ref={equipamentoNomeRef} placeholder="Ex: Kit residencial 5,49 kWp" value={equipamentoForm.nome} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
-            </label>
-            <div className="span-2">
-              <span className="field-label">Tipo</span>
-              <div className="segmented-options">
-                {equipamentoTypeOptions.map(option => (
-                  <button
-                    type="button"
-                    key={option}
-                    className={equipamentoForm.tipo === option ? 'active' : ''}
-                    onClick={() => setEquipamentoForm(prev => ({ ...prev, tipo: option }))}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="product-editor-section">
-          <div className="editor-section-title">
-            <strong>Dados técnicos</strong>
-            <span>Essas informações entram no quadro técnico do contrato.</span>
-          </div>
+          <div className="pkit-section-title">Identificação</div>
           <div className="equipment-form product-editor-grid">
             <label>
-              Modelo da placa
-              <input placeholder="Ex: Painel solar 610 W" value={equipamentoForm.placaModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, placaModelo: e.target.value }))} required />
+              Nome do cadastro *
+              <input ref={equipamentoNomeRef} placeholder="Ex: Kit residencial 5,49 kWp" value={equipamentoForm.nome} onChange={e => setEquipamentoForm(prev => ({ ...prev, nome: e.target.value }))} required />
             </label>
             <label>
-              Modelo do inversor
-              <input placeholder="Ex: Inversor 5 kW" value={equipamentoForm.inversorModelo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, inversorModelo: e.target.value }))} required />
-            </label>
-            <label>
-              Potência placa W
-              <input type="number" value={equipamentoForm.potenciaPlacaW} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaPlacaW: e.target.value }))} />
-            </label>
-            <label>
-              Potência inversor kW
-              <input type="number" step="0.01" value={equipamentoForm.potenciaInversorKw} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaInversorKw: e.target.value }))} />
-            </label>
-            <label>
-              Potência do sistema kWp
-              <input type="number" step="0.01" value={equipamentoForm.potenciaKwp} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, potenciaKwp: e.target.value }))} />
-            </label>
-            <label>
-              Quantidade de placas
-              <input type="number" value={equipamentoForm.numeroPaineis} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, numeroPaineis: e.target.value }))} />
-            </label>
-            <label>
-              Geração mensal kWh
-              <input type="number" step="0.01" value={equipamentoForm.geracaoKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoKwh: e.target.value }))} />
-            </label>
-            <label>
-              Geração anual kWh
-              <input type="number" step="0.01" value={equipamentoForm.geracaoAnualKwh} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, geracaoAnualKwh: e.target.value }))} />
-            </label>
-            <label className="span-2">
-              Quantidade de cabo
-              <input placeholder="Ex: 45 metros" value={equipamentoForm.quantidadeCabo} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, quantidadeCabo: e.target.value }))} />
+              Status *
+              <select value={equipamentoForm.active ? 'ativo' : 'inativo'} onChange={e => setEquipamentoForm(prev => ({ ...prev, active: e.target.value === 'ativo' }))}>
+                <option value="ativo">Ativo</option>
+                <option value="inativo">Inativo</option>
+              </select>
             </label>
           </div>
         </section>
 
         <section className="product-editor-section">
-          <div className="editor-section-title">
-            <strong>Comercial e contrato</strong>
-            <span>Valores e condições que serão puxados automaticamente.</span>
-          </div>
+          <div className="pkit-section-title">Dados da placa</div>
           <div className="equipment-form product-editor-grid">
             <label>
-              Valor do sistema
-              <CurrencyInput value={equipamentoForm.valorSistema} onValueChange={(value) => setEquipamentoForm(prev => ({ ...prev, valorSistema: value }))} />
+              Modelo da placa *
+              <input placeholder="Ex: Canadian Solar 610W" value={equipamentoForm.placaModelo} onChange={e => setEquipamentoForm(prev => ({ ...prev, placaModelo: e.target.value }))} required />
             </label>
             <label>
-              Entrada
-              <CurrencyInput value={equipamentoForm.valorEntrada} onValueChange={(value) => setEquipamentoForm(prev => ({ ...prev, valorEntrada: value }))} />
+              Potência da placa (W) *
+              <input type="number" placeholder="Ex: 610" value={equipamentoForm.potenciaPlacaW} onChange={e => setEquipamentoForm(prev => ({ ...prev, potenciaPlacaW: e.target.value }))} />
+            </label>
+          </div>
+        </section>
+
+        <section className="product-editor-section">
+          <div className="pkit-section-title">Dados do inversor</div>
+          <div className="equipment-form product-editor-grid">
+            <label>
+              Modelo do inversor *
+              <input placeholder="Ex: Growatt MIN 5KTL-X" value={equipamentoForm.inversorModelo} onChange={e => setEquipamentoForm(prev => ({ ...prev, inversorModelo: e.target.value }))} required />
             </label>
             <label>
-              Saldo
-              <CurrencyInput value={equipamentoForm.valorSaldo} onValueChange={(value) => setEquipamentoForm(prev => ({ ...prev, valorSaldo: value }))} />
+              Potência do inversor (kW) *
+              <input type="number" step="0.01" placeholder="Ex: 5" value={equipamentoForm.potenciaInversorKw} onChange={e => setEquipamentoForm(prev => ({ ...prev, potenciaInversorKw: e.target.value }))} />
+            </label>
+          </div>
+        </section>
+
+        <section className="product-editor-section">
+          <div className="pkit-section-title">Cabo</div>
+          <div className="equipment-form product-editor-grid">
+            <label>
+              Quantidade de cabo (m) *
+              <input placeholder="Ex: 45" value={equipamentoForm.quantidadeCabo} onChange={e => setEquipamentoForm(prev => ({ ...prev, quantidadeCabo: e.target.value }))} />
             </label>
             <label>
-              Prazo de execução
-              <input type="number" value={equipamentoForm.prazoExecucao} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, prazoExecucao: e.target.value }))} />
-            </label>
-            <div className="span-2">
-              <span className="field-label">Tipo de pagamento</span>
-              <div className="segmented-options">
-                {pagamentoTypeOptions.map(option => (
-                  <button
-                    type="button"
-                    key={option.value}
-                    className={equipamentoForm.formaPagamentoTipo === option.value ? 'active' : ''}
-                    onClick={() => setEquipamentoForm(prev => ({ ...prev, formaPagamentoTipo: option.value }))}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <label className="span-2">
-              Forma de pagamento detalhada
-              <textarea placeholder="Ex: Entrada de R$ 5.000,00 + saldo financiado em até 60x..." value={equipamentoForm.formaPagamento} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, formaPagamento: e.target.value }))} />
-            </label>
-            <label className="span-2">
-              Observações internas
-              <textarea placeholder="Use para detalhes de fornecedor, validade, exceções comerciais ou instalação." value={equipamentoForm.observacoes} onChange={(e) => setEquipamentoForm(prev => ({ ...prev, observacoes: e.target.value }))} />
+              Observação interna
+              <textarea placeholder="Informações adicionais, compatibilidades, observações..." value={equipamentoForm.observacoes} onChange={e => setEquipamentoForm(prev => ({ ...prev, observacoes: e.target.value }))} rows={3} style={{ resize: 'none' }} />
             </label>
           </div>
         </section>
 
         <div className="product-editor-footer">
-          <div>
-            <strong>{equipamentoForm.valorSistema ? money(equipamentoForm.valorSistema) : 'Sem valor definido'}</strong>
-            <span>{equipamentoForm.potenciaKwp || '0'} kWp • {equipamentoForm.geracaoKwh || '0'} kWh/mês</span>
-          </div>
-          <button className="btn btn-primary" type="submit">{editingEquipamentoId ? 'Salvar alterações' : 'Criar item'}</button>
+          <button type="button" className="btn btn-outline" onClick={startNewEquipamento}>Limpar</button>
+          <button className="btn btn-primary" type="submit">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '0.35rem' }}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Salvar cadastro
+          </button>
         </div>
       </form>
     </div>
@@ -6067,20 +6011,122 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'produtosPacotes' && (
-            <div className="admin-section">
-              <div className="section-heading">
+            <div className="pkit-page">
+              <div className="pkit-page-hd">
                 <div>
-                  <span className="section-kicker">Catálogo</span>
-                  <h3>Produtos e Pacotes</h3>
-                  <p>Cadastre os itens que entram no contrato para a equipe apenas selecionar e revisar.</p>
-                </div>
-                <div className="section-stats">
-                  <div><strong>{equipamentos.length}</strong><span>itens</span></div>
-                  <div><strong>{equipamentos.filter(item => item.active).length}</strong><span>ativos</span></div>
-                  <div><strong>{equipamentos.filter(item => item.valorSistema).length}</strong><span>com valor</span></div>
+                  <h2 className="pkit-title">Produtos e kits</h2>
+                  <p className="pkit-subtitle">Cadastre os modelos técnicos usados no orçamento e no contrato.</p>
                 </div>
               </div>
+
+              <div className="pkit-kpis">
+                <div className="pkit-kpi">
+                  <div className="pkit-kpi-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  </div>
+                  <div className="pkit-kpi-body">
+                    <strong>{equipamentos.length}</strong>
+                    <span>Total de itens</span>
+                    <small>Itens técnicos cadastrados</small>
+                  </div>
+                </div>
+                <div className="pkit-kpi">
+                  <div className="pkit-kpi-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                  </div>
+                  <div className="pkit-kpi-body">
+                    <strong>{new Set(equipamentos.map(e => e.placaModelo).filter(Boolean)).size}</strong>
+                    <span>Placas cadastradas</span>
+                    <small>Modelos de placas</small>
+                  </div>
+                </div>
+                <div className="pkit-kpi">
+                  <div className="pkit-kpi-icon">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+                  </div>
+                  <div className="pkit-kpi-body">
+                    <strong>{new Set(equipamentos.map(e => e.inversorModelo).filter(Boolean)).size}</strong>
+                    <span>Inversores cadastrados</span>
+                    <small>Modelos de inversores</small>
+                  </div>
+                </div>
+                <div className="pkit-kpi">
+                  <div className="pkit-kpi-icon pkit-kpi-icon-green">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><polyline points="9 12 12 15 17 9"/></svg>
+                  </div>
+                  <div className="pkit-kpi-body">
+                    <strong>{equipamentos.filter(e => e.active).length}</strong>
+                    <span>Ativos</span>
+                    <small>Itens ativos</small>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pkit-filter-bar">
+                <div className="pkit-filter-search">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+                  <input
+                    value={produtoSearch}
+                    onChange={e => setProdutoSearch(e.target.value)}
+                    placeholder="Buscar por nome do cadastro, modelo de placa ou inversor..."
+                  />
+                </div>
+                <select className="pkit-filter-select" value={produtoTipoFilter} onChange={e => setProdutoTipoFilter(e.target.value)}>
+                  <option value="todos">Todos os tipos</option>
+                  {equipamentoTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select className="pkit-filter-select" value={produtoStatusFilter} onChange={e => setProdutoStatusFilter(e.target.value)}>
+                  <option value="todos">Todos os status</option>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                </select>
+                <button
+                  type="button"
+                  className="pkit-clear-btn"
+                  onClick={() => { setProdutoSearch(''); setProdutoTipoFilter('todos'); setProdutoStatusFilter('todos'); }}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                  Limpar filtros
+                </button>
+                <button type="button" className="btn btn-primary pkit-new-btn" onClick={startNewEquipamento}>
+                  + Novo cadastro
+                </button>
+              </div>
+
               {renderProdutosPacotes()}
+
+              <div className="pkit-regua">
+                <div className="pkit-regua-info">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <span>Apenas itens com status <strong>"Ativo"</strong> são utilizados na criação de orçamentos e na geração automática de contratos.</span>
+                </div>
+                <div className="pkit-regua-steps">
+                  <div className="pkit-regua-step">
+                    <span className="pkit-regua-num">1</span>
+                    <div>
+                      <strong>Cadastro técnico</strong>
+                      <small>Modelos de placas, inversores e configurações básicas</small>
+                    </div>
+                  </div>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cbd5e1" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  <div className="pkit-regua-step">
+                    <span className="pkit-regua-num">2</span>
+                    <div>
+                      <strong>Orçamento</strong>
+                      <small>Seleção dos itens ativos para o orçamento</small>
+                    </div>
+                  </div>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cbd5e1" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  <div className="pkit-regua-step">
+                    <span className="pkit-regua-num">3</span>
+                    <div>
+                      <strong>Contrato</strong>
+                      <small>Geração automática com os dados técnicos exatos</small>
+                    </div>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
