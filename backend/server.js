@@ -723,6 +723,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
 
     const phoneVariants = whatsAppPhoneVariants(phone);
     const savedWhatsAppContact = isSavedWhatsAppContact(phoneVariants);
+    const knownBusinessPhone = await isKnownBusinessPhone(phoneVariants);
     const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
     const previousConversation = await db.get(
       `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
@@ -734,10 +735,13 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
       && !previousConversation
       && !lead
       && !savedWhatsAppContact
-      && !(await isKnownBusinessPhone(phoneVariants));
-    const effectiveAllowNewLead = (allowNewLead && !savedWhatsAppContact) || rescuedUnknownLidLead;
-    // Contatos salvos/LID conhecidos não entram como lead novo. Se o número não
-    // for conhecido no sistema, liberamos a captura para não perder lead real.
+      && !knownBusinessPhone;
+    const effectiveAllowNewLead = !savedWhatsAppContact
+      && !knownBusinessPhone
+      && (allowNewLead || rescuedUnknownLidLead);
+    // Grupo nunca entra aqui porque é bloqueado antes. Além disso, contatos
+    // salvos e números já conhecidos no sistema não podem disparar lead novo
+    // nem consumir o rodízio dos consultores.
     if (!effectiveAllowNewLead && !previousConversation) return;
 
     let owner = previousConversation?.assignedUserId
@@ -5702,7 +5706,9 @@ app.post('/api/admin/whatsapp/debug-classify-contact', authRequired, requirePerm
     && !lead
     && !savedWhatsAppContact
     && !knownBusinessPhone;
-  const effectiveAllowNewLead = (allowNewLead && !savedWhatsAppContact) || rescuedUnknownLidLead;
+  const effectiveAllowNewLead = !savedWhatsAppContact
+    && !knownBusinessPhone
+    && (allowNewLead || rescuedUnknownLidLead);
   const wouldCreateLead = !lead && effectiveAllowNewLead;
   const wouldNotifyNewLead = wouldCreateLead;
   const wouldNotifyAssignedReply = !savedWhatsAppContact
@@ -5771,7 +5777,9 @@ app.post('/api/internal/whatsapp/debug-classify-contact', async (req, res) => {
     && !lead
     && !savedWhatsAppContact
     && !knownBusinessPhone;
-  const effectiveAllowNewLead = (allowNewLead && !savedWhatsAppContact) || rescuedUnknownLidLead;
+  const effectiveAllowNewLead = !savedWhatsAppContact
+    && !knownBusinessPhone
+    && (allowNewLead || rescuedUnknownLidLead);
   const wouldCreateLead = !lead && effectiveAllowNewLead;
   const wouldNotifyNewLead = wouldCreateLead;
   const wouldNotifyAssignedReply = !savedWhatsAppContact
@@ -6284,14 +6292,25 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
         const messages = Array.isArray(value.messages) ? value.messages : [];
         for (const incoming of messages) {
           const phone = normalizeWhatsAppPhone(incoming.from);
-          if (!phone) continue;
+          if (!phone || !isPlausibleContactPhone(phone)) continue;
 
           const contact = contacts.find(item => normalizeWhatsAppPhone(item.wa_id) === phone) || {};
           const name = contact.profile?.name || phone;
-          let lead = await db.get('SELECT * FROM leads WHERE telefone = ? OR telefone = ?', phone, phone.replace(/^55/, ''));
+          const phoneVariants = whatsAppPhoneVariants(phone);
+          const savedWhatsAppContact = isSavedWhatsAppContact(phoneVariants);
+          const knownBusinessPhone = await isKnownBusinessPhone(phoneVariants);
+          const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
+          const previousConversation = await db.get(
+            `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
+            ...phoneVariants
+          );
+          const leadPlaceholders = phoneVariants.map(() => '?').join(', ');
+          let lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
+          const effectiveAllowNewLead = !savedWhatsAppContact && !knownBusinessPhone;
+          if (!effectiveAllowNewLead && !previousConversation) continue;
           let owner = null;
 
-          if (!lead) {
+          if (!lead && effectiveAllowNewLead) {
             owner = await getNextLeadOwner();
             const result = await db.run(
               `INSERT INTO leads
@@ -6305,9 +6324,11 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
             );
             lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
             io.emit('novo_lead', lead);
-          } else if (lead.assignedUserId) {
+          } else if (!lead && previousConversation?.assignedUserId) {
+            owner = { id: previousConversation.assignedUserId, nome: previousConversation.assignedUserName };
+          } else if (lead?.assignedUserId) {
             owner = { id: lead.assignedUserId, nome: lead.assignedUserName };
-          } else {
+          } else if (lead) {
             owner = await getNextLeadOwner();
             await db.run('UPDATE leads SET assignedUserId = ?, assignedUserName = ? WHERE id = ?', owner.id, owner.nome, lead.id);
             lead = await db.get('SELECT * FROM leads WHERE id = ?', lead.id);
@@ -6316,12 +6337,12 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
 
           const text = incoming.text?.body || incoming.button?.text || incoming.interactive?.button_reply?.title || `[${incoming.type || 'mensagem'}]`;
           const conversation = await upsertWhatsAppConversation({
-            leadId: lead.id,
-            nome: lead.nome || name,
+            leadId: lead?.id || previousConversation?.leadId || null,
+            nome: lead?.nome || previousConversation?.clienteNome || name,
             telefone: phone,
             remoteJid: `${phone}@s.whatsapp.net`,
-            assignedUserId: owner?.id || lead.assignedUserId,
-            assignedUserName: owner?.nome || lead.assignedUserName,
+            assignedUserId: owner?.id || lead?.assignedUserId || previousConversation?.assignedUserId || null,
+            assignedUserName: owner?.nome || lead?.assignedUserName || previousConversation?.assignedUserName || '',
           });
           const message = await createWhatsAppMessage({
             conversationId: conversation.id,
