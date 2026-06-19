@@ -32,6 +32,7 @@ const PORT = Number(process.env.PORT) || 3001;
 const DEFAULT_WHATSAPP_PHONE = '559985127056';
 const WHATSAPP_AUTH_DIR = path.join(__dirname, 'whatsapp-session');
 const WHATSAPP_MEDIA_DIR = path.join(__dirname, 'uploads', 'whatsapp');
+const WHATSAPP_CONTACTS_CACHE_FILE = path.join(__dirname, 'whatsapp-contacts-cache.json');
 const execFileAsync = promisify(execFile);
 const ROUND_ROBIN_SELLERS = [
   { position: 1, phone: '5599984632324', name: 'Vendedor 1' },
@@ -40,6 +41,50 @@ const ROUND_ROBIN_SELLERS = [
 ];
 
 const whatsappKnownContacts = new Map();
+let whatsappContactsCacheSaveTimer = null;
+
+const schedulePersistWhatsAppContacts = () => {
+  if (whatsappContactsCacheSaveTimer) clearTimeout(whatsappContactsCacheSaveTimer);
+  whatsappContactsCacheSaveTimer = setTimeout(() => {
+    whatsappContactsCacheSaveTimer = null;
+    try {
+      const payload = JSON.stringify(
+        [...whatsappKnownContacts.entries()].map(([phone, contact]) => [phone, contact]),
+        null,
+        2
+      );
+      fs.writeFileSync(WHATSAPP_CONTACTS_CACHE_FILE, payload, 'utf8');
+    } catch (error) {
+      console.error('Erro ao persistir cache de contatos do WhatsApp:', error?.message || error);
+    }
+  }, 500);
+};
+
+const loadPersistedWhatsAppContacts = () => {
+  try {
+    if (!fs.existsSync(WHATSAPP_CONTACTS_CACHE_FILE)) return;
+    const raw = fs.readFileSync(WHATSAPP_CONTACTS_CACHE_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+    for (const item of parsed) {
+      if (!Array.isArray(item) || item.length < 2) continue;
+      const phone = normalizeWhatsAppPhone(item[0]);
+      const contact = item[1] && typeof item[1] === 'object' ? item[1] : null;
+      if (!phone || !contact) continue;
+      whatsappKnownContacts.set(phone, {
+        id: String(contact.id || '').trim(),
+        lid: String(contact.lid || '').trim(),
+        phoneNumber: String(contact.phoneNumber || '').trim(),
+        name: String(contact.name || '').trim(),
+        notify: String(contact.notify || '').trim(),
+        verifiedName: String(contact.verifiedName || '').trim(),
+        short: String(contact.short || '').trim(),
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao carregar cache de contatos do WhatsApp:', error?.message || error);
+  }
+};
 
 // Configuração do Servidor HTTP para suportar o Socket.io
 const server = http.createServer(app);
@@ -167,7 +212,7 @@ const INTERNAL_USERS = [
     nome: 'Deivson DRM',
     username: 'deivson',
     email: 'deivson@drm.local',
-    whatsapp: process.env.WHATSAPP_DEIVSON || DEFAULT_WHATSAPP_PHONE,
+    whatsapp: process.env.WHATSAPP_DEIVSON || '559991675608',
     role: 'ADM',
     temporaryPassword: 'Deivson@DRM#2026',
     permissions: {
@@ -227,7 +272,7 @@ const INTERNAL_USERS = [
     nome: 'Carlito Lopes',
     username: 'carlito',
     email: 'carlito@drm.local',
-    whatsapp: process.env.WHATSAPP_CARLITO || '559992276744',
+    whatsapp: process.env.WHATSAPP_CARLITO || '5599992276744',
     role: 'CONSULTOR',
     temporaryPassword: 'Carlito@DRM#2026',
     permissions: {
@@ -324,6 +369,14 @@ const normalizeWhatsAppRemoteJid = (value) => {
 };
 
 const getPhoneFromWhatsAppJid = (jid) => normalizeWhatsAppPhone(String(jid || '').split('@')[0].split(':')[0]);
+const formatLeadPhoneForNotice = (value) => {
+  const phone = normalizeWhatsAppPhone(value);
+  return phone.startsWith('55') ? phone.slice(2) : phone;
+};
+const getPhonesFromWhatsAppContact = (contact = {}) => {
+  const values = [contact?.phoneNumber, contact?.id, contact?.lid];
+  return [...new Set(values.map(value => normalizeWhatsAppPhone(value)).filter(Boolean))];
+};
 
 const isBlockedWhatsAppJid = (jid = '') => {
   const value = String(jid || '');
@@ -376,27 +429,38 @@ const isKnownBusinessPhone = async (phoneVariants = []) => {
 };
 
 const rememberWhatsAppContacts = (contacts = []) => {
+  let changed = false;
   for (const contact of Array.isArray(contacts) ? contacts : []) {
-    const jid = String(contact?.id || '').trim();
-    const phone = normalizeWhatsAppPhone(getPhoneFromWhatsAppJid(jid));
-    if (!phone) continue;
-    const previous = whatsappKnownContacts.get(phone) || {};
-    whatsappKnownContacts.set(phone, {
-      ...previous,
-      id: jid,
-      name: String(contact?.name || previous.name || '').trim(),
-      notify: String(contact?.notify || previous.notify || '').trim(),
-      verifiedName: String(contact?.verifiedName || previous.verifiedName || '').trim(),
-      short: String(contact?.short || previous.short || '').trim(),
-    });
+    const phones = getPhonesFromWhatsAppContact(contact);
+    if (!phones.length) continue;
+    for (const phone of phones) {
+      const previous = whatsappKnownContacts.get(phone) || {};
+      const nextContact = {
+        ...previous,
+        id: String(contact?.id || previous.id || '').trim(),
+        lid: String(contact?.lid || previous.lid || '').trim(),
+        phoneNumber: String(contact?.phoneNumber || previous.phoneNumber || '').trim(),
+        name: String(contact?.name || previous.name || '').trim(),
+        notify: String(contact?.notify || previous.notify || '').trim(),
+        verifiedName: String(contact?.verifiedName || previous.verifiedName || '').trim(),
+        short: String(contact?.short || previous.short || '').trim(),
+      };
+      const previousSerialized = JSON.stringify(previous || {});
+      const nextSerialized = JSON.stringify(nextContact);
+      if (previousSerialized !== nextSerialized) {
+        whatsappKnownContacts.set(phone, nextContact);
+        changed = true;
+      }
+    }
   }
+  if (changed) schedulePersistWhatsAppContacts();
 };
 
 const isSavedWhatsAppContact = (phoneVariants = []) => {
   for (const variant of phoneVariants) {
     const phone = normalizeWhatsAppPhone(variant);
     const contact = phone ? whatsappKnownContacts.get(phone) : null;
-    if (contact?.name) return true;
+    if (contact && (contact.name || contact.notify || contact.verifiedName || contact.short || contact.phoneNumber || contact.lid || contact.id)) return true;
   }
   return false;
 };
@@ -467,7 +531,7 @@ const buildWhatsAppNewLeadNotice = ({ nome = '', telefone = '', mensagem = '', t
   teste ? 'Teste de aviso de lead novo.' : 'Chegou um lead novo aguardando atendimento.',
   '',
   `Cliente: ${nome || 'Sem nome'}`,
-  `WhatsApp: ${telefone || 'Sem telefone'}`,
+  `WhatsApp: ${formatLeadPhoneForNotice(telefone) || 'Sem telefone'}`,
   mensagem ? `Mensagem: ${String(mensagem).slice(0, 280)}` : '',
   '',
   'Abra o painel > WhatsApp e inicie o atendimento.',
@@ -760,7 +824,7 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
       printQRInTerminal: false,
       browser: ['DRM Energia Solar', 'Chrome', '1.0.0'],
       logger: pino({ level: 'silent' }),
-      syncFullHistory: false,
+      syncFullHistory: true,
       markOnlineOnConnect: false,
     });
 
@@ -876,6 +940,11 @@ const disconnectWhatsAppQrSession = async () => {
   whatsappRuntime.phone = '';
   whatsappRuntime.lastUpdate = new Date().toISOString();
   whatsappKnownContacts.clear();
+  if (whatsappContactsCacheSaveTimer) {
+    clearTimeout(whatsappContactsCacheSaveTimer);
+    whatsappContactsCacheSaveTimer = null;
+  }
+  fs.rmSync(WHATSAPP_CONTACTS_CACHE_FILE, { force: true });
   fs.rmSync(WHATSAPP_AUTH_DIR, { recursive: true, force: true });
   emitWhatsAppRuntimeStatus();
   return getWhatsAppProviderStatus();
@@ -1055,6 +1124,7 @@ const resolveWhatsAppJid = async (socket, rawJid) => {
 
   const phone = rawJid.split('@')[0].split(':')[0];
   if (!phone) return rawJid;
+  const expectedVariants = new Set(whatsAppPhoneVariants(phone));
 
   try {
     // Pergunta ao servidor do WhatsApp qual é o JID canônico real do número.
@@ -1062,6 +1132,11 @@ const resolveWhatsAppJid = async (socket, rawJid) => {
     const results = await socket.onWhatsApp(phone);
     const match = Array.isArray(results) ? results.find(r => r?.exists && r?.jid) : null;
     if (match?.jid) {
+      const matchedPhone = normalizeWhatsAppPhone(getPhoneFromWhatsAppJid(match.jid));
+      if (matchedPhone && expectedVariants.size && !expectedVariants.has(matchedPhone)) {
+        console.warn(`[WhatsApp] Ignorando JID canônico divergente para ${rawJid}: ${match.jid}`);
+        return rawJid;
+      }
       if (match.jid !== rawJid) {
         console.log(`[WhatsApp] JID canônico resolvido: ${rawJid} -> ${match.jid}`);
       }
@@ -1091,7 +1166,9 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
     if (!rawJid) {
       throw new Error('Contato do WhatsApp inválido para envio.');
     }
-    const jid = await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
+    const jid = (options.remoteJid || options.exactPhone)
+      ? rawJid
+      : await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
     const result = await whatsappRuntime.socket.sendMessage(jid, { text });
     return {
       configured: true,
@@ -1151,7 +1228,7 @@ const sendWhatsAppAudioMessage = async (to, media, mimeType = 'audio/mp4', optio
   }
   const rawJid = normalizeWhatsAppRemoteJid(options.remoteJid || to);
   if (!rawJid) throw new Error('Contato do WhatsApp inválido para envio.');
-  const jid = await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
+  const jid = options.remoteJid ? rawJid : await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
   const result = await whatsappRuntime.socket.sendMessage(jid, {
     audio: media,
     mimetype: mimeType,
@@ -2160,8 +2237,18 @@ const validateProjectDocumentDataUrl = (dataUrl) => {
   return { valid: true, dataUrl: value };
 };
 
+const getContractConsultantName = (contrato = {}) => (
+  String(contrato.consultorNome || contrato.assignedUserName || contrato.criadoPorNome || '').trim() || 'Sem consultor'
+);
+
+const getContractConsultantId = (contrato = {}) => (
+  contrato.consultorId ?? contrato.assignedUserId ?? contrato.criadoPorId ?? null
+);
+
 const parseContrato = (contrato) => ({
   ...contrato,
+  consultorId: getContractConsultantId(contrato),
+  consultorNome: getContractConsultantName(contrato),
   dados: parseJsonField(contrato.dados),
   equipamentoDados: parseJsonField(contrato.equipamentoDados),
 });
@@ -2319,12 +2406,22 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
     clienteTelefone: String(body.clienteTelefone ?? existing.clienteTelefone ?? '').trim(),
     clienteEmail: String(body.clienteEmail ?? existing.clienteEmail ?? '').trim(),
     clienteCidade: String(body.clienteCidade ?? existing.clienteCidade ?? '').trim(),
+    consultorId: body.consultorId === '' || typeof body.consultorId === 'undefined' || body.consultorId === null
+      ? getContractConsultantId(existing)
+      : numberOrNull(body.consultorId),
+    consultorNome: String(body.consultorNome ?? existing.consultorNome ?? existing.assignedUserName ?? existing.criadoPorNome ?? '').trim(),
     valorProjeto: moneyNumberOrNull(body.valorProjeto) ?? Number(existing.valorProjeto || 0),
     dados: {
       ...dados,
       dimensionamento: nextDimensionamento,
       financeiro: nextFinanceiro,
       manual: nextManual,
+      consultor: {
+        id: body.consultorId === '' || typeof body.consultorId === 'undefined' || body.consultorId === null
+          ? getContractConsultantId(existing)
+          : numberOrNull(body.consultorId),
+        nome: String(body.consultorNome ?? existing.consultorNome ?? existing.assignedUserName ?? existing.criadoPorNome ?? '').trim(),
+      },
       revisadoEm: new Date().toISOString(),
     },
     equipamentoDados: nextEquipamentoDados,
@@ -3999,6 +4096,18 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingContratoColumns.includes('equipamentoDados')) {
     await db.exec('ALTER TABLE contratos ADD COLUMN equipamentoDados TEXT');
   }
+  if (!existingContratoColumns.includes('consultorId')) {
+    await db.exec('ALTER TABLE contratos ADD COLUMN consultorId INTEGER');
+  }
+  if (!existingContratoColumns.includes('consultorNome')) {
+    await db.exec('ALTER TABLE contratos ADD COLUMN consultorNome TEXT');
+  }
+  await db.exec(`
+    UPDATE contratos
+    SET consultorId = COALESCE(consultorId, assignedUserId, criadoPorId),
+        consultorNome = COALESCE(NULLIF(consultorNome, ''), NULLIF(assignedUserName, ''), NULLIF(criadoPorNome, ''))
+    WHERE consultorId IS NULL OR consultorNome IS NULL OR consultorNome = ''
+  `);
 
   const procuracaoColumns = await db.all('PRAGMA table_info(procuracoes)');
   const existingProcuracaoColumns = procuracaoColumns.map(column => column.name);
@@ -4091,6 +4200,24 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       await db.exec(`ALTER TABLE usuarios ADD COLUMN ${field} ${definition}`);
     }
   }
+
+  await db.run(
+    `UPDATE usuarios
+        SET whatsapp = ?
+      WHERE lower(username) = 'carlito'
+        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
+    '5599992276744',
+    '559992276744'
+  );
+
+  await db.run(
+    `UPDATE usuarios
+        SET whatsapp = ?
+      WHERE lower(username) = 'deivson'
+        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
+    '559991675608',
+    '559985127056'
+  );
 
   for (const user of INTERNAL_USERS) {
     const existingUser = await db.get('SELECT id FROM usuarios WHERE username = ?', user.username);
@@ -6597,6 +6724,8 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     Object.entries(manual || {}).filter(([, value]) => value !== '' && typeof value !== 'undefined' && value !== null)
   );
   const manualFinal = mergeManualWithEquipamento({ ...manualFromOrcamento, ...manualOverrides }, equipamento);
+  const consultorId = cliente?.consultorId ?? orcamento.assignedUserId ?? req.user.id ?? null;
+  const consultorNome = String(cliente?.consultorNome || orcamento.assignedUserName || req.user.nome || '').trim() || 'Sem consultor';
   const now = new Date().toISOString();
   const dados = {
     cliente: cliente ? publicClient(cliente) : {
@@ -6609,6 +6738,10 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     dimensionamento,
     financeiro,
     manual: manualFinal,
+    consultor: {
+      id: consultorId,
+      nome: consultorNome,
+    },
     statusOrigem: orcamento.status,
     observacao: dimensionamento.observacoes || 'Contrato gerado no sistema e aguardando aprovação do responsável administrativo.',
   };
@@ -6616,8 +6749,8 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   const result = await db.run(
     `INSERT INTO contratos
       (orcamentoId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, valorProjeto, status, dados,
-       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados)
-     VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome)
+     VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     orcamento.id,
     orcamento.clienteNome,
     orcamento.clienteTelefone,
@@ -6636,7 +6769,9 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
       ...(equipamento || {}),
       placaModelo: manualFinal.painel || equipamento?.placaModelo || '',
       inversorModelo: manualFinal.inversor || equipamento?.inversorModelo || '',
-    })
+    }),
+    consultorId,
+    consultorNome
   );
 
   const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', result.lastID);
@@ -6666,6 +6801,8 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
     ? await db.get('SELECT * FROM equipamentos WHERE id = ?', equipamentoId)
     : await db.get('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id DESC LIMIT 1');
   const manualFinal = mergeManualWithEquipamento(manual, equipamento);
+  const consultorId = cliente.consultorId ?? req.user.id ?? null;
+  const consultorNome = String(cliente.consultorNome || req.user.nome || '').trim() || 'Sem consultor';
 
   const potenciaKwp = Number(manualFinal.potenciaKwp || 0);
   const potenciaPlacaW = Number(equipamento?.potenciaPlacaW || 0);
@@ -6699,6 +6836,10 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
       saldo_rs: moneyNumberOrNull(manualFinal.valorSaldo) || 0,
     },
     manual: manualFinal,
+    consultor: {
+      id: consultorId,
+      nome: consultorNome,
+    },
     cliente: clienteSnapshot,
     statusOrigem: 'Cliente cadastrado',
     observacao: 'Contrato gerado diretamente a partir do cadastro completo do cliente.',
@@ -6707,8 +6848,8 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
   const result = await db.run(
     `INSERT INTO contratos
       (orcamentoId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, valorProjeto, status, dados,
-       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados)
-     VALUES (NULL, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome)
+     VALUES (NULL, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     cliente.nome,
     cliente.whatsapp,
     cliente.email,
@@ -6726,7 +6867,9 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
       ...(equipamento || {}),
       placaModelo: manualFinal.painel || equipamento?.placaModelo || '',
       inversorModelo: manualFinal.inversor || equipamento?.inversorModelo || '',
-    })
+    }),
+    consultorId,
+    consultorNome
   );
 
   const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', result.lastID);
@@ -6755,6 +6898,8 @@ app.put('/api/admin/contratos/:id', authRequired, requirePermission('contratos')
            clienteTelefone = ?,
            clienteEmail = ?,
            clienteCidade = ?,
+           consultorId = ?,
+           consultorNome = ?,
            valorProjeto = ?,
            dados = ?,
            equipamentoDados = ?
@@ -6763,6 +6908,8 @@ app.put('/api/admin/contratos/:id', authRequired, requirePermission('contratos')
       data.clienteTelefone,
       data.clienteEmail,
       data.clienteCidade,
+      data.consultorId,
+      data.consultorNome,
       data.valorProjeto,
       JSON.stringify(data.dados),
       JSON.stringify(data.equipamentoDados),
@@ -7606,6 +7753,37 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
     const sameMonth = data.getMonth() === hoje.getMonth() && data.getFullYear() === hoje.getFullYear();
     return contrato.status === 'Aprovado' && sameMonth ? total + Number(contrato.valorProjeto || 0) : total;
   }, 0);
+  const vendasConsultoresAccumulator = contratos.reduce((acc, contrato) => {
+    if (contrato.status !== 'Aprovado') return acc;
+    const data = new Date(contrato.dataAnalise || contrato.dataCriacao || 0);
+    if (Number.isNaN(data.getTime())) return acc;
+    const consultor = getContractConsultantName(contrato);
+    if (!acc[consultor]) {
+      acc[consultor] = {
+        nome: consultor,
+        mes: { quantidade: 0, valor: 0 },
+        ano: { quantidade: 0, valor: 0 },
+      };
+    }
+    if (data.getFullYear() === hoje.getFullYear()) {
+      acc[consultor].ano.quantidade += 1;
+      acc[consultor].ano.valor += Number(contrato.valorProjeto || 0);
+      if (data.getMonth() === hoje.getMonth()) {
+        acc[consultor].mes.quantidade += 1;
+        acc[consultor].mes.valor += Number(contrato.valorProjeto || 0);
+      }
+    }
+    return acc;
+  }, {});
+  const vendasConsultoresBase = Object.values(vendasConsultoresAccumulator).sort((a, b) => b.ano.valor - a.ano.valor);
+  const vendasConsultores = {
+    referenciaMes: `${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`,
+    referenciaAno: String(hoje.getFullYear()),
+    totalMes: vendasConsultoresBase.reduce((sum, item) => sum + item.mes.valor, 0),
+    totalAno: vendasConsultoresBase.reduce((sum, item) => sum + item.ano.valor, 0),
+    porMes: [...vendasConsultoresBase].sort((a, b) => b.mes.valor - a.mes.valor),
+    porAno: [...vendasConsultoresBase].sort((a, b) => b.ano.valor - a.ano.valor),
+  };
   const leadsPorStatus = leads.reduce((acc, lead) => {
     const status = lead.status || 'Novo';
     acc[status] = (acc[status] || 0) + 1;
@@ -7701,6 +7879,7 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
       eventosRecentes: siteEvents.slice(0, 8),
     },
     roundRobinLeads,
+    vendasConsultores,
     leadsPorStatus,
     projetosPorEtapa,
     proximosRetornos: leads
@@ -7718,7 +7897,7 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
 
 app.get('/api/admin/financeiro', authRequired, requirePermission('financeiro'), async (req, res) => {
   const rows = await db.all('SELECT financeiro, status, data, assignedUserName FROM orcamentos');
-  const contratos = await db.all('SELECT valorProjeto, status, dataAnalise, dataCriacao, criadoPorNome, assignedUserName FROM contratos');
+  const contratos = await db.all('SELECT valorProjeto, status, dataAnalise, dataCriacao, criadoPorNome, assignedUserName, consultorNome, consultorId FROM contratos');
   const despesas = await db.all('SELECT * FROM despesas_fixas ORDER BY active DESC, valor DESC');
   const now = new Date();
   const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -7752,7 +7931,7 @@ app.get('/api/admin/financeiro', authRequired, requirePermission('financeiro'), 
       if (key === lastKey) acc.valorAprovadoMesPassado += valor;
     }
     if (contrato.status === 'Pendente') acc.valorPendente += valor;
-    const pessoa = contrato.assignedUserName || contrato.criadoPorNome || 'Sem responsável';
+    const pessoa = getContractConsultantName(contrato);
     if (!acc.porPessoa[pessoa]) acc.porPessoa[pessoa] = { nome: pessoa, aprovado: 0, pendente: 0, recusado: 0, valorAprovado: 0 };
     if (contrato.status === 'Aprovado') {
       acc.porPessoa[pessoa].aprovado += 1;
@@ -7912,6 +8091,7 @@ io.on('connection', (socket) => {
 // --- INICIAR SERVIDOR ---
 server.listen(PORT, () => {
   console.log(`Backend rodando em http://localhost:${PORT}`);
+  loadPersistedWhatsAppContacts();
   if (fs.existsSync(WHATSAPP_AUTH_DIR)) {
     startWhatsAppQrSession().catch(error => console.error('Erro ao restaurar sessão WhatsApp:', error));
   }

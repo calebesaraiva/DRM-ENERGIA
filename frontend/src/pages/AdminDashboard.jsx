@@ -196,19 +196,22 @@ const LEADS_PER_PAGE = 8;
 const LEAD_STATUS_PRESETS = ['Novo', 'Em atendimento', 'Em negociação', 'Fechando', 'Proposta enviada', 'Convertido', 'Perdido'];
 const defaultQuickActionIds = ['qa-novo-orcamento', 'qa-leads', 'qa-contratos', 'qa-homologacao', 'qa-os'];
 const OS_STATUS_FLOW = [
-  'Aberta',
-  'Em análise',
-  'Aguardando agendamento',
-  'Agendada',
-  'Equipe a caminho',
-  'Em atendimento',
-  'Aguardando material',
-  'Retorno necessário',
-  'Serviço concluído',
-  'Validada pelo cliente',
-  'Encerrada',
-  'Cancelada',
+  'Aguardando triagem', 'Planejada', 'Agendada', 'Em atendimento',
+  'Com pendência', 'Concluída', 'Encerrada', 'Cancelada',
+  'Aberta', 'Em análise', 'Aguardando agendamento', 'Equipe a caminho',
+  'Aguardando material', 'Retorno necessário', 'Serviço concluído', 'Validada pelo cliente',
 ];
+const OS_OCORRENCIA_MAP = {
+  'Geração e desempenho': ['Falha total','Geração abaixo do esperado','Queda repentina','Oscilação','Sistema desligando','Análise de desempenho','Outro'],
+  'Inversor e monitoramento': ['Sem comunicação','Offline','Código de erro','Alarme','Não inicializa','Falha no Wi-Fi','Troca de rede/senha','Troca de equipamento','Suporte de monitoramento'],
+  'Módulos fotovoltaicos': ['Módulo quebrado','Módulo trincado','Limpeza','Sombreamento novo','Suspeita de perda'],
+  'Estrutura e telhado': ['Vazamento','Telha quebrada','Estrutura solta','Fixação solta','Retorno de instalação'],
+  'Instalação elétrica': ['Disjuntor desarmando','DPS danificado','Cabo aquecendo','Aterramento','Adequação elétrica'],
+  'Concessionária e homologação': ['Troca de medidor','Vistoria reprovada','Documento pendente','Divergência na fatura','Contestação'],
+  'Manutenção e vistoria': ['Preventiva','Corretiva','Vistoria técnica','Limpeza','Testes elétricos'],
+  'Atendimento administrativo': ['Garantia','Segunda via','Titularidade','Relatório','Visita técnica particular'],
+  'Outro': ['Outro — descreva no campo abaixo'],
+};
 const OS_PRIORITY_OPTIONS = ['Baixa', 'Normal', 'Alta', 'Urgente'];
 const OS_MOTIVO_OPTIONS = [
   'Manutenção preventiva',
@@ -257,6 +260,7 @@ const createEmptyOsForm = () => ({
   materiaisPrevios: '',
   contatoLocal: '',
   observacoesInternas: '',
+  tipoOcorrencia: '',
 });
 const createDefaultOsDados = (os = {}) => {
   const dados = os?.dados || {};
@@ -475,6 +479,9 @@ const percent = (value) => `${((Number(value || 0)) * 100).toLocaleString('pt-BR
 })}%`;
 
 const getResponsibleName = (name) => name || 'Aguardando distribuição';
+const getContractConsultantLabel = (contrato = {}) => (
+  contrato.consultorNome || contrato.assignedUserName || contrato.criadoPorNome || 'Sem consultor'
+);
 const dateBr = (value) => value ? new Date(value).toLocaleDateString('pt-BR') : 'Sem data';
 const contractNumber = (contrato = {}) => (
   `CT-${String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(contrato.id || '').padStart(4, '0')}`
@@ -508,6 +515,8 @@ const contractToReviewForm = (contrato = {}) => ({
   clienteTelefone: contrato.clienteTelefone || '',
   clienteEmail: contrato.clienteEmail || '',
   clienteCidade: contrato.clienteCidade || '',
+  consultorId: contrato.consultorId ?? '',
+  consultorNome: contrato.consultorNome || contrato.assignedUserName || contrato.criadoPorNome || '',
   valorProjeto: contrato.valorProjeto ?? contrato.dados?.manual?.valorSistema ?? '',
   valorEntrada: contrato.dados?.manual?.valorEntrada ?? contrato.equipamentoDados?.valorEntrada ?? '',
   valorSaldo: contrato.dados?.manual?.valorSaldo ?? contrato.equipamentoDados?.valorSaldo ?? '',
@@ -914,6 +923,12 @@ const AdminDashboard = () => {
   const [osAtrasadasOnly, setOsAtrasadasOnly] = useState(false);
   const [osClienteMode, setOsClienteMode] = useState('existente');
   const [osClienteSearch, setOsClienteSearch] = useState('');
+  const [osDrawerOpen, setOsDrawerOpen] = useState(false);
+  const [osDrawerStep, setOsDrawerStep] = useState(1);
+  const [osInnerTab, setOsInnerTab] = useState('ordensServico');
+  const [osPanelTab, setOsPanelTab] = useState('Resumo');
+  const [osShowMoreFilters, setOsShowMoreFilters] = useState(false);
+  const [osPage, setOsPage] = useState(1);
   const [osEvidenceUploadType, setOsEvidenceUploadType] = useState('Foto antes do serviço');
   const [priceForm, setPriceForm] = useState(emptyPriceForm);
   const [priceResult, setPriceResult] = useState(null);
@@ -1343,6 +1358,28 @@ const AdminDashboard = () => {
     [usuarios]
   );
 
+  const contractConsultantOptions = useMemo(() => {
+    const base = usuarios
+      .filter(user => user.active && user.role !== 'CLIENTE')
+      .map(user => ({
+        value: String(user.id),
+        label: user.nome,
+        nome: user.nome,
+      }));
+    const currentName = String(contractReviewForm.consultorNome || '').trim();
+    if (currentName && !base.some(option => option.nome === currentName)) {
+      base.unshift({
+        value: contractReviewForm.consultorId ? String(contractReviewForm.consultorId) : '',
+        label: `${currentName} (atual)`,
+        nome: currentName,
+      });
+    }
+    return [
+      { value: '', label: 'Selecione o consultor', nome: '' },
+      ...base,
+    ];
+  }, [usuarios, contractReviewForm.consultorId, contractReviewForm.consultorNome]);
+
   const pendingPasswordTotal = useMemo(
     () => usuarios.filter(user => user.mustChangePassword).length,
     [usuarios]
@@ -1485,16 +1522,26 @@ const AdminDashboard = () => {
   const filteredHomologacaoProjetos = useMemo(() => filteredProjetos, [filteredProjetos]);
 
   const osSummary = useMemo(() => {
-    const overdueStatuses = new Set(['Aberta', 'Em análise', 'Aguardando agendamento', 'Agendada', 'Em atendimento', 'Aguardando material', 'Retorno necessário']);
+    const overdueStatuses = new Set(['Aberta', 'Em análise', 'Aguardando triagem', 'Aguardando agendamento', 'Agendada', 'Em atendimento', 'Aguardando material', 'Retorno necessário', 'Com pendência', 'Planejada', 'Equipe a caminho']);
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     return {
       total: ordensServico.length,
       abertas: ordensServico.filter(item => item.status === 'Aberta').length,
       aguardandoAgendamento: ordensServico.filter(item => item.status === 'Aguardando agendamento').length,
-      agendadas: ordensServico.filter(item => item.status === 'Agendada').length,
+      agendadas: ordensServico.filter(item => ['Agendada', 'Aguardando agendamento'].includes(item.status)).length,
       andamento: ordensServico.filter(item => ['Equipe a caminho', 'Em atendimento'].includes(item.status)).length,
       aguardandoMaterial: ordensServico.filter(item => item.status === 'Aguardando material').length,
-      concluidas: ordensServico.filter(item => ['Serviço concluído', 'Validada pelo cliente', 'Encerrada'].includes(item.status)).length,
+      concluidas: ordensServico.filter(item => ['Serviço concluído', 'Validada pelo cliente', 'Encerrada', 'Concluída'].includes(item.status)).length,
       canceladas: ordensServico.filter(item => item.status === 'Cancelada').length,
+      triagem: ordensServico.filter(o => ['Aguardando triagem', 'Aberta'].includes(o.status)).length,
+      planejada: ordensServico.filter(o => ['Planejada', 'Em análise'].includes(o.status)).length,
+      comPendencia: ordensServico.filter(o => ['Com pendência', 'Aguardando material', 'Retorno necessário'].includes(o.status)).length,
+      concluidasNoMes: ordensServico.filter(o => {
+        if (!['Concluída', 'Serviço concluído', 'Validada pelo cliente', 'Encerrada'].includes(o.status)) return false;
+        const d = new Date(o.dataAbertura);
+        return d >= firstOfMonth && d <= now;
+      }).length,
       atrasadas: ordensServico.filter((item) => {
         const dados = createDefaultOsDados(item);
         const limite = dados.atendimento?.prazoMaximo || dados.atendimento?.dataDesejada;
@@ -1538,6 +1585,11 @@ const AdminDashboard = () => {
       return matchesStatus && matchesPriority && matchesResponsavel && matchesCidade && matchesTipo && matchesDataFrom && matchesDataTo && matchesSistema && matchesContrato && matchesAtrasadas && matchesSearch;
     });
   }, [ordensServico, osCidadeFilter, osPriorityFilter, osResponsavelFilter, osSearch, osStatusFilter, osTipoFilter, osDataFrom, osDataTo, osSistemaFilter, osContratoFilter, osAtrasadasOnly]);
+
+  const paginatedOrdensServico = useMemo(
+    () => filteredOrdensServico.slice((osPage - 1) * 10, osPage * 10),
+    [filteredOrdensServico, osPage]
+  );
 
   const selectedOs = useMemo(
     () => ordensServico.find((item) => item.id === selectedOsId) || filteredOrdensServico[0] || ordensServico[0] || null,
@@ -3382,6 +3434,16 @@ const AdminDashboard = () => {
     if (reviewError) setReviewError('');
   };
 
+  const updateContractConsultant = (nextId) => {
+    const selectedOption = contractConsultantOptions.find(option => option.value === String(nextId));
+    setContractReviewForm(prev => ({
+      ...prev,
+      consultorId: nextId,
+      consultorNome: selectedOption?.nome || prev.consultorNome || '',
+    }));
+    if (reviewError) setReviewError('');
+  };
+
   const canEditReviewedContract = (contrato = selectedContrato) => (
     adminUser.role === 'ADM' && contrato && (contrato.status !== 'Aprovado' || isMasterAdmin)
   );
@@ -3789,6 +3851,83 @@ const AdminDashboard = () => {
                 <button type="button" className="crm-kpi-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}><span>Contratos</span><strong>{resumo.kpis?.contratos || 0}</strong><p>{resumo.kpis?.contratosPendentes || 0} pendentes, {resumo.kpis?.contratosAprovados || 0} aprovados.</p></button>
                 <button type="button" className="crm-kpi-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}><span>Valor pendente</span><strong>{money(resumo.kpis?.valorPendenteContratos)}</strong><p>Em contratos aguardando aprovação.</p></button>
               </div>
+
+              {Array.isArray(resumo.vendasConsultores?.porAno) && resumo.vendasConsultores.porAno.length > 0 && (
+                <div className="admin-card consultor-sales-panel">
+                  <div className="section-heading consultor-sales-heading">
+                    <div>
+                      <span className="section-kicker">Performance comercial</span>
+                      <h3>Vendas por consultor</h3>
+                      <p>Agora o contrato já guarda o consultor da venda para a gente separar faturamento e produção por pessoa.</p>
+                    </div>
+                    <div className="section-stats">
+                      <div><strong>{money(resumo.vendasConsultores?.totalMes || 0)}</strong><span>mês atual</span></div>
+                      <div><strong>{money(resumo.vendasConsultores?.totalAno || 0)}</strong><span>ano atual</span></div>
+                      <div><strong>{resumo.vendasConsultores?.porAno?.length || 0}</strong><span>consultores</span></div>
+                    </div>
+                  </div>
+
+                  <div className="consultor-sales-grid">
+                    <section className="consultor-sales-card">
+                      <div className="consultor-sales-card-header">
+                        <div>
+                          <span>Ranking mensal</span>
+                          <strong>{resumo.vendasConsultores?.referenciaMes || 'Mês atual'}</strong>
+                        </div>
+                      </div>
+                      <div className="consultor-sales-list">
+                        {(resumo.vendasConsultores?.porMes || []).map(item => {
+                          const width = resumo.vendasConsultores?.totalMes
+                            ? Math.max((Number(item.mes?.valor || 0) / Number(resumo.vendasConsultores.totalMes || 1)) * 100, item.mes?.valor ? 12 : 0)
+                            : 0;
+                          return (
+                            <div className="consultor-sales-item" key={`mes-${item.nome}`}>
+                              <div className="consultor-sales-row">
+                                <strong>{item.nome}</strong>
+                                <span>{item.mes?.quantidade || 0} venda{(item.mes?.quantidade || 0) === 1 ? '' : 's'}</span>
+                              </div>
+                              <div className="consultor-sales-bar"><span style={{ width: `${Math.min(width, 100)}%` }}></span></div>
+                              <div className="consultor-sales-row is-summary">
+                                <small>{money(item.mes?.valor || 0)}</small>
+                                <small>{resumo.vendasConsultores?.totalMes ? percent((item.mes?.valor || 0) / resumo.vendasConsultores.totalMes) : '0,0%'}</small>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    <section className="consultor-sales-card">
+                      <div className="consultor-sales-card-header">
+                        <div>
+                          <span>Ranking anual</span>
+                          <strong>{resumo.vendasConsultores?.referenciaAno || 'Ano atual'}</strong>
+                        </div>
+                      </div>
+                      <div className="consultor-sales-list">
+                        {(resumo.vendasConsultores?.porAno || []).map(item => {
+                          const width = resumo.vendasConsultores?.totalAno
+                            ? Math.max((Number(item.ano?.valor || 0) / Number(resumo.vendasConsultores.totalAno || 1)) * 100, item.ano?.valor ? 12 : 0)
+                            : 0;
+                          return (
+                            <div className="consultor-sales-item" key={`ano-${item.nome}`}>
+                              <div className="consultor-sales-row">
+                                <strong>{item.nome}</strong>
+                                <span>{item.ano?.quantidade || 0} venda{(item.ano?.quantidade || 0) === 1 ? '' : 's'}</span>
+                              </div>
+                              <div className="consultor-sales-bar annual"><span style={{ width: `${Math.min(width, 100)}%` }}></span></div>
+                              <div className="consultor-sales-row is-summary">
+                                <small>{money(item.ano?.valor || 0)}</small>
+                                <small>{resumo.vendasConsultores?.totalAno ? percent((item.ano?.valor || 0) / resumo.vendasConsultores.totalAno) : '0,0%'}</small>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              )}
 
               <div className="ops-insight-grid">
                 <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
@@ -5563,7 +5702,7 @@ const AdminDashboard = () => {
                         <th>DATA DO CONTRATO</th>
                         <th>VALOR TOTAL</th>
                         <th>STATUS</th>
-                        <th>RESPONSÁVEL</th>
+                        <th>CONSULTOR</th>
                         <th>AÇÕES</th>
                       </tr>
                     </thead>
@@ -5587,7 +5726,7 @@ const AdminDashboard = () => {
                                 {contrato.status}
                               </span>
                             </td>
-                            <td>{getResponsibleName(contrato.assignedUserName) || contrato.criadoPorNome}</td>
+                            <td>{getContractConsultantLabel(contrato)}</td>
                             <td>
                               <div className="ctr-table-actions" onClick={e => e.stopPropagation()}>
                                 {adminUser.role === 'ADM' && contrato.status === 'Pendente' && (
@@ -5677,6 +5816,21 @@ const AdminDashboard = () => {
                           {renderContractReviewField('Telefone', 'clienteTelefone', { inputMode: 'tel' })}
                           {renderContractReviewField('E-mail', 'clienteEmail', { type: 'email' })}
                           {renderContractReviewField('Cidade', 'clienteCidade')}
+                          <label className="ctr-review-field">
+                            <span>Consultor da venda</span>
+                            {canEditReviewedContract(selectedContrato) ? (
+                              <select
+                                value={String(contractReviewForm.consultorId ?? '')}
+                                onChange={(event) => updateContractConsultant(event.target.value)}
+                              >
+                                {contractConsultantOptions.map(option => (
+                                  <option key={`${option.value}-${option.nome || 'blank'}`} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <strong>{contractReviewForm.consultorNome || 'Sem consultor'}</strong>
+                            )}
+                          </label>
                           <label className="ctr-review-field"><span>Responsável</span><strong>{getResponsibleName(selectedContrato.assignedUserName || selectedContrato.criadoPorNome)}</strong></label>
                           <label className="ctr-review-field"><span>Data</span><strong>{dateBr(selectedContrato.dataCriacao)}</strong></label>
                         </div>
@@ -6888,789 +7042,430 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'ordensServico' && (
-            <div className="admin-section">
-              <div className="section-heading">
+            <div className="os-page">
+              {/* Page Header */}
+              <div className="os-page-hd">
                 <div>
-                  <span className="section-kicker">Fluxograma completo</span>
-                  <h3>O.S e suporte</h3>
-                  <p>Gerencie ordens de serviço do primeiro chamado até a validação final do cliente.</p>
+                  <h3>O.S. e suporte</h3>
+                  <p>Gerencie chamados, atendimentos técnicos e pós-venda.</p>
                 </div>
-                <div className="section-stats">
-                  <div><strong>{osSummary.total}</strong><span>ordens</span></div>
-                  <div><strong>{osSummary.andamento}</strong><span>em atendimento</span></div>
-                  <div><strong>{osSummary.concluidas}</strong><span>concluídas</span></div>
-                </div>
+                <button type="button" className="btn btn-primary" onClick={() => { setOsDrawerOpen(true); setOsDrawerStep(1); setOsForm(createEmptyOsForm()); setOsClienteMode('existente'); setOsClienteSearch(''); }}>
+                  + Nova O.S.
+                </button>
               </div>
-
-              <div className="os-hero-card">
-                <div className="os-hero-brand">
-                  <div className="os-hero-logo">DRM</div>
-                  <div>
-                    <strong>Energia Solar</strong>
-                    <span>O.S, suporte técnico e pós-venda</span>
+              {/* KPI Indicators */}
+              <div className="os-kpis">
+                <button type="button" className={`os-kpi${osStatusFilter === 'Aguardando triagem' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Aguardando triagem'); setOsAtrasadasOnly(false); setOsPage(1); }}>
+                  <span className="os-kpi-icon">📋</span>
+                  <div className="os-kpi-body">
+                    <span className="os-kpi-num">{osSummary.triagem}</span>
+                    <span className="os-kpi-label">Aguardando triagem</span>
                   </div>
-                </div>
-                <div className="os-hero-title">
-                  <strong>Fluxograma completo - O.S e suporte</strong>
-                  <span>Da abertura ao relatório final, tudo centralizado no painel.</span>
-                </div>
-                <div className="os-hero-objective">
-                  <span>Objetivo</span>
-                  <p>Controlar atendimento, equipe, evidências, materiais, validação do cliente e encerramento da ordem.</p>
-                </div>
+                </button>
+                <button type="button" className={`os-kpi${osStatusFilter === 'Agendada' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Agendada'); setOsAtrasadasOnly(false); setOsPage(1); }}>
+                  <span className="os-kpi-icon">📅</span>
+                  <div className="os-kpi-body">
+                    <span className="os-kpi-num">{osSummary.agendadas}</span>
+                    <span className="os-kpi-label">Agendadas</span>
+                  </div>
+                </button>
+                <button type="button" className={`os-kpi${['Em atendimento','Equipe a caminho'].includes(osStatusFilter) ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Em atendimento'); setOsAtrasadasOnly(false); setOsPage(1); }}>
+                  <span className="os-kpi-icon">🔧</span>
+                  <div className="os-kpi-body">
+                    <span className="os-kpi-num">{osSummary.andamento}</span>
+                    <span className="os-kpi-label">Em atendimento</span>
+                  </div>
+                </button>
+                <button type="button" className={`os-kpi${osStatusFilter === 'Com pendência' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Com pendência'); setOsAtrasadasOnly(false); setOsPage(1); }}>
+                  <span className="os-kpi-icon">⏸️</span>
+                  <div className="os-kpi-body">
+                    <span className="os-kpi-num">{osSummary.comPendencia}</span>
+                    <span className="os-kpi-label">Com pendência</span>
+                  </div>
+                </button>
+                <button type="button" className={`os-kpi danger${osAtrasadasOnly ? ' active' : ''}`} onClick={() => { setOsStatusFilter('todos'); setOsAtrasadasOnly(prev => !prev); setOsPage(1); }}>
+                  <span className="os-kpi-icon">⚠️</span>
+                  <div className="os-kpi-body">
+                    <span className="os-kpi-num">{osSummary.atrasadas}</span>
+                    <span className="os-kpi-label">Atrasadas</span>
+                  </div>
+                </button>
+                <button type="button" className={`os-kpi success${osStatusFilter === 'Concluída' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Concluída'); setOsAtrasadasOnly(false); setOsPage(1); }}>
+                  <span className="os-kpi-icon">✅</span>
+                  <div className="os-kpi-body">
+                    <span className="os-kpi-num">{osSummary.concluidasNoMes}</span>
+                    <span className="os-kpi-label">Concluídas no mês</span>
+                  </div>
+                </button>
               </div>
 
-              <div className="os-flow-overview">
+              {/* Horizontal Filter Bar */}
+              <div className="os-hfilter">
+                <input
+                  type="text"
+                  placeholder="Pesquisar cliente, telefone ou O.S."
+                  value={osSearch}
+                  onChange={(event) => { setOsSearch(event.target.value); setOsPage(1); }}
+                />
+                <select value={osStatusFilter} onChange={(event) => { setOsStatusFilter(event.target.value); setOsAtrasadasOnly(false); setOsPage(1); }}>
+                  <option value="todos">Status</option>
+                  {OS_STATUS_FLOW.map(status => <option key={status} value={status}>{status}</option>)}
+                </select>
+                <select value={osTipoFilter} onChange={(event) => { setOsTipoFilter(event.target.value); setOsPage(1); }}>
+                  <option value="todos">Categoria</option>
+                  {OS_MOTIVO_OPTIONS.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
+                </select>
+                <select value={osPriorityFilter} onChange={(event) => { setOsPriorityFilter(event.target.value); setOsPage(1); }}>
+                  <option value="todas">Prioridade</option>
+                  {OS_PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <select value={osResponsavelFilter} onChange={(event) => { setOsResponsavelFilter(event.target.value); setOsPage(1); }}>
+                  <option value="todos">Técnico</option>
+                  {usuarios.filter(u => u.active && (u.role === 'ADM' || u.permissions?.equipeTecnica || u.permissions?.ordensServico)).map(u => (
+                    <option key={u.id} value={u.id}>{u.nome}</option>
+                  ))}
+                </select>
+                <select value={osCidadeFilter} onChange={(event) => { setOsCidadeFilter(event.target.value); setOsPage(1); }}>
+                  <option value="todas">Cidade</option>
+                  {osCities.map(city => <option key={city} value={city}>{city}</option>)}
+                </select>
+                <div className="os-hfilter-divider" />
+                <div className="os-hfilter-period">
+                  <input type="date" value={osDataFrom} onChange={(event) => { setOsDataFrom(event.target.value); setOsPage(1); }} title="De" />
+                  <span>–</span>
+                  <input type="date" value={osDataTo} onChange={(event) => { setOsDataTo(event.target.value); setOsPage(1); }} title="Até" />
+                </div>
+                <div className="os-hfilter-divider" />
+                <button type="button" className="os-more-filter-btn" onClick={() => setOsShowMoreFilters(prev => !prev)}>
+                  Mais filtros {osShowMoreFilters ? '▲' : '▼'}
+                </button>
+                <button type="button" className="os-clear-btn" onClick={() => { setOsSearch(''); setOsStatusFilter('todos'); setOsPriorityFilter('todas'); setOsResponsavelFilter('todos'); setOsCidadeFilter('todas'); setOsTipoFilter('todos'); setOsDataFrom(''); setOsDataTo(''); setOsSistemaFilter(''); setOsContratoFilter(''); setOsAtrasadasOnly(false); setOsPage(1); }}>
+                  Limpar filtros
+                </button>
+              </div>
+              {osShowMoreFilters && (
+                <div className="os-more-filters-panel">
+                  <input
+                    placeholder="Sistema / Potência"
+                    value={osSistemaFilter}
+                    onChange={(event) => { setOsSistemaFilter(event.target.value); setOsPage(1); }}
+                  />
+                  <input
+                    placeholder="Contrato"
+                    value={osContratoFilter}
+                    onChange={(event) => { setOsContratoFilter(event.target.value); setOsPage(1); }}
+                  />
+                  <label>
+                    <input type="checkbox" checked={osAtrasadasOnly} onChange={(event) => { setOsAtrasadasOnly(event.target.checked); setOsPage(1); }} />
+                    Só atrasadas
+                  </label>
+                </div>
+              )}
+
+              {/* Inner Tabs */}
+              <div className="os-inner-tabs">
                 {[
-                  '1. Abertura da O.S',
-                  '2. Análise e planejamento',
-                  '3. Agendamento e atribuição',
-                  '4. Execução em campo',
-                  '5. Registros e evidências',
-                  '6. Conclusão e validação',
-                  '7. Encerramento e relatório',
-                ].map((step) => (
-                  <div key={step} className="os-flow-step">
-                    <i>{step.split('.')[0]}</i>
-                    <span>{step.replace(/^\d+\.\s*/, '')}</span>
-                  </div>
+                  { key: 'ordensServico', label: 'Ordens de serviço' },
+                  { key: 'agenda', label: 'Agenda técnica' },
+                  { key: 'materiais', label: 'Materiais' },
+                  { key: 'relatorios', label: 'Relatórios' },
+                ].map(tab => (
+                  <button key={tab.key} type="button" className={`os-inner-tab${osInnerTab === tab.key ? ' active' : ''}`} onClick={() => setOsInnerTab(tab.key)}>
+                    {tab.label}
+                  </button>
                 ))}
               </div>
 
-              <div className="os-dashboard-grid">
-                <aside className="os-filters-card">
-                  <div className="os-panel-head">
-                    <strong>Filtros</strong>
-                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setOsSearch(''); setOsStatusFilter('todos'); setOsPriorityFilter('todas'); setOsResponsavelFilter('todos'); setOsCidadeFilter('todas'); setOsTipoFilter('todos'); setOsDataFrom(''); setOsDataTo(''); setOsSistemaFilter(''); setOsContratoFilter(''); setOsAtrasadasOnly(false); }}>
-                      Limpar filtros
-                    </button>
-                  </div>
-                  <label className="os-filter-label">Cliente / Nº O.S</label>
-                  <input
-                    placeholder="Nome, número da O.S, telefone..."
-                    value={osSearch}
-                    onChange={(event) => setOsSearch(event.target.value)}
-                  />
-                  <label className="os-filter-label">Instalador</label>
-                  <select value={osResponsavelFilter} onChange={(event) => setOsResponsavelFilter(event.target.value)}>
-                    <option value="todos">Todos os instaladores</option>
-                    {usuarios.filter(user => user.active && (user.role === 'ADM' || user.permissions?.equipeTecnica || user.permissions?.ordensServico)).map(user => (
-                      <option key={user.id} value={user.id}>{user.nome}</option>
-                    ))}
-                  </select>
-                  <label className="os-filter-label">Cidade</label>
-                  <select value={osCidadeFilter} onChange={(event) => setOsCidadeFilter(event.target.value)}>
-                    <option value="todas">Todas as cidades</option>
-                    {osCities.map(city => <option key={city} value={city}>{city}</option>)}
-                  </select>
-                  <label className="os-filter-label">Tipo de atendimento</label>
-                  <select value={osTipoFilter} onChange={(event) => setOsTipoFilter(event.target.value)}>
-                    <option value="todos">Todos os tipos</option>
-                    {OS_MOTIVO_OPTIONS.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
-                  </select>
-                  <label className="os-filter-label">Prioridade</label>
-                  <select value={osPriorityFilter} onChange={(event) => setOsPriorityFilter(event.target.value)}>
-                    <option value="todas">Todas as prioridades</option>
-                    {OS_PRIORITY_OPTIONS.map(priority => <option key={priority} value={priority}>{priority}</option>)}
-                  </select>
-                  <label className="os-filter-label">Status</label>
-                  <select value={osStatusFilter} onChange={(event) => setOsStatusFilter(event.target.value)}>
-                    <option value="todos">Todos os status</option>
-                    {OS_STATUS_FLOW.map(status => <option key={status} value={status}>{status}</option>)}
-                  </select>
-                  <label className="os-filter-label">Período (abertura)</label>
-                  <div className="os-filter-date-range">
-                    <input type="date" value={osDataFrom} onChange={(event) => setOsDataFrom(event.target.value)} placeholder="De" />
-                    <input type="date" value={osDataTo} onChange={(event) => setOsDataTo(event.target.value)} placeholder="Até" />
-                  </div>
-                  <label className="os-filter-label">Sistema / Potência</label>
-                  <input
-                    placeholder="Ex: 5kWp, 10 placas..."
-                    value={osSistemaFilter}
-                    onChange={(event) => setOsSistemaFilter(event.target.value)}
-                  />
-                  <label className="os-filter-label">Contrato</label>
-                  <input
-                    placeholder="Nº do contrato..."
-                    value={osContratoFilter}
-                    onChange={(event) => setOsContratoFilter(event.target.value)}
-                  />
-                </aside>
-
-                <div className="os-status-board">
-                  <div className="os-status-grid">
-                    <button type="button" className={`os-status-card${osStatusFilter === 'Aberta' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Aberta'); setOsAtrasadasOnly(false); }}><strong>{osSummary.abertas}</strong><span>Abertas</span></button>
-                    <button type="button" className={`os-status-card${osStatusFilter === 'Aguardando agendamento' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Aguardando agendamento'); setOsAtrasadasOnly(false); }}><strong>{osSummary.aguardandoAgendamento}</strong><span>Aguardando Agendamento</span></button>
-                    <button type="button" className={`os-status-card${osStatusFilter === 'Agendada' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Agendada'); setOsAtrasadasOnly(false); }}><strong>{osSummary.agendadas}</strong><span>Agendadas</span></button>
-                    <button type="button" className={`os-status-card${osStatusFilter === 'Em atendimento' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Em atendimento'); setOsAtrasadasOnly(false); }}><strong>{osSummary.andamento}</strong><span>Em Atendimento</span></button>
-                    <button type="button" className={`os-status-card${osStatusFilter === 'Aguardando material' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Aguardando material'); setOsAtrasadasOnly(false); }}><strong>{osSummary.aguardandoMaterial}</strong><span>Aguardando Peça ou Material</span></button>
-                    <button type="button" className={`os-status-card${osStatusFilter === 'Encerrada' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Encerrada'); setOsAtrasadasOnly(false); }}><strong>{osSummary.concluidas}</strong><span>Concluídas</span></button>
-                    <button type="button" className={`os-status-card danger${osAtrasadasOnly ? ' active' : ''}`} onClick={() => { setOsStatusFilter('todos'); setOsAtrasadasOnly(prev => !prev); }}><strong>{osSummary.atrasadas}</strong><span>Atrasadas</span></button>
-                    <button type="button" className={`os-status-card${osStatusFilter === 'Cancelada' ? ' active' : ''}`} onClick={() => { setOsStatusFilter('Cancelada'); setOsAtrasadasOnly(false); }}><strong>{osSummary.canceladas}</strong><span>Canceladas</span></button>
-                  </div>
+              {osInnerTab !== 'ordensServico' && (
+                <div className="os-tab-placeholder">
+                  <strong>Em breve</strong>
+                  <span>Esta funcionalidade está sendo desenvolvida.</span>
                 </div>
+              )}
 
-                <div className="os-quick-actions-card">
-                  <strong>Ações rápidas</strong>
-                  <button type="button" className="btn btn-primary" onClick={() => {
-                    document.getElementById('os-open-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}>+ Nova O.S</button>
-                  <button type="button" className="btn btn-outline" onClick={() => {
-                    setOsStatusFilter('Agendada');
-                    setOsAtrasadasOnly(false);
-                    setTimeout(() => document.getElementById('os-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-                  }}>Agenda técnica</button>
-                  <button type="button" className="btn btn-outline" onClick={() => {
-                    setOsStatusFilter('todos');
-                    setOsResponsavelFilter('todos');
-                    setOsAtrasadasOnly(false);
-                    setTimeout(() => document.getElementById('os-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-                  }}>Equipes</button>
-                  <button type="button" className="btn btn-outline" onClick={() => {
-                    setOsStatusFilter('Aguardando material');
-                    setOsAtrasadasOnly(false);
-                    setTimeout(() => document.getElementById('os-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-                  }}>Materiais</button>
-                  <button type="button" className="btn btn-outline" onClick={() => {
-                    setTimeout(() => document.getElementById('os-detail-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-                    if (!selectedOs) document.getElementById('os-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}>Relatórios</button>
-                </div>
-              </div>
-
-              <form className="os-opening-form" id="os-open-form" onSubmit={createOrdemServico}>
-                <div className="os-section-title">
-                  <span>1. Abertura da O.S</span>
-                  <h4>Cadastro inicial e triagem</h4>
-                </div>
-                <div className="os-opening-grid">
-                  <section className="os-detail-card">
-                    <div className="os-cliente-mode-toggle">
-                      <strong>Dados do cliente</strong>
-                      <div className="os-mode-pills">
-                        <button type="button" className={`os-mode-pill${osClienteMode === 'existente' ? ' active' : ''}`} onClick={() => setOsClienteMode('existente')}>
-                          Usar cliente cadastrado
-                        </button>
-                        <button type="button" className={`os-mode-pill${osClienteMode === 'novo' ? ' active' : ''}`} onClick={() => { setOsClienteMode('novo'); setOsClienteSearch(''); }}>
-                          Cadastro manual
-                        </button>
-                      </div>
-                    </div>
-
-                    {osClienteMode === 'existente' ? (
-                      <div className="os-cliente-search-wrap">
-                        <input
-                          placeholder="Buscar cliente por nome, telefone ou CPF..."
-                          value={osClienteSearch}
-                          onChange={(event) => setOsClienteSearch(event.target.value)}
-                          autoComplete="off"
-                        />
-                        {osClienteSearch.trim().length > 0 && (() => {
-                          const q = osClienteSearch.trim().toLowerCase();
-                          const matches = clientes.filter(c =>
-                            [c.nome, c.whatsapp, c.cpfCnpj, c.cidade].some(v => String(v || '').toLowerCase().includes(q))
-                          ).slice(0, 8);
-                          return matches.length > 0 ? (
-                            <ul className="os-cliente-dropdown">
-                              {matches.map(c => (
-                                <li key={c.id}>
-                                  <button type="button" onClick={() => {
-                                    setOsForm(prev => ({
-                                      ...prev,
-                                      clienteNome: c.nome || '',
-                                      clienteTelefone: c.whatsapp || '',
-                                      cpfCnpj: c.cpfCnpj || '',
-                                      cidade: c.cidade || '',
-                                      endereco: c.endereco || '',
-                                    }));
-                                    setOsClienteSearch(c.nome || '');
-                                  }}>
-                                    <strong>{c.nome}</strong>
-                                    <span>{c.whatsapp || '—'} • {c.cidade || '—'}</span>
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <div className="os-cliente-empty">
-                              Nenhum cliente encontrado.{' '}
-                              <button type="button" className="os-link-btn" onClick={() => setOsClienteMode('novo')}>Fazer cadastro manual</button>
-                            </div>
-                          );
-                        })()}
-                        {osForm.clienteNome && (
-                          <div className="os-cliente-selected">
-                            <div className="os-cliente-selected-info">
-                              <strong>{osForm.clienteNome}</strong>
-                              <span>{osForm.clienteTelefone || '—'} • {osForm.cidade || '—'}</span>
-                              {osForm.cpfCnpj && <span>CPF/CNPJ: {osForm.cpfCnpj}</span>}
-                            </div>
-                            <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setOsForm(prev => ({ ...prev, clienteNome: '', clienteTelefone: '', cpfCnpj: '', cidade: '', endereco: '' })); setOsClienteSearch(''); }}>Trocar</button>
-                          </div>
-                        )}
-                        <div className="os-form-grid two" style={{ marginTop: '0.5rem' }}>
-                          <div className="os-field-wrap">
-                            <label className="os-field-label">Contrato / referência</label>
-                            <input placeholder="Nº do contrato ou código interno" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
-                          </div>
-                          <div className="os-field-wrap">
-                            <label className="os-field-label">Sistema instalado (potência/painéis)</label>
-                            <input placeholder="Ex: 5kWp, 12 painéis 410W" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
-                          </div>
-                          <div className="os-field-wrap">
-                            <label className="os-field-label">Data da instalação original</label>
-                            <input placeholder="dd/mm/aaaa" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
-                          </div>
-                          <div className="os-field-wrap">
-                            <label className="os-field-label">Consultor responsável pela venda</label>
-                            <input placeholder="Nome do consultor" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="os-form-grid two">
-                        <div className="os-field-wrap">
-                          <label className="os-field-label">Nome completo do cliente *</label>
-                          <input placeholder="Ex: João da Silva" value={osForm.clienteNome} onChange={(event) => setOsForm(prev => ({ ...prev, clienteNome: event.target.value }))} required />
-                        </div>
-                        <div className="os-field-wrap">
-                          <label className="os-field-label">Telefone / WhatsApp</label>
-                          <input placeholder="(99) 99999-9999" value={osForm.clienteTelefone} onChange={(event) => setOsForm(prev => ({ ...prev, clienteTelefone: event.target.value }))} />
-                        </div>
-                        <div className="os-field-wrap">
-                          <label className="os-field-label">CPF ou CNPJ</label>
-                          <input placeholder="000.000.000-00" value={osForm.cpfCnpj} onChange={(event) => setOsForm(prev => ({ ...prev, cpfCnpj: event.target.value }))} />
-                        </div>
-                        <div className="os-field-wrap">
-                          <label className="os-field-label">Cidade</label>
-                          <input placeholder="Ex: Imperatriz - MA" value={osForm.cidade} onChange={(event) => setOsForm(prev => ({ ...prev, cidade: event.target.value }))} />
-                        </div>
-                        <div className="os-field-wrap">
-                          <label className="os-field-label">Contrato / referência</label>
-                          <input placeholder="Nº do contrato ou código interno" value={osForm.contratoId} onChange={(event) => setOsForm(prev => ({ ...prev, contratoId: event.target.value }))} />
-                        </div>
-                        <div className="os-field-wrap">
-                          <label className="os-field-label">Sistema instalado (potência/painéis)</label>
-                          <input placeholder="Ex: 5kWp, 12 painéis 410W" value={osForm.sistemaResumo} onChange={(event) => setOsForm(prev => ({ ...prev, sistemaResumo: event.target.value }))} />
-                        </div>
-                        <div className="os-field-wrap">
-                          <label className="os-field-label">Data da instalação original</label>
-                          <input placeholder="dd/mm/aaaa" type="date" value={osForm.dataInstalacao} onChange={(event) => setOsForm(prev => ({ ...prev, dataInstalacao: event.target.value }))} />
-                        </div>
-                        <div className="os-field-wrap">
-                          <label className="os-field-label">Consultor responsável pela venda</label>
-                          <input placeholder="Nome do consultor" value={osForm.consultor} onChange={(event) => setOsForm(prev => ({ ...prev, consultor: event.target.value }))} />
-                        </div>
-                        <div className="os-field-wrap span-2">
-                          <label className="os-field-label">Endereço completo do cliente</label>
-                          <textarea placeholder="Rua, número, bairro, cidade - UF, CEP" value={osForm.endereco} onChange={(event) => setOsForm(prev => ({ ...prev, endereco: event.target.value }))} />
-                        </div>
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="os-detail-card">
-                    <strong>Motivo da O.S</strong>
-                    <label className="os-field-label">Selecione o tipo de atendimento</label>
-                    <div className="os-chip-selector">
-                      {OS_MOTIVO_OPTIONS.map((item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          className={osForm.motivo === item ? 'active' : ''}
-                          onClick={() => setOsForm(prev => ({ ...prev, motivo: item, categoria: item }))}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                    <label className="os-field-label">Descrição detalhada do problema (obrigatório)</label>
-                    <textarea
-                      placeholder="Descreva com detalhes o que o cliente relatou — erro no inversor, código de falha, comportamento do sistema..."
-                      value={osForm.descricaoProblema}
-                      onChange={(event) => setOsForm(prev => ({ ...prev, descricaoProblema: event.target.value, problema: event.target.value }))}
-                      required
-                    />
-                  </section>
-
-                  <section className="os-detail-card">
-                    <strong>Informações do atendimento</strong>
-                    <label className="os-field-label">Prioridade do atendimento</label>
-                    <div className="os-priority-row">
-                      {OS_PRIORITY_OPTIONS.map((priority) => (
-                        <label key={priority} className={`os-radio-pill ${osForm.prioridade === priority ? 'active' : ''}`}>
-                          <input
-                            type="radio"
-                            name="os-priority-create"
-                            checked={osForm.prioridade === priority}
-                            onChange={() => setOsForm(prev => ({ ...prev, prioridade: priority }))}
-                          />
-                          <span>{priority}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="os-form-grid two">
-                      <div className="os-field-wrap">
-                        <label className="os-field-label">Data desejada para o atendimento</label>
-                        <input type="date" value={osForm.dataDesejada} onChange={(event) => setOsForm(prev => ({ ...prev, dataDesejada: event.target.value }))} />
-                      </div>
-                      <div className="os-field-wrap">
-                        <label className="os-field-label">Prazo máximo (limite para concluir)</label>
-                        <input type="date" value={osForm.prazoMaximo} onChange={(event) => setOsForm(prev => ({ ...prev, prazoMaximo: event.target.value }))} />
-                      </div>
-                      <div className="os-field-wrap">
-                        <label className="os-field-label">Técnico / equipe responsável</label>
-                        <select value={osForm.responsavelId} onChange={(event) => setOsForm(prev => ({ ...prev, responsavelId: event.target.value }))}>
-                          <option value="">Selecionar técnico / equipe</option>
-                          {usuarios.filter(user => user.active && (user.role === 'ADM' || user.permissions?.equipeTecnica || user.permissions?.ordensServico)).map(user => (
-                            <option key={user.id} value={user.id}>{user.nome}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="os-field-wrap">
-                        <label className="os-field-label">Canal de origem do chamado</label>
-                        <select value={osForm.origem} onChange={(event) => setOsForm(prev => ({ ...prev, origem: event.target.value }))}>
-                          <option>WhatsApp</option>
-                          <option>Site</option>
-                          <option>Equipe técnica</option>
-                          <option>Pós-venda</option>
-                          <option>Cliente recorrente</option>
-                        </select>
-                      </div>
-                      <div className="os-field-wrap">
-                        <label className="os-field-label">Materiais prévios (o que levar)</label>
-                        <input placeholder="Ex: Fusível CC, MC4, Cabo..." value={osForm.materiaisPrevios} onChange={(event) => setOsForm(prev => ({ ...prev, materiaisPrevios: event.target.value }))} />
-                      </div>
-                      <div className="os-field-wrap">
-                        <label className="os-field-label">Contato no local (pessoa que recebe)</label>
-                        <input placeholder="Nome e telefone de quem abre a porteira..." value={osForm.contatoLocal} onChange={(event) => setOsForm(prev => ({ ...prev, contatoLocal: event.target.value }))} />
-                      </div>
-                      <div className="os-field-wrap span-2">
-                        <label className="os-field-label">Observações internas (não visível ao cliente)</label>
-                        <textarea placeholder="Anote detalhes úteis para a equipe técnica..." value={osForm.observacoesInternas} onChange={(event) => setOsForm(prev => ({ ...prev, observacoesInternas: event.target.value, observacoes: event.target.value }))} />
-                      </div>
-                    </div>
-                    <button className="btn btn-primary" type="submit">Abrir O.S</button>
-                  </section>
-                </div>
-              </form>
-
-              <div className="os-list-card" id="os-list-section">
-                <div className="os-panel-head">
-                  <div>
-                    <strong>Listagem de O.S</strong>
-                    <span>{filteredOrdensServico.length} ordem{filteredOrdensServico.length === 1 ? '' : 'ens'} na visão atual.</span>
-                  </div>
-                  <div className="lead-filter-pills" aria-label="Filtros rápidos de O.S">
-                    {['todos', 'Aberta', 'Em atendimento', 'Aguardando material', 'Encerrada'].map(status => (
-                      <button
-                        type="button"
-                        key={status}
-                        className={osStatusFilter === status ? 'active' : ''}
-                        onClick={() => setOsStatusFilter(status)}
-                      >
-                        {status === 'todos' ? 'Todas' : status}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="table-wrap os-table-wrap">
-                  <table className="data-table os-table">
-                    <thead>
-                      <tr>
-                        <th>Nº O.S</th>
-                        <th>Cliente</th>
-                        <th>Cidade</th>
-                        <th>Tipo</th>
-                        <th>Prioridade</th>
-                        <th>Instalador</th>
-                        <th>Status</th>
-                        <th>Data abertura</th>
-                        <th>Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredOrdensServico.map((os) => {
-                        const details = createDefaultOsDados(os);
-                        return (
-                          <tr key={os.id} className={selectedOs?.id === os.id ? 'is-selected' : ''}>
-                            <td>{os.numeroOs}</td>
-                            <td>{os.clienteNome}</td>
-                            <td>{details.cliente.cidade || '—'}</td>
-                            <td>{details.motivo || os.categoria}</td>
-                            <td><span className={`status-chip ${os.prioridade === 'Urgente' ? 'danger' : os.prioridade === 'Alta' ? 'warning' : ''}`}>{os.prioridade}</span></td>
-                            <td>{os.responsavelNome || details.atendimento.tecnicoEquipe || 'Não atribuído'}</td>
-                            <td><span className={`status-chip${['Em atendimento', 'Equipe a caminho'].includes(os.status) ? ' status-em-atendimento' : ['Encerrada', 'Serviço concluído', 'Validada pelo cliente'].includes(os.status) ? ' status-concluida' : os.status === 'Cancelada' ? ' danger' : os.status === 'Agendada' ? ' status-agendada' : ''}`}>{os.status}</span></td>
-                            <td>{dateBr(os.dataAbertura)}</td>
-                            <td>
-                              <div className="table-actions">
-                                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setSelectedOsId(os.id)}>Abrir</button>
-                                {os.clienteTelefone ? (
-                                  <a className="btn btn-primary btn-sm-admin" href={getPanelWhatsAppUrl(os.clienteTelefone, `Olá! Sou da DRM Energia Solar. Estamos acompanhando sua ${os.numeroOs}.`)} target="_blank" rel="noopener noreferrer">
-                                    WhatsApp
-                                  </a>
-                                ) : null}
-                              </div>
-                            </td>
+              {osInnerTab === 'ordensServico' && (
+                <div className="os-split">
+                  {/* OS Table */}
+                  <div className={`os-list-pane${selectedOsId ? ' narrowed' : ''}`}>
+                    <div className="os-table-wrap">
+                      <table className="os-tbl">
+                        <thead>
+                          <tr>
+                            <th>O.S.</th>
+                            <th>Cliente</th>
+                            <th>Cidade/UF</th>
+                            <th>Categoria</th>
+                            <th>Prioridade</th>
+                            <th>Responsável</th>
+                            <th>Status</th>
+                            <th>Abertura</th>
+                            <th>Prazo</th>
+                            <th>Últ. atualiz.</th>
+                            <th>Ações</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {!filteredOrdensServico.length && (
-                    <div className="empty-inline">
-                      <strong>Nenhuma O.S encontrada</strong>
-                      <span>Ajuste os filtros ou abra uma nova ordem.</span>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            const pageItems = filteredOrdensServico.slice((osPage - 1) * 10, osPage * 10);
+                            if (!pageItems.length) return null;
+                            return pageItems.map((os) => {
+                              const details = createDefaultOsDados(os);
+                              const prazo = details.atendimento?.prazoMaximo || details.atendimento?.dataDesejada || '';
+                              const isOverdue = prazo && !['Concluída','Encerrada','Cancelada','Serviço concluído','Validada pelo cliente'].includes(os.status) && new Date(prazo).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+                              return (
+                                <tr
+                                  key={os.id}
+                                  className={selectedOsId === os.id ? 'is-selected' : ''}
+                                  onClick={() => { setSelectedOsId(os.id); setOsPanelTab('Resumo'); }}
+                                >
+                                  <td style={{fontWeight:600,color:'#e87c1e'}}>{os.numeroOs || '—'}</td>
+                                  <td>
+                                    <div className="os-td-name">{os.clienteNome || '—'}</div>
+                                    <div className="os-td-phone">{os.clienteTelefone || ''}</div>
+                                  </td>
+                                  <td>{details.cliente?.cidade || '—'}</td>
+                                  <td>{details.motivo || os.categoria || '—'}</td>
+                                  <td>
+                                    <span className={`status-chip${os.prioridade === 'Urgente' ? ' danger' : os.prioridade === 'Alta' ? ' warning' : ''}`}>{os.prioridade || 'Normal'}</span>
+                                  </td>
+                                  <td>{os.responsavelNome || details.atendimento?.tecnicoEquipe || '—'}</td>
+                                  <td>
+                                    <span className={`status-chip${['Em atendimento','Equipe a caminho'].includes(os.status) ? ' status-em-atendimento' : ['Encerrada','Serviço concluído','Validada pelo cliente','Concluída'].includes(os.status) ? ' status-concluida' : os.status === 'Cancelada' ? ' danger' : os.status === 'Agendada' ? ' status-agendada' : ''}`}>{os.status}</span>
+                                  </td>
+                                  <td>
+                                    <div>{dateBr(os.dataAbertura)}</div>
+                                    <div className="os-td-phone">{os.dataAbertura ? new Date(os.dataAbertura).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) : ''}</div>
+                                  </td>
+                                  <td style={isOverdue ? {color:'#dc2626',fontWeight:700} : {}}>{prazo ? dateBr(prazo) : '—'}</td>
+                                  <td>{os.dataUltimaAtualizacao ? dateBr(os.dataUltimaAtualizacao) : '—'}</td>
+                                  <td onClick={(e) => e.stopPropagation()}>
+                                    {(() => {
+                                      return (
+                                        <div style={{position:'relative',display:'inline-block'}}>
+                                          <button
+                                            type="button"
+                                            className="os-three-dot"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedOsId(prev => prev === os.id ? null : os.id);
+                                            }}
+                                            title="Ações"
+                                          >
+                                            ···
+                                          </button>
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                      {!filteredOrdensServico.length && (
+                        <div className="os-tbl-empty">
+                          <strong>Nenhuma O.S encontrada</strong>
+                          <span>Ajuste os filtros ou abra uma nova ordem.</span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {selectedOs && (
-                <div className="os-detail-layout" id="os-detail-section" key={selectedOs.id}>
-                  <div className="os-section-title">
-                    <span>O.S selecionada</span>
-                    <h4>{selectedOs.numeroOs} • {selectedOs.clienteNome}</h4>
-                  </div>
-
-                  <div className="os-detail-header">
-                    <div>
-                      <strong>{selectedOs.numeroOs}</strong>
-                      <span>{selectedOs.clienteTelefone || 'Sem telefone'} • {selectedOs.responsavelNome || 'Sem técnico definido'}</span>
-                    </div>
-                    <div className="os-detail-header-actions">
-                      <select value={selectedOs.status} onChange={(event) => updateOrdemServico(selectedOs.id, { status: event.target.value })}>
-                        {OS_STATUS_FLOW.map(status => <option key={status} value={status}>{status}</option>)}
-                      </select>
-                      <button type="button" className="btn btn-outline" onClick={printOsReport}>Gerar relatório em PDF</button>
-                    </div>
-                  </div>
-
-                  <div className="os-status-flow-card">
-                    <div className="os-section-title small">
-                      <span>2. Fluxo de status</span>
-                    </div>
-                    <div className="os-status-flow-grid">
-                      {OS_STATUS_FLOW.map((status, index) => (
-                        <button
-                          key={status}
-                          type="button"
-                          className={`os-status-flow-item ${selectedOs.status === status ? 'active' : ''}`}
-                          onClick={() => updateOrdemServico(selectedOs.id, { status })}
-                        >
-                          <i>{index + 1}</i>
-                          <span>{status}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="os-detail-grid">
-                    <section className="os-detail-card">
-                      <div className="os-section-title small">
-                        <span>1. Abertura da O.S</span>
+                    <div className="os-tbl-footer">
+                      <span>{filteredOrdensServico.length} ordem{filteredOrdensServico.length === 1 ? '' : 'ens'}</span>
+                      <div className="os-pagination">
+                        <button type="button" className="os-pg-btn" disabled={osPage <= 1} onClick={() => setOsPage(prev => prev - 1)}>‹</button>
+                        {Array.from({length: Math.ceil(filteredOrdensServico.length / 10)}, (_, i) => i + 1).map(p => (
+                          <button key={p} type="button" className={`os-pg-btn${osPage === p ? ' active' : ''}`} onClick={() => setOsPage(p)}>{p}</button>
+                        ))}
+                        <button type="button" className="os-pg-btn" disabled={osPage >= Math.ceil(filteredOrdensServico.length / 10)} onClick={() => setOsPage(prev => prev + 1)}>›</button>
                       </div>
-                      <strong>Dados do cliente</strong>
-                      <div className="os-form-grid two">
-                        <input defaultValue={selectedOs.clienteNome} onBlur={(event) => event.target.value !== selectedOs.clienteNome && updateOrdemServico(selectedOs.id, { clienteNome: event.target.value })} />
-                        <input defaultValue={selectedOs.clienteTelefone || ''} onBlur={(event) => event.target.value !== (selectedOs.clienteTelefone || '') && updateOrdemServico(selectedOs.id, { clienteTelefone: event.target.value })} />
-                        <input defaultValue={selectedOsDados.cliente.cpfCnpj} placeholder="CPF/CNPJ" onBlur={(event) => updateSelectedOsField('cliente', 'cpfCnpj', event.target.value)} />
-                        <input defaultValue={selectedOsDados.cliente.cidade} placeholder="Cidade" onBlur={(event) => updateSelectedOsField('cliente', 'cidade', event.target.value)} />
-                        <input defaultValue={selectedOsDados.cliente.contratoNumero} placeholder="Contrato" onBlur={(event) => updateSelectedOsField('cliente', 'contratoNumero', event.target.value)} />
-                        <input defaultValue={selectedOsDados.cliente.sistema} placeholder="Sistema / potência" onBlur={(event) => updateSelectedOsField('cliente', 'sistema', event.target.value)} />
-                        <input type="date" defaultValue={selectedOsDados.cliente.dataInstalacao} onBlur={(event) => updateSelectedOsField('cliente', 'dataInstalacao', event.target.value)} />
-                        <input defaultValue={selectedOsDados.cliente.consultor} placeholder="Consultor" onBlur={(event) => updateSelectedOsField('cliente', 'consultor', event.target.value)} />
-                        <textarea className="span-2" defaultValue={selectedOsDados.cliente.endereco} placeholder="Endereço" onBlur={(event) => updateSelectedOsField('cliente', 'endereco', event.target.value)} />
-                      </div>
-                    </section>
+                    </div>
+                  </div>
 
-                    <section className="os-detail-card">
-                      <strong>Motivo da O.S</strong>
-                      <div className="os-chip-selector">
-                        {OS_MOTIVO_OPTIONS.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            className={selectedOsDados.motivo === item ? 'active' : ''}
-                            onClick={() => updateSelectedOsDados({ ...selectedOsDados, motivo: item }, { categoria: item, problema: selectedOsDados.descricaoProblema })}
-                          >
-                            {item}
+                  {/* Detail Side Panel */}
+                  {selectedOsId && selectedOs && (
+                    <div className="os-detail-pane" key={selectedOs.id}>
+                      <div className="os-panel-hd">
+                        <div>
+                          <div className="os-panel-number">{selectedOs.numeroOs}</div>
+                          <span className={`status-chip${['Em atendimento','Equipe a caminho'].includes(selectedOs.status) ? ' status-em-atendimento' : ['Encerrada','Serviço concluído','Validada pelo cliente','Concluída'].includes(selectedOs.status) ? ' status-concluida' : selectedOs.status === 'Cancelada' ? ' danger' : selectedOs.status === 'Agendada' ? ' status-agendada' : ''}`}>{selectedOs.status}</span>
+                        </div>
+                        <button type="button" className="os-panel-close" onClick={() => setSelectedOsId(null)}>✕</button>
+                      </div>
+                      <div className="os-panel-client">
+                        <strong>{selectedOs.clienteNome}</strong>
+                        <div className="os-panel-client-row">
+                          <span>📞</span>
+                          <span>{selectedOs.clienteTelefone || 'Sem telefone'}</span>
+                        </div>
+                        <div className="os-panel-client-row">
+                          <span>📍</span>
+                          <span>{selectedOsDados.cliente?.cidade || '—'}</span>
+                        </div>
+                      </div>
+                      <div className="os-panel-meta">
+                        <div className="os-panel-meta-item">
+                          <span>Categoria</span>
+                          <span>{selectedOsDados.motivo || selectedOs.categoria || '—'}</span>
+                        </div>
+                        <div className="os-panel-meta-item">
+                          <span>Prioridade</span>
+                          <span>{selectedOs.prioridade || 'Normal'}</span>
+                        </div>
+                        <div className="os-panel-meta-item">
+                          <span>Responsável</span>
+                          <span>{selectedOs.responsavelNome || '—'}</span>
+                        </div>
+                        <div className="os-panel-meta-item">
+                          <span>Abertura</span>
+                          <span>{dateBr(selectedOs.dataAbertura)}</span>
+                        </div>
+                      </div>
+                      <div className="os-panel-tabs">
+                        {['Resumo','Histórico','Evidências','Materiais','Comunicação'].map(tab => (
+                          <button key={tab} type="button" className={`os-panel-tab${osPanelTab === tab ? ' active' : ''}`} onClick={() => setOsPanelTab(tab)}>
+                            {tab}
                           </button>
                         ))}
                       </div>
-                      <textarea
-                        defaultValue={selectedOsDados.descricaoProblema}
-                        placeholder="Descrição detalhada do problema"
-                        onBlur={(event) => updateSelectedOsDados({ ...selectedOsDados, descricaoProblema: event.target.value }, { problema: event.target.value })}
-                      />
-                    </section>
-
-                    <section className="os-detail-card">
-                      <strong>Informações do atendimento</strong>
-                      <div className="os-priority-row">
-                        {OS_PRIORITY_OPTIONS.map((priority) => (
-                          <label key={priority} className={`os-radio-pill ${selectedOsDados.atendimento.prioridade === priority ? 'active' : ''}`}>
-                            <input
-                              type="radio"
-                              name={`os-priority-${selectedOs.id}`}
-                              checked={selectedOsDados.atendimento.prioridade === priority}
-                              onChange={() => updateSelectedOsDados({ ...selectedOsDados, atendimento: { ...selectedOsDados.atendimento, prioridade: priority } }, { prioridade: priority })}
-                            />
-                            <span>{priority}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <div className="os-form-grid two">
-                        <input type="date" defaultValue={selectedOsDados.atendimento.dataDesejada} onBlur={(event) => updateSelectedOsField('atendimento', 'dataDesejada', event.target.value)} />
-                        <input type="date" defaultValue={selectedOsDados.atendimento.prazoMaximo} onBlur={(event) => updateSelectedOsField('atendimento', 'prazoMaximo', event.target.value)} />
-                        <select value={selectedOs.responsavelId || ''} onChange={(event) => updateOrdemServico(selectedOs.id, { responsavelId: event.target.value || null })}>
-                          <option value="">Selecionar técnico / equipe</option>
-                          {usuarios.filter(user => user.active && (user.role === 'ADM' || user.permissions?.equipeTecnica || user.permissions?.ordensServico)).map(user => (
-                            <option key={user.id} value={user.id}>{user.nome}</option>
-                          ))}
-                        </select>
-                        <input defaultValue={selectedOsDados.atendimento.tecnicoEquipe} placeholder="Técnico / equipe" onBlur={(event) => updateSelectedOsField('atendimento', 'tecnicoEquipe', event.target.value)} />
-                        <input defaultValue={selectedOsDados.atendimento.materiaisPrevios} placeholder="Materiais prévios" onBlur={(event) => updateSelectedOsField('atendimento', 'materiaisPrevios', event.target.value)} />
-                        <input defaultValue={selectedOsDados.atendimento.contatoLocal} placeholder="Contato no local" onBlur={(event) => updateSelectedOsField('atendimento', 'contatoLocal', event.target.value)} />
-                        <textarea className="span-2" defaultValue={selectedOsDados.atendimento.observacoesInternas} placeholder="Observações internas" onBlur={(event) => updateSelectedOsDados({ ...selectedOsDados, atendimento: { ...selectedOsDados.atendimento, observacoesInternas: event.target.value } }, { observacoes: event.target.value })} />
-                      </div>
-                    </section>
-                  </div>
-
-                  <div className="os-detail-grid os-middle-grid">
-                    <section className="os-detail-card">
-                      <div className="os-section-title small">
-                        <span>3. Execução em campo</span>
-                      </div>
-                      <strong>Checklist do instalador</strong>
-                      <div className="os-checklist-grid">
-                        {[
-                          ['verificarInversor', 'Verificar inversor'],
-                          ['fotografarTela', 'Fotografar tela do inversor'],
-                          ['registrarCodigoErro', 'Registrar código de erro'],
-                          ['verificarDisjuntores', 'Verificar disjuntores CC e CA'],
-                          ['medirTensaoCc', 'Medir tensão CC'],
-                          ['medirTensaoCa', 'Medir tensão CA'],
-                          ['verificarComunicacao', 'Verificar comunicação'],
-                          ['verificarAplicativo', 'Verificar aplicativo / monitoramento'],
-                          ['registrarGeracaoAtual', 'Registrar geração atual'],
-                          ['informarDiagnostico', 'Informar diagnóstico'],
-                          ['indicarNecessidadeRetorno', 'Indicar necessidade de retorno'],
-                        ].map(([field, label]) => (
-                          <label key={field} className="os-check-item">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(selectedOsDados.checklist[field])}
-                              onChange={(event) => updateSelectedOsField('checklist', field, event.target.checked)}
-                            />
-                            <span>{label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section className="os-detail-card">
-                      <div className="os-section-title small">
-                        <span>4. Registros e evidências</span>
-                      </div>
-                      <strong>Arquivos do atendimento</strong>
-                      <div className="os-evidence-upload">
-                        <select value={osEvidenceUploadType} onChange={(event) => setOsEvidenceUploadType(event.target.value)}>
-                          <option>Foto antes do serviço</option>
-                          <option>Foto durante o serviço</option>
-                          <option>Foto depois do serviço</option>
-                          <option>Vídeo do problema</option>
-                          <option>Vídeo do equipamento funcionando</option>
-                          <option>Foto do número de série</option>
-                          <option>Foto do inversor</option>
-                          <option>Foto dos módulos</option>
-                          <option>Documento técnico</option>
-                        </select>
-                        <label className="btn btn-outline os-upload-btn">
-                          Selecionar arquivo
-                          <input
-                            type="file"
-                            accept=".pdf,image/jpeg,image/png"
-                            multiple
-                            hidden
-                            onChange={(event) => {
-                              uploadOsEvidencias(selectedOs.id, event.target.files);
-                              event.target.value = '';
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <p className="os-upload-hint">Aceita PDF, JPG e PNG. Cada arquivo fica salvo dentro da O.S para consulta da equipe.</p>
-                      <div className="os-evidence-grid">
-                        {(selectedOs.fotos || []).map((foto) => (
-                          <article key={foto.id} className="os-evidence-card">
-                            <button type="button" className="os-evidence-preview" onClick={() => openOsEvidencePreview(foto)}>
-                              {String(foto.mimeType || '').startsWith('image/') ? (
-                                <img src={foto.dataUrl} alt={foto.descricao || foto.tipo || 'Evidência'} />
-                              ) : (
-                                <span className="os-evidence-file">PDF</span>
+                      <div className="os-panel-body">
+                        {osPanelTab === 'Resumo' && (
+                          <div>
+                            <div className="os-info-item" style={{marginBottom:'0.75rem'}}>
+                              <label>Descrição do problema</label>
+                              <textarea
+                                defaultValue={selectedOsDados.descricaoProblema}
+                                placeholder="Descrição detalhada do problema"
+                                onBlur={(event) => updateSelectedOsDados({ ...selectedOsDados, descricaoProblema: event.target.value }, { problema: event.target.value })}
+                              />
+                            </div>
+                            <div className="os-info-grid">
+                              <div className="os-info-item">
+                                <label>Sistema</label>
+                                <input defaultValue={selectedOsDados.cliente?.sistema} placeholder="Sistema" onBlur={(event) => updateSelectedOsField('cliente', 'sistema', event.target.value)} />
+                              </div>
+                              <div className="os-info-item">
+                                <label>Contrato</label>
+                                <input defaultValue={selectedOsDados.cliente?.contratoNumero || selectedOs.contratoId} placeholder="Contrato" onBlur={(event) => updateSelectedOsField('cliente', 'contratoNumero', event.target.value)} />
+                              </div>
+                              <div className="os-info-item">
+                                <label>Data instalação</label>
+                                <input type="date" defaultValue={selectedOsDados.cliente?.dataInstalacao} onBlur={(event) => updateSelectedOsField('cliente', 'dataInstalacao', event.target.value)} />
+                              </div>
+                              <div className="os-info-item">
+                                <label>Consultor</label>
+                                <input defaultValue={selectedOsDados.cliente?.consultor} placeholder="Consultor" onBlur={(event) => updateSelectedOsField('cliente', 'consultor', event.target.value)} />
+                              </div>
+                            </div>
+                            <div style={{marginBottom:'0.5rem'}}>
+                              <label style={{fontSize:'0.72rem',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.04em',display:'block',marginBottom:'0.35rem'}}>Fluxo de status</label>
+                              <div className="os-status-flow-row">
+                                {['Aguardando triagem','Planejada','Agendada','Em atendimento','Com pendência','Concluída','Encerrada'].map(status => (
+                                  <button key={status} type="button" className={`os-sflow-btn${selectedOs.status === status ? ' active' : ''}`} onClick={() => updateOrdemServico(selectedOs.id, { status })}>
+                                    {status}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {osPanelTab === 'Histórico' && (
+                          <div>
+                            <div style={{display:'flex',gap:'0.75rem',marginBottom:'0.75rem',alignItems:'flex-start'}}>
+                              <div style={{width:10,height:10,borderRadius:'50%',background:'#e87c1e',flexShrink:0,marginTop:4}}></div>
+                              <div>
+                                <div style={{fontWeight:600,fontSize:'0.87rem'}}>O.S. criada</div>
+                                <div style={{fontSize:'0.78rem',color:'#64748b'}}>{dateBr(selectedOs.dataAbertura)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {osPanelTab === 'Evidências' && (
+                          <div>
+                            <div className="os-evidence-upload" style={{marginBottom:'0.75rem'}}>
+                              <select value={osEvidenceUploadType} onChange={(event) => setOsEvidenceUploadType(event.target.value)}>
+                                <option>Foto antes do serviço</option>
+                                <option>Foto durante o serviço</option>
+                                <option>Foto depois do serviço</option>
+                                <option>Vídeo do problema</option>
+                                <option>Foto do inversor</option>
+                                <option>Documento técnico</option>
+                              </select>
+                              <label className="btn btn-outline os-upload-btn">
+                                Selecionar arquivo
+                                <input type="file" accept=".pdf,image/jpeg,image/png" multiple hidden onChange={(event) => { uploadOsEvidencias(selectedOs.id, event.target.files); event.target.value = ''; }} />
+                              </label>
+                            </div>
+                            <div className="os-evidence-grid">
+                              {(selectedOs.fotos || []).map((foto) => (
+                                <article key={foto.id} className="os-evidence-card">
+                                  <button type="button" className="os-evidence-preview" onClick={() => openOsEvidencePreview(foto)}>
+                                    {String(foto.mimeType || '').startsWith('image/') ? (
+                                      <img src={foto.dataUrl} alt={foto.descricao || foto.tipo || 'Evidência'} />
+                                    ) : (
+                                      <span className="os-evidence-file">PDF</span>
+                                    )}
+                                  </button>
+                                  <div><strong>{foto.tipo || 'Evidência'}</strong><span>{foto.descricao || 'Arquivo enviado'}</span></div>
+                                  <div className="table-actions">
+                                    <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => openOsEvidencePreview(foto)}>Ver</button>
+                                    <button type="button" className="btn btn-danger btn-sm-admin" onClick={() => removeOsEvidencia(selectedOs.id, foto.id)}>Remover</button>
+                                  </div>
+                                </article>
+                              ))}
+                              {!selectedOs.fotos?.length && (
+                                <div className="empty-inline"><strong>Sem evidências</strong><span>Envie fotos e documentos.</span></div>
                               )}
-                            </button>
-                            <div>
-                              <strong>{foto.tipo || 'Evidência'}</strong>
-                              <span>{foto.descricao || 'Arquivo enviado'}</span>
                             </div>
-                            <div className="table-actions">
-                              <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => openOsEvidencePreview(foto)}>Ver</button>
-                              <button type="button" className="btn btn-danger btn-sm-admin" onClick={() => removeOsEvidencia(selectedOs.id, foto.id)}>Remover</button>
-                            </div>
-                          </article>
-                        ))}
-                        {!selectedOs.fotos?.length && (
-                          <div className="empty-inline">
-                            <strong>Sem evidências</strong>
-                            <span>Envie fotos e documentos deste atendimento.</span>
                           </div>
                         )}
-                      </div>
-                    </section>
-                  </div>
-
-                  <div className="os-detail-grid os-bottom-grid">
-                    <section className="os-detail-card">
-                      <div className="os-section-title small">
-                        <span>5. Relatório técnico</span>
-                      </div>
-                      <div className="os-form-grid two">
-                        <textarea defaultValue={selectedOsDados.relatorio.diagnostico} placeholder="Diagnóstico encontrado" onBlur={(event) => updateSelectedOsField('relatorio', 'diagnostico', event.target.value)} />
-                        <textarea defaultValue={selectedOsDados.relatorio.servicoRealizado} placeholder="Serviço realizado" onBlur={(event) => updateSelectedOsField('relatorio', 'servicoRealizado', event.target.value)} />
-                        <textarea defaultValue={selectedOsDados.relatorio.pecasMateriais} placeholder="Peças / materiais utilizados" onBlur={(event) => updateSelectedOsField('relatorio', 'pecasMateriais', event.target.value)} />
-                        <textarea defaultValue={selectedOsDados.relatorio.equipamentosSubstituidos} placeholder="Equipamentos substituídos" onBlur={(event) => updateSelectedOsField('relatorio', 'equipamentosSubstituidos', event.target.value)} />
-                        <textarea defaultValue={selectedOsDados.relatorio.numeroSerie} placeholder="Nº de série dos equipamentos" onBlur={(event) => updateSelectedOsField('relatorio', 'numeroSerie', event.target.value)} />
-                        <textarea defaultValue={selectedOsDados.relatorio.testes} placeholder="Testes realizados" onBlur={(event) => updateSelectedOsField('relatorio', 'testes', event.target.value)} />
-                        <textarea className="span-2" defaultValue={selectedOsDados.relatorio.resultado} placeholder="Resultado do atendimento" onBlur={(event) => updateSelectedOsDados({ ...selectedOsDados, relatorio: { ...selectedOsDados.relatorio, resultado: event.target.value } }, { solucao: event.target.value })} />
-                        <textarea defaultValue={selectedOsDados.relatorio.necessidadeRetorno} placeholder="Necessidade de retorno" onBlur={(event) => updateSelectedOsField('relatorio', 'necessidadeRetorno', event.target.value)} />
-                        <textarea defaultValue={selectedOsDados.relatorio.recomendacao} placeholder="Recomendação técnica" onBlur={(event) => updateSelectedOsField('relatorio', 'recomendacao', event.target.value)} />
-                        <textarea className="span-2" defaultValue={selectedOsDados.relatorio.observacoesFinais} placeholder="Observações finais" onBlur={(event) => updateSelectedOsField('relatorio', 'observacoesFinais', event.target.value)} />
-                      </div>
-                      <button type="button" className="btn btn-primary os-pdf-btn" onClick={printOsReport}>
-                        📄 Gerar Relatório em PDF
-                      </button>
-                    </section>
-
-                    <section className="os-detail-card">
-                      <div className="os-section-title small">
-                        <span>6. Assinatura do cliente</span>
-                      </div>
-                      <div className="os-signature-options">
-                        {OS_ASSINATURA_OPTIONS.map((option) => (
-                          <label key={option.value} className={`os-check-item ${selectedOsDados.assinatura.servicoRealizado === option.value ? 'active' : ''}`}>
-                            <input
-                              type="radio"
-                              name={`os-signature-${selectedOs.id}`}
-                              checked={selectedOsDados.assinatura.servicoRealizado === option.value}
-                              onChange={() => updateSelectedOsField('assinatura', 'servicoRealizado', option.value)}
-                            />
-                            <span>{option.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <input defaultValue={selectedOsDados.assinatura.nomeCliente} placeholder="Nome para assinatura" onBlur={(event) => updateSelectedOsField('assinatura', 'nomeCliente', event.target.value)} />
-                      <textarea defaultValue={selectedOsDados.assinatura.motivoRecusa} placeholder="Motivo (se recusado)" onBlur={(event) => updateSelectedOsField('assinatura', 'motivoRecusa', event.target.value)} />
-                      <div className="os-signature-pad-wrap">
-                        <span className="os-filter-label">Assinatura do Cliente:</span>
-                        {selectedOsDados.assinatura.assinaturaDataUrl ? (
-                          <div className="os-signature-done">
-                            <img src={selectedOsDados.assinatura.assinaturaDataUrl} alt="Assinatura" />
-                            <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateSelectedOsField('assinatura', 'assinaturaDataUrl', '')}>Limpar assinatura</button>
+                        {osPanelTab === 'Materiais' && (
+                          <div>
+                            <div className="os-info-item">
+                              <label>Materiais prévios</label>
+                              <textarea defaultValue={selectedOsDados.atendimento?.materiaisPrevios} placeholder="Materiais necessários" onBlur={(event) => updateSelectedOsField('atendimento', 'materiaisPrevios', event.target.value)} />
+                            </div>
+                            <div className="os-info-item" style={{marginTop:'0.5rem'}}>
+                              <label>Peças / materiais utilizados</label>
+                              <textarea defaultValue={selectedOsDados.relatorio?.pecasMateriais} placeholder="O que foi utilizado" onBlur={(event) => updateSelectedOsField('relatorio', 'pecasMateriais', event.target.value)} />
+                            </div>
                           </div>
-                        ) : (
-                          <div className="os-signature-canvas-wrap">
-                            <canvas
-                              ref={signatureCanvasRef}
-                              className="os-signature-canvas"
-                              width={400}
-                              height={150}
-                              onMouseDown={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const ctx = e.currentTarget.getContext('2d');
-                                ctx.strokeStyle = '#1e293b';
-                                ctx.lineWidth = 2;
-                                ctx.lineCap = 'round';
-                                signatureDrawingRef.current = { isDrawing: true, lastX: e.clientX - rect.left, lastY: e.clientY - rect.top };
-                              }}
-                              onMouseMove={(e) => {
-                                if (!signatureDrawingRef.current.isDrawing) return;
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const ctx = e.currentTarget.getContext('2d');
-                                const x = e.clientX - rect.left;
-                                const y = e.clientY - rect.top;
-                                ctx.beginPath();
-                                ctx.moveTo(signatureDrawingRef.current.lastX, signatureDrawingRef.current.lastY);
-                                ctx.lineTo(x, y);
-                                ctx.stroke();
-                                signatureDrawingRef.current.lastX = x;
-                                signatureDrawingRef.current.lastY = y;
-                              }}
-                              onMouseUp={() => {
-                                signatureDrawingRef.current.isDrawing = false;
-                              }}
-                              onMouseLeave={() => {
-                                signatureDrawingRef.current.isDrawing = false;
-                              }}
-                              onTouchStart={(e) => {
-                                e.preventDefault();
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const touch = e.touches[0];
-                                signatureDrawingRef.current = { isDrawing: true, lastX: touch.clientX - rect.left, lastY: touch.clientY - rect.top };
-                              }}
-                              onTouchMove={(e) => {
-                                e.preventDefault();
-                                if (!signatureDrawingRef.current.isDrawing) return;
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const touch = e.touches[0];
-                                const ctx = e.currentTarget.getContext('2d');
-                                ctx.strokeStyle = '#1e293b';
-                                ctx.lineWidth = 2;
-                                ctx.lineCap = 'round';
-                                const x = touch.clientX - rect.left;
-                                const y = touch.clientY - rect.top;
-                                ctx.beginPath();
-                                ctx.moveTo(signatureDrawingRef.current.lastX, signatureDrawingRef.current.lastY);
-                                ctx.lineTo(x, y);
-                                ctx.stroke();
-                                signatureDrawingRef.current.lastX = x;
-                                signatureDrawingRef.current.lastY = y;
-                              }}
-                              onTouchEnd={() => { signatureDrawingRef.current.isDrawing = false; }}
-                            />
-                            <div className="os-signature-canvas-actions">
-                              <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => {
-                                const canvas = signatureCanvasRef.current;
-                                if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); }
-                              }}>Limpar</button>
-                              <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => {
-                                const canvas = signatureCanvasRef.current;
-                                if (canvas) updateSelectedOsField('assinatura', 'assinaturaDataUrl', canvas.toDataURL());
-                              }}>Salvar assinatura</button>
+                        )}
+                        {osPanelTab === 'Comunicação' && (
+                          <div>
+                            {selectedOs.clienteTelefone ? (
+                              <a
+                                className="btn btn-primary"
+                                style={{display:'block',marginBottom:'0.75rem',textAlign:'center',textDecoration:'none'}}
+                                href={getPanelWhatsAppUrl(selectedOs.clienteTelefone, `Olá! Sou da DRM Energia Solar. Estamos acompanhando sua ${selectedOs.numeroOs}.`)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                💬 Abrir WhatsApp
+                              </a>
+                            ) : (
+                              <p style={{color:'#94a3b8',fontSize:'0.87rem'}}>Sem telefone cadastrado.</p>
+                            )}
+                            <div className="os-info-item">
+                              <label>Observações internas</label>
+                              <textarea
+                                defaultValue={selectedOsDados.atendimento?.observacoesInternas}
+                                placeholder="Notas internas..."
+                                onBlur={(event) => updateSelectedOsDados({ ...selectedOsDados, atendimento: { ...selectedOsDados.atendimento, observacoesInternas: event.target.value } }, { observacoes: event.target.value })}
+                              />
                             </div>
                           </div>
                         )}
                       </div>
-                    </section>
-
-                    <section className="os-detail-card">
-                      <div className="os-section-title small">
-                        <span>7. Validação e encerramento</span>
+                      <div className="os-panel-actions">
+                        <button type="button" className="btn btn-primary btn-sm-admin" onClick={() => updateOrdemServico(selectedOs.id, { status: 'Em atendimento' })}>Iniciar atendimento</button>
+                        <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateOrdemServico(selectedOs.id, { status: 'Concluída' })}>Concluir</button>
+                        <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => updateOrdemServico(selectedOs.id, { status: 'Encerrada' })}>Encerrar O.S.</button>
+                        <button type="button" className="btn btn-danger btn-sm-admin" onClick={() => updateOrdemServico(selectedOs.id, { status: 'Cancelada' })}>Cancelar</button>
+                        <button type="button" className="btn btn-outline btn-sm-admin" onClick={printOsReport}>Gerar PDF</button>
                       </div>
-                      <div className="os-validation-flow">
-                        <div><strong>Instalador</strong><span>Marca serviço concluído</span></div>
-                        <div><strong>Supervisor técnico</strong><span>Valida registros, fotos e informações</span></div>
-                        <div><strong>O.S encerrada</strong><span>Relatório final gerado</span></div>
-                      </div>
-                      <div className="table-actions wrap">
-                        <button type="button" className="btn btn-outline" onClick={() => updateOrdemServico(selectedOs.id, { status: 'Serviço concluído' })}>Marcar concluída</button>
-                        <button type="button" className="btn btn-outline" onClick={() => updateOrdemServico(selectedOs.id, { status: 'Validada pelo cliente' })}>Validar com cliente</button>
-                        <button type="button" className="btn btn-primary" onClick={() => updateOrdemServico(selectedOs.id, { status: 'Encerrada' })}>Encerrar O.S</button>
-                        <button type="button" className="btn btn-danger" onClick={() => updateOrdemServico(selectedOs.id, { status: 'Cancelada' })}>Cancelar</button>
-                      </div>
-                    </section>
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -8144,6 +7939,285 @@ const AdminDashboard = () => {
                 <button type="submit" className="btn btn-primary">Salvar lead manual</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {osDrawerOpen && (
+        <div className="os-drawer-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setOsDrawerOpen(false); } }}>
+          <div className="os-drawer">
+            <div className="os-drawer-header">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div className="os-drawer-title">Nova Ordem de Serviço</div>
+                <button type="button" className="os-panel-close" onClick={() => setOsDrawerOpen(false)} style={{fontSize:'1.3rem'}}>✕</button>
+              </div>
+              <div className="os-drawer-steps-row">
+                {[
+                  {n:1,label:'Cliente e sistema'},
+                  {n:2,label:'Ocorrência'},
+                  {n:3,label:'Planejamento'},
+                  {n:4,label:'Evidências'},
+                  {n:5,label:'Revisão'},
+                ].map((step, idx, arr) => (
+                  <div key={step.n} className="os-drawer-step-item">
+                    <div className={`os-drawer-step-circle${osDrawerStep === step.n ? ' active' : osDrawerStep > step.n ? ' done' : ''}`}>{osDrawerStep > step.n ? '✓' : step.n}</div>
+                    <span className={`os-drawer-step-label${osDrawerStep === step.n ? ' active' : ''}`}>{step.label}</span>
+                    {idx < arr.length - 1 && <div className={`os-drawer-step-connector${osDrawerStep > step.n ? ' done' : ''}`} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="os-drawer-body">
+              {osDrawerStep === 1 && (
+                <div>
+                  <div className="os-step-section">
+                    <div className="os-step-section-title">Dados do cliente</div>
+                    <div className="os-cliente-mode-toggle" style={{marginBottom:'0.75rem'}}>
+                      <div className="os-mode-pills">
+                        <button type="button" className={`os-mode-pill${osClienteMode === 'existente' ? ' active' : ''}`} onClick={() => setOsClienteMode('existente')}>Usar cliente cadastrado</button>
+                        <button type="button" className={`os-mode-pill${osClienteMode === 'novo' ? ' active' : ''}`} onClick={() => { setOsClienteMode('novo'); setOsClienteSearch(''); }}>Cadastro manual</button>
+                      </div>
+                    </div>
+                    {osClienteMode === 'existente' ? (
+                      <div className="os-cliente-search-wrap">
+                        <input
+                          placeholder="Buscar cliente por nome, telefone ou CPF..."
+                          value={osClienteSearch}
+                          onChange={(event) => setOsClienteSearch(event.target.value)}
+                          autoComplete="off"
+                        />
+                        {osClienteSearch.trim().length > 0 && (() => {
+                          const q = osClienteSearch.trim().toLowerCase();
+                          const matches = clientes.filter(c => [c.nome, c.whatsapp, c.cpfCnpj, c.cidade].some(v => String(v || '').toLowerCase().includes(q))).slice(0, 8);
+                          return matches.length > 0 ? (
+                            <ul className="os-cliente-dropdown">
+                              {matches.map(c => (
+                                <li key={c.id}>
+                                  <button type="button" onClick={() => {
+                                    setOsForm(prev => ({ ...prev, clienteNome: c.nome || '', clienteTelefone: c.whatsapp || '', cpfCnpj: c.cpfCnpj || '', cidade: c.cidade || '', endereco: c.endereco || '' }));
+                                    setOsClienteSearch(c.nome || '');
+                                  }}>
+                                    <strong>{c.nome}</strong>
+                                    <span>{c.whatsapp || '—'} • {c.cidade || '—'}</span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="os-cliente-empty">Nenhum cliente encontrado. <button type="button" className="os-link-btn" onClick={() => setOsClienteMode('novo')}>Cadastro manual</button></div>
+                          );
+                        })()}
+                        {osForm.clienteNome && (
+                          <div className="os-cliente-selected">
+                            <div className="os-cliente-selected-info">
+                              <strong>{osForm.clienteNome}</strong>
+                              <span>{osForm.clienteTelefone || '—'} • {osForm.cidade || '—'}</span>
+                            </div>
+                            <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => { setOsForm(prev => ({ ...prev, clienteNome: '', clienteTelefone: '', cpfCnpj: '', cidade: '', endereco: '' })); setOsClienteSearch(''); }}>Trocar</button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="os-step-grid">
+                        <div className="os-step-field">
+                          <label>Nome completo *</label>
+                          <input placeholder="João da Silva" value={osForm.clienteNome} onChange={(e) => setOsForm(prev => ({ ...prev, clienteNome: e.target.value }))} />
+                        </div>
+                        <div className="os-step-field">
+                          <label>Telefone / WhatsApp</label>
+                          <input placeholder="(99) 99999-9999" value={osForm.clienteTelefone} onChange={(e) => setOsForm(prev => ({ ...prev, clienteTelefone: e.target.value }))} />
+                        </div>
+                        <div className="os-step-field">
+                          <label>CPF / CNPJ</label>
+                          <input placeholder="000.000.000-00" value={osForm.cpfCnpj} onChange={(e) => setOsForm(prev => ({ ...prev, cpfCnpj: e.target.value }))} />
+                        </div>
+                        <div className="os-step-field">
+                          <label>Cidade</label>
+                          <input placeholder="Ex: Imperatriz - MA" value={osForm.cidade} onChange={(e) => setOsForm(prev => ({ ...prev, cidade: e.target.value }))} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="os-step-section">
+                    <div className="os-step-section-title">Informações do sistema</div>
+                    <div className="os-step-grid">
+                      <div className="os-step-field">
+                        <label>Contrato / referência</label>
+                        <input placeholder="Nº do contrato" value={osForm.contratoId} onChange={(e) => setOsForm(prev => ({ ...prev, contratoId: e.target.value }))} />
+                      </div>
+                      <div className="os-step-field">
+                        <label>Sistema instalado</label>
+                        <input placeholder="Ex: 5kWp, 12 painéis" value={osForm.sistemaResumo} onChange={(e) => setOsForm(prev => ({ ...prev, sistemaResumo: e.target.value }))} />
+                      </div>
+                      <div className="os-step-field">
+                        <label>Data da instalação</label>
+                        <input type="date" value={osForm.dataInstalacao} onChange={(e) => setOsForm(prev => ({ ...prev, dataInstalacao: e.target.value }))} />
+                      </div>
+                      <div className="os-step-field">
+                        <label>Consultor responsável</label>
+                        <input placeholder="Nome do consultor" value={osForm.consultor} onChange={(e) => setOsForm(prev => ({ ...prev, consultor: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {osDrawerStep === 2 && (
+                <div>
+                  <div className="os-step-section">
+                    <div className="os-step-section-title">Categoria</div>
+                    <div className="os-cat-grid">
+                      {Object.keys(OS_OCORRENCIA_MAP).map(cat => (
+                        <button key={cat} type="button" className={`os-cat-btn${osForm.motivo === cat ? ' active' : ''}`} onClick={() => setOsForm(prev => ({ ...prev, motivo: cat, categoria: cat }))}>
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {osForm.motivo && OS_OCORRENCIA_MAP[osForm.motivo] && (
+                    <div className="os-step-section">
+                      <div className="os-step-section-title">Tipo da ocorrência</div>
+                      <div className="os-type-list">
+                        {OS_OCORRENCIA_MAP[osForm.motivo].map(tipo => (
+                          <button key={tipo} type="button" className={`os-type-chip${osForm.tipoOcorrencia === tipo ? ' active' : ''}`} onClick={() => setOsForm(prev => ({ ...prev, tipoOcorrencia: tipo }))}>
+                            {tipo}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="os-step-section">
+                    <div className="os-step-section-title">Descrição do problema *</div>
+                    <div className="os-step-field span-2">
+                      <textarea
+                        placeholder="Descreva com detalhes o que o cliente relatou..."
+                        value={osForm.descricaoProblema}
+                        onChange={(e) => setOsForm(prev => ({ ...prev, descricaoProblema: e.target.value, problema: e.target.value }))}
+                        style={{minHeight:120}}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {osDrawerStep === 3 && (
+                <div>
+                  <div className="os-step-section">
+                    <div className="os-step-section-title">Prioridade</div>
+                    <div className="os-priority-row">
+                      {OS_PRIORITY_OPTIONS.map((priority) => (
+                        <label key={priority} className={`os-radio-pill ${osForm.prioridade === priority ? 'active' : ''}`}>
+                          <input type="radio" name="os-drawer-priority" checked={osForm.prioridade === priority} onChange={() => setOsForm(prev => ({ ...prev, prioridade: priority }))} />
+                          <span>{priority}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="os-step-section">
+                    <div className="os-step-section-title">Agendamento e atribuição</div>
+                    <div className="os-step-grid">
+                      <div className="os-step-field">
+                        <label>Data desejada</label>
+                        <input type="date" value={osForm.dataDesejada} onChange={(e) => setOsForm(prev => ({ ...prev, dataDesejada: e.target.value }))} />
+                      </div>
+                      <div className="os-step-field">
+                        <label>Prazo máximo</label>
+                        <input type="date" value={osForm.prazoMaximo} onChange={(e) => setOsForm(prev => ({ ...prev, prazoMaximo: e.target.value }))} />
+                      </div>
+                      <div className="os-step-field">
+                        <label>Técnico / equipe</label>
+                        <select value={osForm.responsavelId} onChange={(e) => setOsForm(prev => ({ ...prev, responsavelId: e.target.value }))}>
+                          <option value="">Selecionar</option>
+                          {usuarios.filter(u => u.active && (u.role === 'ADM' || u.permissions?.equipeTecnica || u.permissions?.ordensServico)).map(u => (
+                            <option key={u.id} value={u.id}>{u.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="os-step-field">
+                        <label>Canal de origem</label>
+                        <select value={osForm.origem} onChange={(e) => setOsForm(prev => ({ ...prev, origem: e.target.value }))}>
+                          <option>WhatsApp</option>
+                          <option>Site</option>
+                          <option>Equipe técnica</option>
+                          <option>Pós-venda</option>
+                          <option>Cliente recorrente</option>
+                        </select>
+                      </div>
+                      <div className="os-step-field">
+                        <label>Materiais prévios</label>
+                        <input placeholder="Ex: Fusível CC, MC4..." value={osForm.materiaisPrevios} onChange={(e) => setOsForm(prev => ({ ...prev, materiaisPrevios: e.target.value }))} />
+                      </div>
+                      <div className="os-step-field">
+                        <label>Contato no local</label>
+                        <input placeholder="Nome e telefone" value={osForm.contatoLocal} onChange={(e) => setOsForm(prev => ({ ...prev, contatoLocal: e.target.value }))} />
+                      </div>
+                      <div className="os-step-field span-2">
+                        <label>Observações internas</label>
+                        <textarea placeholder="Notas para a equipe..." value={osForm.observacoesInternas} onChange={(e) => setOsForm(prev => ({ ...prev, observacoesInternas: e.target.value, observacoes: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {osDrawerStep === 4 && (
+                <div>
+                  <div className="os-step-section">
+                    <div className="os-step-section-title">Evidências iniciais (opcional)</div>
+                    <div className="os-upload-zone">
+                      <div style={{fontSize:'2rem'}}>📎</div>
+                      <p>Arraste arquivos aqui ou clique para selecionar</p>
+                      <p style={{fontSize:'0.78rem',color:'#94a3b8'}}>PDF, JPG, PNG aceitos</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {osDrawerStep === 5 && (
+                <div>
+                  <div className="os-step-section">
+                    <div className="os-step-section-title">Revisão da O.S.</div>
+                    <div className="os-review-block">
+                      <div className="os-review-block-title">Cliente</div>
+                      <div className="os-review-row"><span>Nome</span><span>{osForm.clienteNome || '—'}</span></div>
+                      <div className="os-review-row"><span>Telefone</span><span>{osForm.clienteTelefone || '—'}</span></div>
+                      <div className="os-review-row"><span>Cidade</span><span>{osForm.cidade || '—'}</span></div>
+                      <div className="os-review-row"><span>Sistema</span><span>{osForm.sistemaResumo || '—'}</span></div>
+                    </div>
+                    <div className="os-review-block">
+                      <div className="os-review-block-title">Ocorrência</div>
+                      <div className="os-review-row"><span>Categoria</span><span>{osForm.motivo || '—'}</span></div>
+                      <div className="os-review-row"><span>Tipo</span><span>{osForm.tipoOcorrencia || '—'}</span></div>
+                      <div className="os-review-row"><span>Descrição</span><span>{osForm.descricaoProblema || '—'}</span></div>
+                    </div>
+                    <div className="os-review-block">
+                      <div className="os-review-block-title">Planejamento</div>
+                      <div className="os-review-row"><span>Prioridade</span><span>{osForm.prioridade}</span></div>
+                      <div className="os-review-row"><span>Data desejada</span><span>{osForm.dataDesejada ? dateBr(osForm.dataDesejada) : '—'}</span></div>
+                      <div className="os-review-row"><span>Prazo máximo</span><span>{osForm.prazoMaximo ? dateBr(osForm.prazoMaximo) : '—'}</span></div>
+                      <div className="os-review-row"><span>Canal</span><span>{osForm.origem}</span></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="os-drawer-footer">
+              <div className="os-drawer-footer-left">
+                {osDrawerStep > 1 && (
+                  <button type="button" className="btn btn-outline" onClick={() => setOsDrawerStep(prev => prev - 1)}>Voltar</button>
+                )}
+                <button type="button" className="btn btn-outline" onClick={() => setOsDrawerOpen(false)}>Salvar rascunho</button>
+              </div>
+              <div className="os-drawer-footer-right">
+                {osDrawerStep < 5 ? (
+                  <button type="button" className="btn btn-primary" onClick={() => {
+                    if (osDrawerStep === 2 && (!osForm.motivo || !osForm.descricaoProblema.trim())) {
+                      alert('Selecione uma categoria e preencha a descrição do problema.');
+                      return;
+                    }
+                    setOsDrawerStep(prev => prev + 1);
+                  }}>Avançar</button>
+                ) : (
+                  <button type="button" className="btn btn-primary" onClick={(e) => { createOrdemServico(e); setOsDrawerOpen(false); }}>Abrir O.S.</button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
