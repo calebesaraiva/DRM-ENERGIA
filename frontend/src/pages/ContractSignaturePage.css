@@ -1,0 +1,636 @@
+.contract-sign-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.14), transparent 26%),
+    linear-gradient(180deg, #fff7ed 0%, #fff 24%, #f8fafc 100%);
+  padding: 28px 18px;
+}
+
+.contract-sign-page.loading {
+  display: grid;
+  place-items: center;
+  color: #475569;
+  font-size: 1.05rem;
+}
+
+.contract-sign-shell {
+  width: min(1240px, 100%);
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #fed7aa;
+  border-radius: 28px;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  backdrop-filter: blur(16px);
+}
+
+.contract-sign-shell.error {
+  max-width: 620px;
+  padding: 36px;
+}
+
+.contract-sign-header,
+.contract-sign-hero,
+.trust-strip,
+.contract-sign-grid {
+  padding: 24px 28px;
+}
+
+.contract-sign-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.contract-sign-header h1,
+.contract-sign-header p,
+.contract-sign-grid h2 {
+  margin: 0;
+}
+
+.contract-sign-header h1 {
+  font-size: clamp(2rem, 2.8vw, 2.5rem);
+  color: #111827;
+}
+
+.contract-sign-header p {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 1.05rem;
+}
+
+.kicker {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #c2410c;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.back-home,
+.contract-preview-card a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  text-decoration: none;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.open-signature-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(249, 115, 22, 0.18);
+}
+
+.open-signature-button.ghost {
+  background: #fff;
+  border: 1px solid #fdba74;
+  box-shadow: none;
+}
+
+.contract-sign-hero {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.hero-card,
+.contract-preview-card,
+.signature-card {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+}
+
+.hero-card {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hero-card-primary {
+  border-color: #fdba74;
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.98), rgba(255, 255, 255, 0.98));
+}
+
+.hero-card strong {
+  font-size: 1.85rem;
+  color: #0f172a;
+}
+
+.hero-card small,
+.hero-card span {
+  color: #64748b;
+}
+
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.hero-badges span,
+.signature-status,
+.trust-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.signature-status {
+  width: fit-content;
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.hero-badges span {
+  background: #fff;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+
+.trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.signature-success-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 28px 0;
+  flex-wrap: wrap;
+}
+
+.signature-success-banner strong {
+  color: #166534;
+  font-size: 1.05rem;
+}
+
+.signature-success-banner p {
+  margin: 0;
+  color: #475569;
+  flex: 1 1 280px;
+}
+
+.trust-chip {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.contract-sign-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.95fr);
+  gap: 18px;
+}
+
+.contract-preview-card,
+.signature-card {
+  padding: 18px;
+}
+
+.signature-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid #fed7aa;
+  background: linear-gradient(180deg, #fff7ed, #ffffff);
+}
+
+.signature-entry-card span {
+  color: #c2410c;
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.signature-entry-card strong {
+  color: #111827;
+  font-size: 1.3rem;
+}
+
+.signature-entry-card p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.signature-locked-state {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.signature-locked-state strong {
+  color: #0f172a;
+}
+
+.signature-locked-state span {
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card-head span {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.card-head h2 {
+  color: #111827;
+}
+
+.signature-intro {
+  margin: 8px 0 0;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.contract-preview-card iframe {
+  width: 100%;
+  min-height: 760px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.signature-card label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.signature-card input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  font-size: 1rem;
+}
+
+.signature-modal-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.signature-modal-card label:first-of-type {
+  margin-top: 2px;
+}
+
+.signature-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.signature-meta-card {
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.signature-meta-card span {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.signature-meta-card strong {
+  color: #111827;
+}
+
+.signature-pad {
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.signature-pad-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #fff, #fff7ed);
+}
+
+.signature-pad-head button {
+  border: 0;
+  background: transparent;
+  color: #f97316;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.signature-canvas,
+.signature-finished {
+  width: 100%;
+  height: 240px;
+  display: block;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 38px,
+      rgba(226, 232, 240, 0.9) 38px,
+      rgba(226, 232, 240, 0.9) 39px
+    );
+}
+
+.signature-finished {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 16px;
+  background: #fff;
+}
+
+.signature-finished img {
+  max-width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+}
+
+.signature-pad-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.signature-consent {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-top: 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 16px;
+  background: #fff7ed;
+}
+
+.signature-consent input {
+  width: 18px;
+  min-height: 18px;
+  margin-top: 4px;
+}
+
+.signature-consent span {
+  color: #7c2d12;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.signature-legal-box {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.signature-legal-box strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.signature-legal-box p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.signature-feedback {
+  margin: 14px 0 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.submit-signature,
+.contract-sign-shell.error button {
+  margin-top: 16px;
+  min-height: 54px;
+  width: 100%;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  color: #111827;
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 18px 34px rgba(249, 115, 22, 0.24);
+}
+
+.signature-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.signature-modal-frame {
+  width: min(760px, 100%);
+  max-height: min(92vh, 100%);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-radius: 28px;
+  background: #fff;
+  border: 1px solid rgba(253, 186, 116, 0.9);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+}
+
+.signature-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #ffffff, #fff7ed);
+}
+
+.signature-modal-header span {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: #c2410c;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.signature-modal-header h2,
+.signature-modal-header p {
+  margin: 0;
+}
+
+.signature-modal-header p {
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.signature-modal-close {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid #fdba74;
+  background: #fff;
+  color: #9a3412;
+  font-size: 1.7rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.signature-modal-body {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+@media (max-width: 1100px) {
+  .contract-sign-grid,
+  .contract-sign-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .contract-preview-card iframe {
+    min-height: 580px;
+  }
+}
+
+@media (max-width: 720px) {
+  .contract-sign-page {
+    padding: 12px;
+  }
+
+  .contract-sign-header,
+  .contract-sign-hero,
+  .trust-strip,
+  .contract-sign-grid {
+    padding: 18px;
+  }
+
+  .contract-sign-header {
+    flex-direction: column;
+  }
+
+  .back-home,
+  .contract-preview-card a,
+  .open-signature-button {
+    width: 100%;
+  }
+
+  .preview-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .signature-meta-grid,
+  .signature-pad-foot {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .contract-preview-card iframe {
+    min-height: 360px;
+  }
+
+  .signature-modal-overlay {
+    padding: 0;
+  }
+
+  .signature-modal-frame {
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .signature-modal-header,
+  .signature-modal-body {
+    padding: 18px;
+  }
+
+  .signature-modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .signature-canvas,
+  .signature-finished {
+    height: 300px;
+  }
+
+  .submit-signature {
+    position: sticky;
+    bottom: 0;
+  }
+}

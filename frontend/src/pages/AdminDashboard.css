@@ -15763,3 +15763,181 @@
   .inst-table-wrap { border-radius: 10px; }
 }
 /* ── End Instalações redesign ──────────────────────────────────────────────── */
+.orc-budget-mode-switch {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  margin: 10px 0 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+}
+
+.orc-budget-mode-switch button {
+  border: 0;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.orc-budget-mode-switch button.active {
+  background: linear-gradient(135deg, #fff7ed, #ffffff);
+  color: #c2410c;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.12);
+}
+
+.quick-budget-grid {
+  margin-bottom: 10px;
+}
+
+.quick-budget-empty-actions {
+  margin: 18px 0 8px;
+}
+
+.quick-budget-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.quick-budget-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.quick-budget-card strong,
+.quick-budget-card p {
+  margin: 0;
+}
+
+.quick-budget-card p {
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.quick-budget-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 10px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.quick-budget-card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.contract-signature-chip {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.contract-signature-chip.tone-success { background: #dcfce7; color: #15803d; }
+.contract-signature-chip.tone-warning { background: #fef3c7; color: #b45309; }
+.contract-signature-chip.tone-info { background: #dbeafe; color: #1d4ed8; }
+.contract-signature-chip.tone-muted { background: #e2e8f0; color: #475569; }
+
+.contract-signature-modal {
+  max-width: 860px;
+}
+
+.contract-signature-form {
+  display: grid;
+  gap: 18px;
+}
+
+.contract-signature-pad {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.contract-signature-pad-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.contract-signature-canvas {
+  width: 100%;
+  height: 220px;
+  display: block;
+  background: #fff;
+  touch-action: none;
+}
+
+.contract-signature-link-box {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 16px;
+  background: #fff7ed;
+}
+
+.contract-signature-link-box span {
+  color: #9a3412;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.contract-signature-link-box strong {
+  color: #7c2d12;
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .quick-budget-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .quick-budget-card-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .quick-budget-card-actions .btn {
+    width: 100%;
+  }
+
+  .orc-budget-mode-switch {
+    width: 100%;
+    flex-direction: column;
+    border-radius: 18px;
+  }
+
+  .orc-budget-mode-switch button {
+    width: 100%;
+  }
+}

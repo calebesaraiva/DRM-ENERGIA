@@ -2240,6 +2240,100 @@ const parseJsonField = (value, fallback = {}) => {
   }
 };
 
+const DRM_SIGNATORY = Object.freeze({
+  nome: 'Deivson Rodrigues Martins',
+  cpf: '04870895374',
+  nascimento: '1991-06-23',
+});
+
+const validateSignatureDataUrl = (dataUrl) => {
+  if (!dataUrl) return { valid: false, message: 'A assinatura está vazia.' };
+  const value = String(dataUrl);
+  const match = value.match(/^data:(image\/png|image\/jpeg);base64,([A-Za-z0-9+/=\r\n]+)$/i);
+  if (!match) return { valid: false, message: 'Envie uma assinatura em PNG ou JPG válida.' };
+  const estimatedBytes = Math.floor(match[2].replace(/\s/g, '').length * 0.75);
+  if (estimatedBytes > 1.5 * 1024 * 1024) {
+    return { valid: false, message: 'A assinatura deve ter no máximo 1.5 MB.' };
+  }
+  return { valid: true, dataUrl: value, mimeType: match[1].toLowerCase() };
+};
+
+const dataUrlToBuffer = (dataUrl) => {
+  const match = String(dataUrl || '').match(/^data:([^;]+);base64,(.+)$/i);
+  if (!match) return null;
+  return Buffer.from(match[2], 'base64');
+};
+
+const normalizeIpAddress = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.includes(',')) return normalizeIpAddress(raw.split(',')[0]);
+  return raw.replace(/^::ffff:/i, '');
+};
+
+const getRequestIp = (req) => (
+  normalizeIpAddress(req.headers['x-forwarded-for']) ||
+  normalizeIpAddress(req.ip) ||
+  normalizeIpAddress(req.socket?.remoteAddress)
+);
+
+const buildSignatureDocumentHash = (parsed = {}) => {
+  const payload = {
+    id: parsed.id || null,
+    clienteNome: parsed.clienteNome || '',
+    clienteCpfCnpj: parsed.clienteCpfCnpj || parsed.dados?.manual?.cpfCnpj || '',
+    clienteCidade: parsed.clienteCidade || '',
+    clienteTelefone: parsed.clienteTelefone || '',
+    clienteEmail: parsed.clienteEmail || '',
+    valorProjeto: parsed.valorProjeto || 0,
+    status: parsed.status || '',
+    equipamentoId: parsed.equipamentoId || null,
+    equipamentoNome: parsed.equipamentoNome || '',
+    manual: parsed.dados?.manual || {},
+    dimensionamento: parsed.dados?.dimensionamento || {},
+    financeiro: parsed.dados?.financeiro || {},
+    equipamentoDados: parsed.equipamentoDados || {},
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+};
+
+const buildSignatureEvidenceSummary = (parsed = {}) => {
+  const assinatura = parsed.dados?.assinatura || {};
+  const documentHash = assinatura?.documentHash || buildSignatureDocumentHash(parsed);
+  return {
+    method: assinatura?.method || 'Assinatura eletrônica simples com trilha de evidências',
+    provider: assinatura?.provider || 'DRM Energia Solar',
+    documentHash,
+    linkToken: assinatura?.link?.token || null,
+    requestedAt: assinatura?.link?.createdAt || null,
+    expiresAt: assinatura?.link?.expiresAt || null,
+    drm: assinatura?.drm || null,
+    cliente: assinatura?.cliente || null,
+  };
+};
+
+const buildAutoDrmSignature = ({ signedAt, approvedByUser }) => ({
+  signedAt: signedAt || new Date().toISOString(),
+  signedById: approvedByUser?.id ?? null,
+  signedByName: DRM_SIGNATORY.nome,
+  cpf: DRM_SIGNATORY.cpf,
+  birthDate: DRM_SIGNATORY.nascimento,
+  autoApplied: true,
+  approvedById: approvedByUser?.id ?? null,
+  approvedByName: approvedByUser?.nome || '',
+  source: 'aprovacao-admin',
+});
+
+const resolveAssinaturaStatus = (assinatura = {}) => {
+  const drmSigned = Boolean((assinatura?.drm?.dataUrl || assinatura?.drm?.autoApplied) && assinatura?.drm?.signedAt);
+  const clienteSigned = Boolean(assinatura?.cliente?.dataUrl && assinatura?.cliente?.signedAt);
+  if (drmSigned && clienteSigned) return 'Assinado digitalmente';
+  if (drmSigned) return 'Aguardando assinatura do cliente';
+  if (clienteSigned) return 'Aguardando assinatura DRM';
+  if (assinatura?.link?.token) return 'Link enviado para assinatura';
+  return 'Pendente de assinaturas';
+};
+
 const validateProjectDocumentDataUrl = (dataUrl) => {
   if (!dataUrl) return { valid: true, dataUrl: null };
   const value = String(dataUrl);
@@ -2266,6 +2360,7 @@ const parseContrato = (contrato) => ({
   consultorNome: getContractConsultantName(contrato),
   dados: parseJsonField(contrato.dados),
   equipamentoDados: parseJsonField(contrato.equipamentoDados),
+  assinaturaStatus: contrato.assinaturaStatus || resolveAssinaturaStatus(parseJsonField(contrato.dados)?.assinatura || {}),
 });
 
 const parseProcuracao = (procuracao) => ({
@@ -3041,6 +3136,7 @@ const buildContratoPdf = async (contrato) => {
   const manual = parsed.dados?.manual || {};
   const cliente = parsed.dados?.cliente || {};
   const equipamento = parsed.equipamentoDados || {};
+  const assinatura = parsed.dados?.assinatura || {};
   const template = await getContractTemplate();
   const logoPath = path.join(__dirname, '../frontend/public/assets/logo.png');
   const clientAddress = cliente.enderecoCompleto || buildClientAddress(cliente);
@@ -3286,11 +3382,71 @@ const buildContratoPdf = async (contrato) => {
     const signatureY = doc.y;
     doc.strokeColor(dark).moveTo(doc.page.margins.left, signatureY).lineTo(doc.page.margins.left + 205, signatureY).stroke();
     doc.moveTo(doc.page.margins.left + pageWidth - 205, signatureY).lineTo(doc.page.margins.left + pageWidth, signatureY).stroke();
+    const drmSignatureBuffer = assinatura?.drm?.dataUrl ? dataUrlToBuffer(assinatura.drm.dataUrl) : null;
+    const clientSignatureBuffer = assinatura?.cliente?.dataUrl ? dataUrlToBuffer(assinatura.cliente.dataUrl) : null;
+    if (drmSignatureBuffer) {
+      try {
+        doc.image(drmSignatureBuffer, doc.page.margins.left + 24, signatureY - 48, { fit: [156, 42], align: 'center' });
+      } catch (error) {
+        console.warn('Nao foi possivel renderizar a assinatura DRM no PDF:', error?.message || error);
+      }
+    } else if (assinatura?.drm?.signedAt) {
+      const autoDrmName = assinatura?.drm?.signedByName || DRM_SIGNATORY.nome;
+      doc.font('Helvetica-Oblique').fontSize(17).fillColor(accent).text(
+        autoDrmName,
+        doc.page.margins.left + 18,
+        signatureY - 34,
+        { width: 170, align: 'center' }
+      );
+    }
+    if (clientSignatureBuffer) {
+      try {
+        doc.image(clientSignatureBuffer, doc.page.margins.left + pageWidth - 181, signatureY - 48, { fit: [156, 42], align: 'center' });
+      } catch (error) {
+        console.warn('Nao foi possivel renderizar a assinatura do cliente no PDF:', error?.message || error);
+      }
+    }
     doc.font('Helvetica-Bold').fontSize(8.5).text(template.empresa.nome, doc.page.margins.left, signatureY + 7, { width: 205, align: 'center' });
     doc.text(parsed.clienteNome, doc.page.margins.left + pageWidth - 205, signatureY + 7, { width: 205, align: 'center' });
     doc.font('Helvetica').fontSize(8).fillColor(muted).text('CONTRATADA', doc.page.margins.left, signatureY + 20, { width: 205, align: 'center' });
     doc.text('CONTRATANTE', doc.page.margins.left + pageWidth - 205, signatureY + 20, { width: 205, align: 'center' });
-    doc.y = signatureY + 42;
+    if (assinatura?.drm?.signedAt) {
+      doc.font('Helvetica').fontSize(7).fillColor(muted).text(
+        `Assinado digitalmente por ${assinatura.drm.signedByName || template.empresa.nome} em ${formatDateBr(assinatura.drm.signedAt)}`,
+        doc.page.margins.left,
+        signatureY + 31,
+        { width: 205, align: 'center' }
+      );
+      doc.text(
+        `CPF ${assinatura.drm.cpf || DRM_SIGNATORY.cpf} - Nascimento ${formatDateBr(assinatura.drm.birthDate || DRM_SIGNATORY.nascimento)}`,
+        doc.page.margins.left,
+        signatureY + 41,
+        { width: 205, align: 'center' }
+      );
+    }
+    if (assinatura?.cliente?.signedAt) {
+      doc.font('Helvetica').fontSize(7).fillColor(muted).text(
+        `Assinado digitalmente por ${assinatura.cliente.signedByName || parsed.clienteNome} em ${formatDateBr(assinatura.cliente.signedAt)}`,
+        doc.page.margins.left + pageWidth - 205,
+        signatureY + 31,
+        { width: 205, align: 'center' }
+      );
+    }
+    doc.y = signatureY + 60;
+
+    const signatureEvidence = buildSignatureEvidenceSummary(parsed);
+    const evidenceRows = [
+      ['Método', signatureEvidence.method],
+      ['Hash SHA-256 do contrato', signatureEvidence.documentHash],
+      ['Link/token', signatureEvidence.linkToken || 'Não gerado'],
+      ['Solicitado em', signatureEvidence.requestedAt ? formatDateBr(signatureEvidence.requestedAt) : 'Não informado'],
+      ['Assinatura cliente', assinatura?.cliente?.signedAt ? `${assinatura.cliente.signedByName || parsed.clienteNome} em ${formatDateBr(assinatura.cliente.signedAt)}` : 'Pendente'],
+      ['Evidência cliente', assinatura?.cliente?.ip ? `IP ${assinatura.cliente.ip}` : 'IP não registrado'],
+      ['Assinatura DRM', assinatura?.drm?.signedAt ? `${assinatura.drm.signedByName || template.empresa.nome} em ${formatDateBr(assinatura.drm.signedAt)}` : 'Pendente'],
+      ['Evidência DRM', assinatura?.drm?.ip ? `IP ${assinatura.drm.ip}` : 'IP não registrado'],
+    ];
+    sectionTitle('Comprovante da assinatura eletrônica');
+    cardGrid(evidenceRows, 2);
 
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i += 1) {
@@ -3302,7 +3458,7 @@ const buildContratoPdf = async (contrato) => {
   });
 };
 
-const sendContratoPdf = async (res, contrato) => {
+const sendContratoPdf = async (res, contrato, { download = true } = {}) => {
   const safeClientName = String(contrato.clienteNome || 'cliente')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -3314,7 +3470,7 @@ const sendContratoPdf = async (res, contrato) => {
   const pdf = await buildContratoPdf(contrato);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Length', pdf.length);
-  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${fileName}"`);
   res.send(pdf);
 };
 
@@ -3546,10 +3702,16 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       clienteId INTEGER,
       clienteNome TEXT,
+      clienteTelefone TEXT,
+      clienteEmail TEXT,
+      clienteCidade TEXT,
       status TEXT,
       data TEXT,
+      tipo TEXT DEFAULT 'completo',
       dimensionamento TEXT,
       financeiro TEXT,
+      assignedUserId INTEGER,
+      assignedUserName TEXT,
       FOREIGN KEY (clienteId) REFERENCES clientes(id)
     );
 
@@ -3607,6 +3769,10 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       equipamentoId INTEGER,
       equipamentoNome TEXT,
       equipamentoDados TEXT,
+      assinaturaStatus TEXT DEFAULT 'Pendente de assinaturas',
+      assinaturaToken TEXT,
+      assinaturaSolicitadaEm TEXT,
+      assinaturaTokenExpiraEm TEXT,
       FOREIGN KEY (orcamentoId) REFERENCES orcamentos(id)
     );
 
@@ -4024,6 +4190,9 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingOrcamentoColumns.includes('assignedUserName')) {
     await db.exec('ALTER TABLE orcamentos ADD COLUMN assignedUserName TEXT');
   }
+  if (!existingOrcamentoColumns.includes('tipo')) {
+    await db.exec("ALTER TABLE orcamentos ADD COLUMN tipo TEXT DEFAULT 'completo'");
+  }
 
   const leadColumns = await db.all('PRAGMA table_info(leads)');
   const existingLeadColumns = leadColumns.map(column => column.name);
@@ -4117,12 +4286,31 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingContratoColumns.includes('consultorNome')) {
     await db.exec('ALTER TABLE contratos ADD COLUMN consultorNome TEXT');
   }
+  if (!existingContratoColumns.includes('assinaturaStatus')) {
+    await db.exec("ALTER TABLE contratos ADD COLUMN assinaturaStatus TEXT DEFAULT 'Pendente de assinaturas'");
+  }
+  if (!existingContratoColumns.includes('assinaturaToken')) {
+    await db.exec('ALTER TABLE contratos ADD COLUMN assinaturaToken TEXT');
+  }
+  if (!existingContratoColumns.includes('assinaturaSolicitadaEm')) {
+    await db.exec('ALTER TABLE contratos ADD COLUMN assinaturaSolicitadaEm TEXT');
+  }
+  if (!existingContratoColumns.includes('assinaturaTokenExpiraEm')) {
+    await db.exec('ALTER TABLE contratos ADD COLUMN assinaturaTokenExpiraEm TEXT');
+  }
   await db.exec(`
     UPDATE contratos
     SET consultorId = COALESCE(consultorId, assignedUserId, criadoPorId),
         consultorNome = COALESCE(NULLIF(consultorNome, ''), NULLIF(assignedUserName, ''), NULLIF(criadoPorNome, ''))
     WHERE consultorId IS NULL OR consultorNome IS NULL OR consultorNome = ''
   `);
+  const contratosParaAssinatura = await db.all('SELECT id, dados, assinaturaStatus FROM contratos');
+  for (const contrato of contratosParaAssinatura) {
+    const assinaturaStatus = resolveAssinaturaStatus(parseJsonField(contrato.dados)?.assinatura || {});
+    if (assinaturaStatus !== (contrato.assinaturaStatus || '')) {
+      await db.run('UPDATE contratos SET assinaturaStatus = ? WHERE id = ?', assinaturaStatus, contrato.id);
+    }
+  }
 
   const procuracaoColumns = await db.all('PRAGMA table_info(procuracoes)');
   const existingProcuracaoColumns = procuracaoColumns.map(column => column.name);
@@ -6378,11 +6566,33 @@ app.get('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'), 
 });
 
 app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'), async (req, res) => {
-  const { clienteId, dimensionamento = {}, financeiro = {}, status = 'Orçamento manual' } = req.body;
-  if (!clienteId) return res.status(400).json({ message: 'Selecione um cliente para criar o orçamento.' });
+  const {
+    clienteId,
+    clienteNome,
+    clienteTelefone,
+    clienteEmail,
+    clienteCidade,
+    dimensionamento = {},
+    financeiro = {},
+    status = 'Orçamento manual',
+    tipo = 'completo',
+  } = req.body;
+  const isQuickBudget = String(tipo || '').trim().toLowerCase() === 'rapido';
 
-  const cliente = await db.get('SELECT * FROM clientes WHERE id = ?', clienteId);
-  if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+  let cliente = null;
+  if (clienteId) {
+    cliente = await db.get('SELECT * FROM clientes WHERE id = ?', clienteId);
+    if (!cliente) return res.status(404).json({ message: 'Cliente não encontrado.' });
+  } else if (!isQuickBudget) {
+    return res.status(400).json({ message: 'Selecione um cliente ou use o modo de orçamento rápido.' });
+  }
+
+  const snapshotClienteNome = String(cliente?.nome || clienteNome || '').trim();
+  const snapshotClienteCidade = String(cliente?.cidade || clienteCidade || '').trim();
+  const snapshotClienteTelefone = String(cliente?.whatsapp || clienteTelefone || '').trim();
+  const snapshotClienteEmail = String(cliente?.email || clienteEmail || '').trim();
+  if (!snapshotClienteNome) return res.status(400).json({ message: 'Informe o nome do cliente para salvar o orçamento.' });
+  if (!snapshotClienteCidade) return res.status(400).json({ message: 'Informe a cidade do cliente para salvar o orçamento.' });
 
   const potenciaPlacaW = Number(dimensionamento.potencia_placa_w || dimensionamento.potenciaPlacaW || 0);
   const numeroPaineis = Number(dimensionamento.numero_paineis_necessarios || dimensionamento.numeroPaineis || 0);
@@ -6413,8 +6623,8 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
     perda_percentual: perdaPercentual,
     geracao_estimada_kwh: Number(geracaoMensal.toFixed(2)),
     geracao_anual_kwh: Number((geracaoMensal * 12).toFixed(2)),
-    cidade_base: dimensionamento.cidade_base || cliente.cidade || '',
-    origem: 'Orçamento interno',
+    cidade_base: dimensionamento.cidade_base || snapshotClienteCidade || '',
+    origem: isQuickBudget ? 'Orçamento rápido' : 'Orçamento interno',
   };
   const normalizedFinanceiro = {
     ...financeiro,
@@ -6428,15 +6638,16 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
 
   const result = await db.run(
     `INSERT INTO orcamentos
-      (clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, status, data, dimensionamento, financeiro, assignedUserId, assignedUserName)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    cliente.id,
-    cliente.nome,
-    cliente.whatsapp,
-    cliente.email,
-    cliente.cidade,
+      (clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, status, data, tipo, dimensionamento, financeiro, assignedUserId, assignedUserName)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    cliente?.id || null,
+    snapshotClienteNome,
+    snapshotClienteTelefone || null,
+    snapshotClienteEmail || null,
+    snapshotClienteCidade,
     status,
     data,
+    isQuickBudget ? 'rapido' : 'completo',
     JSON.stringify(normalizedDimensionamento),
     JSON.stringify(normalizedFinanceiro),
     ownerId,
@@ -6445,13 +6656,14 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
 
   const orcamento = {
     id: result.lastID,
-    clienteId: cliente.id,
-    clienteNome: cliente.nome,
-    clienteTelefone: cliente.whatsapp,
-    clienteEmail: cliente.email,
-    clienteCidade: cliente.cidade,
+    clienteId: cliente?.id || null,
+    clienteNome: snapshotClienteNome,
+    clienteTelefone: snapshotClienteTelefone || null,
+    clienteEmail: snapshotClienteEmail || null,
+    clienteCidade: snapshotClienteCidade,
     status,
     data,
+    tipo: isQuickBudget ? 'rapido' : 'completo',
     dimensionamento: normalizedDimensionamento,
     financeiro: normalizedFinanceiro,
     assignedUserId: ownerId,
@@ -6770,6 +6982,11 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     dimensionamento,
     financeiro,
     manual: manualFinal,
+    assinatura: {
+      drm: null,
+      cliente: null,
+      link: null,
+    },
     consultor: {
       id: consultorId,
       nome: consultorNome,
@@ -6781,8 +6998,8 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   const result = await db.run(
     `INSERT INTO contratos
       (orcamentoId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, valorProjeto, status, dados,
-       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome)
-     VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome, assinaturaStatus)
+     VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     orcamento.id,
     orcamento.clienteNome,
     orcamento.clienteTelefone,
@@ -6803,7 +7020,8 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
       inversorModelo: manualFinal.inversor || equipamento?.inversorModelo || '',
     }),
     consultorId,
-    consultorNome
+    consultorNome,
+    'Pendente de assinaturas'
   );
 
   const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', result.lastID);
@@ -6868,6 +7086,11 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
       saldo_rs: moneyNumberOrNull(manualFinal.valorSaldo) || 0,
     },
     manual: manualFinal,
+    assinatura: {
+      drm: null,
+      cliente: null,
+      link: null,
+    },
     consultor: {
       id: consultorId,
       nome: consultorNome,
@@ -6880,8 +7103,8 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
   const result = await db.run(
     `INSERT INTO contratos
       (orcamentoId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, valorProjeto, status, dados,
-       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome)
-     VALUES (NULL, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome, assinaturaStatus)
+     VALUES (NULL, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     cliente.nome,
     cliente.whatsapp,
     cliente.email,
@@ -6901,7 +7124,8 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
       inversorModelo: manualFinal.inversor || equipamento?.inversorModelo || '',
     }),
     consultorId,
-    consultorNome
+    consultorNome,
+    'Pendente de assinaturas'
   );
 
   const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', result.lastID);
@@ -7003,12 +7227,287 @@ app.put('/api/admin/contratos/:id/revisao', authRequired, requirePermission('con
     req.params.id
   );
 
-  const updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id));
+  let updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id));
   if (updated.status === 'Aprovado') {
+    const assinaturaAtual = updated.dados?.assinatura || {};
+    const assinatura = {
+      ...assinaturaAtual,
+      method: 'Assinatura eletrônica simples com trilha de evidências',
+      provider: 'DRM Energia Solar',
+      drm: buildAutoDrmSignature({
+        signedAt: assinaturaAtual?.drm?.signedAt || new Date().toISOString(),
+        approvedByUser: req.user,
+      }),
+    };
+    const nextDados = {
+      ...(updated.dados || {}),
+      assinatura,
+    };
+    const assinaturaComHash = {
+      ...assinatura,
+      documentHash: buildSignatureDocumentHash({
+        ...updated,
+        dados: nextDados,
+      }),
+    };
+    await db.run(
+      'UPDATE contratos SET dados = ?, assinaturaStatus = ? WHERE id = ?',
+      JSON.stringify({
+        ...(updated.dados || {}),
+        assinatura: assinaturaComHash,
+      }),
+      resolveAssinaturaStatus(assinaturaComHash),
+      req.params.id
+    );
+    updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id));
     await createProjetoFromContrato(updated);
   }
   io.emit('contrato_atualizado', updated);
   res.json(updated);
+});
+
+app.post('/api/admin/contratos/:id/assinatura-link', authRequired, requirePermission('contratos'), async (req, res) => {
+  const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id);
+  if (!contrato) return res.status(404).json({ message: 'Contrato não encontrado.' });
+  if (!can(req.user, 'verTodosLeads') && contrato.assignedUserId !== req.user.id && contrato.criadoPorId !== req.user.id) {
+    return res.status(403).json({ message: 'Você não pode gerar link para este contrato.' });
+  }
+  if (contrato.status !== 'Aprovado') {
+    return res.status(400).json({ message: 'A assinatura digital é liberada somente após a aprovação do contrato.' });
+  }
+
+  const parsed = parseContrato(contrato);
+  const existingAssinatura = parsed.dados?.assinatura || {};
+  const now = new Date();
+  const signatureAlreadyCompleted = Boolean(existingAssinatura?.cliente?.signedAt);
+  if (signatureAlreadyCompleted) {
+    return res.status(400).json({ message: 'Este contrato já foi assinado pelo cliente e o link não pode mais ser reaberto.' });
+  }
+  const token = crypto.randomBytes(24).toString('hex');
+  const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 30).toISOString();
+  const drm = buildAutoDrmSignature({
+    signedAt: existingAssinatura?.drm?.signedAt || now.toISOString(),
+    approvedByUser: req.user,
+  });
+  const documentHash = buildSignatureDocumentHash({
+    ...parsed,
+    dados: {
+      ...(parsed.dados || {}),
+      assinatura: {
+        ...existingAssinatura,
+        drm,
+      },
+    },
+  });
+  const assinatura = {
+    ...existingAssinatura,
+    method: 'Assinatura eletrônica simples com trilha de evidências',
+    provider: 'DRM Energia Solar',
+    documentHash,
+    drm,
+    link: {
+      token,
+      createdAt: now.toISOString(),
+      expiresAt,
+      createdById: req.user.id,
+      createdByName: req.user.nome,
+    },
+  };
+  const assinaturaStatus = resolveAssinaturaStatus(assinatura);
+  const nextDados = {
+    ...(parsed.dados || {}),
+    assinatura,
+  };
+
+  await db.run(
+    `UPDATE contratos
+     SET dados = ?, assinaturaStatus = ?, assinaturaToken = ?, assinaturaSolicitadaEm = ?, assinaturaTokenExpiraEm = ?
+     WHERE id = ?`,
+    JSON.stringify(nextDados),
+    assinaturaStatus,
+    token,
+    now.toISOString(),
+    expiresAt,
+    contrato.id
+  );
+
+  const updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', contrato.id));
+  io.emit('contrato_atualizado', updated);
+
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  res.json({
+    contrato: updated,
+    signatureUrl: `${baseUrl}/assinatura/contrato/${token}`,
+    expiresAt,
+    documentHash,
+  });
+});
+
+app.post('/api/admin/contratos/:id/assinar-drm', authRequired, requirePermission('contratos'), async (req, res) => {
+  const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id);
+  if (!contrato) return res.status(404).json({ message: 'Contrato não encontrado.' });
+  if (req.user.role !== 'ADM') {
+    return res.status(403).json({ message: 'Somente a administração pode assinar pela DRM.' });
+  }
+  if (contrato.status !== 'Aprovado') {
+    return res.status(400).json({ message: 'A assinatura DRM só é liberada após a aprovação do contrato.' });
+  }
+
+  const signerName = String(req.body?.signerName || req.user.nome || '').trim();
+  if (!signerName) return res.status(400).json({ message: 'Informe o nome do responsável que está assinando pela DRM.' });
+  const signatureCheck = validateSignatureDataUrl(req.body?.signatureDataUrl);
+  if (!signatureCheck.valid) return res.status(400).json({ message: signatureCheck.message });
+
+  const parsed = parseContrato(contrato);
+  const assinatura = {
+    ...(parsed.dados?.assinatura || {}),
+    drm: {
+      signedAt: new Date().toISOString(),
+      signedById: req.user.id,
+      signedByName: signerName,
+      dataUrl: signatureCheck.dataUrl,
+      ip: getRequestIp(req),
+      userAgent: String(req.headers['user-agent'] || ''),
+    },
+  };
+  const nextDados = {
+    ...(parsed.dados || {}),
+    assinatura,
+  };
+  const assinaturaStatus = resolveAssinaturaStatus(assinatura);
+
+  await db.run(
+    'UPDATE contratos SET dados = ?, assinaturaStatus = ? WHERE id = ?',
+    JSON.stringify(nextDados),
+    assinaturaStatus,
+    contrato.id
+  );
+
+  const updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', contrato.id));
+  io.emit('contrato_atualizado', updated);
+  res.json(updated);
+});
+
+app.get('/api/assinatura/contrato/:token', async (req, res) => {
+  const token = String(req.params.token || '').trim();
+  if (!token) return res.status(400).json({ message: 'Token de assinatura inválido.' });
+  const contrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', token);
+  if (!contrato) return res.status(404).json({ message: 'Link de assinatura não encontrado.' });
+
+  const parsed = parseContrato(contrato);
+  const expiresAt = contrato.assinaturaTokenExpiraEm || parsed.dados?.assinatura?.link?.expiresAt || null;
+  if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
+    return res.status(410).json({ message: 'Este link de assinatura expirou. Gere um novo link no painel.' });
+  }
+  if (parsed.dados?.assinatura?.link?.consumedAt) {
+    return res.status(410).json({ message: 'Este link de assinatura já foi concluído e não pode mais ser reaberto.' });
+  }
+
+  res.json({
+    id: parsed.id,
+    numero: `CT-${String(parsed.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(parsed.id || '').padStart(4, '0')}`,
+    clienteNome: parsed.clienteNome,
+    clienteCidade: parsed.clienteCidade,
+    clienteTelefone: parsed.clienteTelefone,
+    clienteEmail: parsed.clienteEmail,
+    valorProjeto: parsed.valorProjeto,
+    status: parsed.status,
+    assinaturaStatus: parsed.assinaturaStatus,
+    assinatura: parsed.dados?.assinatura || {},
+    evidencias: buildSignatureEvidenceSummary(parsed),
+    resumo: {
+      potenciaKwp: parsed.dados?.manual?.potenciaKwp ?? parsed.dados?.dimensionamento?.potencia_real_instalada_kwp ?? '',
+      geracaoKwh: parsed.dados?.manual?.geracaoKwh ?? parsed.dados?.dimensionamento?.geracao_estimada_kwh ?? '',
+      formaPagamento: parsed.dados?.manual?.formaPagamento || parsed.equipamentoDados?.formaPagamento || '',
+    },
+    previewUrl: `/api/assinatura/contrato/${token}/pdf`,
+    downloadUrl: `/api/assinatura/contrato/${token}/download`,
+    expiresAt,
+  });
+});
+
+app.post('/api/assinatura/contrato/:token/cliente', async (req, res) => {
+  const token = String(req.params.token || '').trim();
+  if (!token) return res.status(400).json({ message: 'Token de assinatura inválido.' });
+  const contrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', token);
+  if (!contrato) return res.status(404).json({ message: 'Link de assinatura não encontrado.' });
+  if (contrato.status !== 'Aprovado') {
+    return res.status(400).json({ message: 'Este contrato ainda não está liberado para assinatura.' });
+  }
+  if (contrato.assinaturaTokenExpiraEm && new Date(contrato.assinaturaTokenExpiraEm).getTime() < Date.now()) {
+    return res.status(410).json({ message: 'Este link expirou. Solicite um novo link para a DRM.' });
+  }
+
+  const signerName = String(req.body?.signerName || '').trim();
+  if (!signerName) return res.status(400).json({ message: 'Informe seu nome para concluir a assinatura.' });
+  if (!req.body?.acceptedTerms) {
+    return res.status(400).json({ message: 'Confirme a leitura e o aceite do contrato antes de assinar.' });
+  }
+  const existingAssinatura = parseContrato(contrato).dados?.assinatura || {};
+  if (existingAssinatura?.cliente?.signedAt || existingAssinatura?.link?.consumedAt) {
+    return res.status(409).json({ message: 'Este contrato já foi assinado e o link não aceita nova assinatura.' });
+  }
+  const signatureCheck = validateSignatureDataUrl(req.body?.signatureDataUrl);
+  if (!signatureCheck.valid) return res.status(400).json({ message: signatureCheck.message });
+
+  const parsed = parseContrato(contrato);
+  const documentHash = buildSignatureDocumentHash(parsed);
+  const assinatura = {
+    ...(parsed.dados?.assinatura || {}),
+    cliente: {
+      signedAt: new Date().toISOString(),
+      signedByName: signerName,
+      dataUrl: signatureCheck.dataUrl,
+      ip: getRequestIp(req),
+      userAgent: String(req.headers['user-agent'] || ''),
+      referer: String(req.headers.referer || ''),
+      acceptedTerms: true,
+      acceptedAt: new Date().toISOString(),
+      documentHash,
+    },
+    link: {
+      ...(parsed.dados?.assinatura?.link || {}),
+      consumedAt: new Date().toISOString(),
+    },
+  };
+  const nextDados = {
+    ...(parsed.dados || {}),
+    assinatura,
+  };
+  const assinaturaStatus = resolveAssinaturaStatus(assinatura);
+
+  await db.run(
+    'UPDATE contratos SET dados = ?, assinaturaStatus = ?, assinaturaToken = NULL, assinaturaTokenExpiraEm = NULL WHERE id = ?',
+    JSON.stringify(nextDados),
+    assinaturaStatus,
+    contrato.id
+  );
+
+  const updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', contrato.id));
+  io.emit('contrato_atualizado', updated);
+  res.json({
+    message: 'Assinatura registrada com sucesso.',
+    assinaturaStatus: updated.assinaturaStatus,
+    downloadUrl: `/api/assinatura/contrato/${token}/download`,
+  });
+});
+
+app.get('/api/assinatura/contrato/:token/pdf', async (req, res) => {
+  const contrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', req.params.token);
+  if (!contrato) return res.status(404).send('Link de assinatura não encontrado.');
+  if (contrato.assinaturaTokenExpiraEm && new Date(contrato.assinaturaTokenExpiraEm).getTime() < Date.now()) {
+    return res.status(410).send('Este link expirou.');
+  }
+  await sendContratoPdf(res, contrato, { download: false });
+});
+
+app.get('/api/assinatura/contrato/:token/download', async (req, res) => {
+  const contrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', req.params.token);
+  if (!contrato) return res.status(404).send('Link de assinatura não encontrado.');
+  if (contrato.assinaturaTokenExpiraEm && new Date(contrato.assinaturaTokenExpiraEm).getTime() < Date.now()) {
+    return res.status(410).send('Este link expirou.');
+  }
+  await sendContratoPdf(res, contrato, { download: true });
 });
 
 app.get('/api/admin/contratos/:id/download', authRequired, requirePermission('contratos'), async (req, res) => {

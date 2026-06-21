@@ -540,6 +540,17 @@ const contractToReviewForm = (contrato = {}) => ({
   formaPagamento: contrato.dados?.manual?.formaPagamento || contrato.equipamentoDados?.formaPagamento || '',
 });
 
+const getContractSignatureMeta = (contrato = {}) => {
+  const assinatura = contrato?.dados?.assinatura || {};
+  const drmSigned = Boolean(assinatura?.drm?.dataUrl && assinatura?.drm?.signedAt);
+  const clienteSigned = Boolean(assinatura?.cliente?.dataUrl && assinatura?.cliente?.signedAt);
+  if (drmSigned && clienteSigned) return { label: 'Assinado digitalmente', tone: 'success' };
+  if (drmSigned) return { label: 'Aguardando assinatura do cliente', tone: 'warning' };
+  if (clienteSigned) return { label: 'Cliente assinou, falta DRM', tone: 'info' };
+  if (assinatura?.link?.token) return { label: 'Link de assinatura gerado', tone: 'info' };
+  return { label: 'Pendente de assinaturas', tone: 'muted' };
+};
+
 const emptyEquipamentoForm = {
   nome: '',
   tipo: 'Kit solar',
@@ -762,7 +773,12 @@ const emptyPriceForm = {
 };
 
 const emptyBudgetForm = {
+  modo: 'cliente',
   clienteId: '',
+  clienteNome: '',
+  clienteCidade: '',
+  clienteTelefone: '',
+  clienteEmail: '',
   equipamentoId: '',
   potenciaPlacaW: '600',
   placaModelo: '',
@@ -915,6 +931,7 @@ const AdminDashboard = () => {
   const [contractReviewForm, setContractReviewForm] = useState(contractToReviewForm());
   const [reviewNote, setReviewNote] = useState('');
   const [reviewError, setReviewError] = useState('');
+  const [contractSignatureModal, setContractSignatureModal] = useState({ open: false, contract: null, signerName: '', signatureLink: '' });
   const [equipamentos, setEquipamentos] = useState([]);
   const [equipamentoForm, setEquipamentoForm] = useState(emptyEquipamentoForm);
   const [editingEquipamentoId, setEditingEquipamentoId] = useState(null);
@@ -924,6 +941,8 @@ const AdminDashboard = () => {
   const equipamentoNomeRef = useRef(null);
   const signatureCanvasRef = useRef(null);
   const signatureDrawingRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
+  const contractSignatureCanvasRef = useRef(null);
+  const contractSignatureDrawingRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
   const whatsappMessagesEndRef = useRef(null);
   const whatsappMediaRecorderRef = useRef(null);
   const whatsappRecordingStreamRef = useRef(null);
@@ -1441,6 +1460,13 @@ const AdminDashboard = () => {
           .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))
       : [],
     [selectedOrcClient, orcamentos]
+  );
+
+  const quickBudgets = useMemo(
+    () => orcamentos
+      .filter(o => String(o.tipo || '').toLowerCase() === 'rapido' || !o.clienteId)
+      .sort((a, b) => Number(b.id || 0) - Number(a.id || 0)),
+    [orcamentos]
   );
 
   const budgetClient = useMemo(
@@ -3140,13 +3166,19 @@ const AdminDashboard = () => {
     setBudgetStatus('');
     setBudgetForm({
       ...emptyBudgetForm,
+      modo: cliente?.id ? 'cliente' : 'rapido',
       clienteId: cliente?.id ? String(cliente.id) : '',
+      clienteNome: cliente?.nome || '',
+      clienteCidade: cliente?.cidade || '',
+      clienteTelefone: cliente?.whatsapp || '',
+      clienteEmail: cliente?.email || '',
       placaModelo: equipamentos.find(item => item.active)?.placaModelo || '',
       inversorModelo: equipamentos.find(item => item.active)?.inversorModelo || '',
       potenciaPlacaW: equipamentos.find(item => item.active)?.potenciaPlacaW || emptyBudgetForm.potenciaPlacaW,
       potenciaInversorKw: equipamentos.find(item => item.active)?.potenciaInversorKw || '',
       equipamentoId: equipamentos.find(item => item.active)?.id ? String(equipamentos.find(item => item.active).id) : '',
     });
+    setSelectedOrcClient(cliente || null);
     setIsBudgetFormOpen(true);
     setActiveTab('orcamentos');
   };
@@ -3173,10 +3205,20 @@ const AdminDashboard = () => {
     event.preventDefault();
     setBudgetStatus('Salvando orçamento...');
     try {
+      const isQuickBudget = budgetForm.modo === 'rapido' || !budgetForm.clienteId;
+      if (budgetForm.modo === 'cliente' && !budgetForm.clienteId) {
+        setBudgetStatus('Selecione um cliente cadastrado ou troque para orçamento rápido.');
+        return;
+      }
       const orcamento = await request('/api/admin/orcamentos', {
         method: 'POST',
         body: JSON.stringify({
           clienteId: budgetForm.clienteId,
+          clienteNome: budgetForm.clienteNome,
+          clienteCidade: budgetForm.clienteCidade,
+          clienteTelefone: budgetForm.clienteTelefone,
+          clienteEmail: budgetForm.clienteEmail,
+          tipo: isQuickBudget ? 'rapido' : 'completo',
           status: 'Orçamento salvo',
           dimensionamento: {
             potencia_placa_w: budgetForm.potenciaPlacaW,
@@ -3192,7 +3234,7 @@ const AdminDashboard = () => {
             perda_percentual: budgetForm.perdaPercentual,
             geracao_estimada_kwh: budgetCalculations.geracaoKwh,
             geracao_anual_kwh: budgetCalculations.geracaoAnualKwh,
-            cidade_base: budgetClient?.cidade,
+            cidade_base: budgetClient?.cidade || budgetForm.clienteCidade,
             observacoes: budgetForm.observacoes,
             modelo_orcamento: 'Solaris',
           },
@@ -3211,8 +3253,11 @@ const AdminDashboard = () => {
       localStorage.removeItem(budgetDraftStorageKey);
       localStorage.removeItem(budgetDraftOpenStorageKey);
       setBudgetForm(emptyBudgetForm);
-      setBudgetStatus('Orçamento criado. Agora você pode gerar o contrato a partir dele.');
+      setBudgetStatus(isQuickBudget
+        ? 'Orçamento rápido criado. Você já pode baixar o PDF ou seguir para contrato quando o cliente avançar.'
+        : 'Orçamento criado. Agora você pode gerar o contrato a partir dele.');
       setIsBudgetFormOpen(false);
+      if (!orcamento.clienteId) setSelectedOrcClient(null);
       request('/api/admin/resumo').then(setResumo).catch(() => {});
     } catch (err) {
       setBudgetStatus(err.message);
@@ -3564,6 +3609,165 @@ const AdminDashboard = () => {
   const getContratoDownloadUrl = (contratoId) => (
     `${withApiBase(`/api/admin/contratos/${contratoId}/download`)}?token=${localStorage.getItem('token')}`
   );
+
+  const copyToClipboard = async (text, successMessage = 'Copiado com sucesso.') => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const input = document.createElement('textarea');
+        input.value = text;
+        input.setAttribute('readonly', '');
+        input.style.position = 'absolute';
+        input.style.left = '-9999px';
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+      }
+      showToast(successMessage, 'success');
+    } catch {
+      showToast('Não consegui copiar automaticamente. Copie manualmente o link exibido.', 'warning');
+    }
+  };
+
+  const resizeContractSignatureCanvas = useCallback(() => {
+    const canvas = contractSignatureCanvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(320, Math.floor(rect.width || 640));
+    const height = Math.max(160, Math.floor(rect.height || 220));
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = '#111827';
+  }, []);
+
+  useEffect(() => {
+    if (!contractSignatureModal.open) return undefined;
+    const timer = window.setTimeout(resizeContractSignatureCanvas, 40);
+    const handleResize = () => resizeContractSignatureCanvas();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [contractSignatureModal.open, resizeContractSignatureCanvas]);
+
+  const clearContractSignatureCanvas = () => {
+    const canvas = contractSignatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    const displayCtx = canvas.getContext('2d');
+    displayCtx.lineJoin = 'round';
+    displayCtx.lineCap = 'round';
+    displayCtx.lineWidth = 2.2;
+    displayCtx.strokeStyle = '#111827';
+  };
+
+  const getContractCanvasPoint = (event) => {
+    const canvas = contractSignatureCanvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const source = event.touches?.[0] || event.changedTouches?.[0] || event;
+    return {
+      x: source.clientX - rect.left,
+      y: source.clientY - rect.top,
+    };
+  };
+
+  const startContractSignature = (event) => {
+    const canvas = contractSignatureCanvasRef.current;
+    if (!canvas) return;
+    event.preventDefault();
+    const ctx = canvas.getContext('2d');
+    const point = getContractCanvasPoint(event);
+    contractSignatureDrawingRef.current = { isDrawing: true, lastX: point.x, lastY: point.y };
+    ctx.beginPath();
+    ctx.moveTo(point.x, point.y);
+  };
+
+  const moveContractSignature = (event) => {
+    if (!contractSignatureDrawingRef.current.isDrawing) return;
+    const canvas = contractSignatureCanvasRef.current;
+    if (!canvas) return;
+    event.preventDefault();
+    const ctx = canvas.getContext('2d');
+    const point = getContractCanvasPoint(event);
+    ctx.beginPath();
+    ctx.moveTo(contractSignatureDrawingRef.current.lastX, contractSignatureDrawingRef.current.lastY);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+    contractSignatureDrawingRef.current.lastX = point.x;
+    contractSignatureDrawingRef.current.lastY = point.y;
+  };
+
+  const stopContractSignature = () => {
+    contractSignatureDrawingRef.current.isDrawing = false;
+  };
+
+  const openDrmSignatureModal = (contrato) => {
+    setContractSignatureModal({
+      open: true,
+      contract: contrato,
+      signerName: adminUser.nome || 'DRM Energia Solar',
+      signatureLink: '',
+    });
+  };
+
+  const closeDrmSignatureModal = () => {
+    setContractSignatureModal({ open: false, contract: null, signerName: '', signatureLink: '' });
+  };
+
+  const signContractAsDrm = async () => {
+    const contrato = contractSignatureModal.contract;
+    if (!contrato?.id) return;
+    const canvas = contractSignatureCanvasRef.current;
+    if (!canvas) return;
+    try {
+      const updated = await request(`/api/admin/contratos/${contrato.id}/assinar-drm`, {
+        method: 'POST',
+        body: JSON.stringify({
+          signerName: contractSignatureModal.signerName,
+          signatureDataUrl: canvas.toDataURL('image/png'),
+        }),
+      });
+      setContratos(prev => prev.map(item => item.id === updated.id ? updated : item));
+      setSelectedContrato(current => (current?.id === updated.id ? updated : current));
+      closeDrmSignatureModal();
+      showToast(`Assinatura DRM registrada no ${contractNumber(updated)}.`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const generateContractSignatureLink = async (contrato) => {
+    try {
+      const data = await request(`/api/admin/contratos/${contrato.id}/assinatura-link`, {
+        method: 'POST',
+      });
+      setContratos(prev => prev.map(item => item.id === data.contrato.id ? data.contrato : item));
+      setSelectedContrato(current => (current?.id === data.contrato.id ? data.contrato : current));
+      setContractSignatureModal(prev => ({ ...prev, signatureLink: data.signatureUrl || '' }));
+      await copyToClipboard(data.signatureUrl, 'Link de assinatura copiado.');
+      return data.signatureUrl;
+    } catch (err) {
+      showToast(err.message, 'error');
+      return '';
+    }
+  };
 
   const getOrcamentoDownloadUrl = (orcamentoId) => (
     `${withApiBase(`/api/admin/orcamentos/${orcamentoId}/download`)}?token=${localStorage.getItem('token')}`
@@ -5293,23 +5497,63 @@ const AdminDashboard = () => {
 
               {/* ── RIGHT: Client budgets ── */}
               <div className="orc-right-panel">
-                {!selectedOrcClient ? (
-                  <div className="admin-card orc-empty-state">
-                    <div className="orc-empty-icon">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 1.5L18.5 9H13V3.5ZM8 17h8v1.5H8V17Zm0-3.5h8v1.5H8v-1.5Zm0-3.5h5v1.5H8V10Z" fill="currentColor"/></svg>
-                    </div>
-                    <h4>Orçamentos do cliente</h4>
-                    <p>Selecione um cliente ao lado para visualizar os orçamentos realizados.</p>
-                  </div>
-                ) : isBudgetFormOpen ? (
+                {isBudgetFormOpen ? (
                   <form className="admin-card orc-budget-form" onSubmit={createManualBudget}>
                     <div className="card-header-flex">
                       <div>
-                        <span className="section-kicker">Novo orçamento</span>
-                        <h4>Proposta para {selectedOrcClient.nome}</h4>
+                        <span className="section-kicker">{budgetForm.modo === 'rapido' ? 'Orçamento rápido' : 'Novo orçamento'}</span>
+                        <h4>{budgetForm.modo === 'rapido' ? 'Proposta ágil para lead ainda não convertido' : `Proposta para ${selectedOrcClient?.nome || budgetForm.clienteNome || 'cliente'}`}</h4>
+                        <p className="muted-text">{budgetForm.modo === 'rapido' ? 'Use só nome, cidade e kit técnico. O restante pode ser completado depois.' : 'Fluxo completo com o cliente já cadastrado no sistema.'}</p>
                       </div>
                       <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setIsBudgetFormOpen(false)}>← Voltar</button>
                     </div>
+
+                    <div className="orc-budget-mode-switch" role="tablist" aria-label="Modo do orçamento">
+                      <button
+                        type="button"
+                        className={budgetForm.modo === 'cliente' ? 'active' : ''}
+                        onClick={() => setBudgetForm(prev => ({
+                          ...prev,
+                          modo: 'cliente',
+                          clienteNome: selectedOrcClient?.nome || prev.clienteNome,
+                          clienteCidade: selectedOrcClient?.cidade || prev.clienteCidade,
+                          clienteTelefone: selectedOrcClient?.whatsapp || prev.clienteTelefone,
+                          clienteEmail: selectedOrcClient?.email || prev.clienteEmail,
+                          clienteId: selectedOrcClient?.id ? String(selectedOrcClient.id) : prev.clienteId,
+                        }))}
+                      >
+                        Cliente cadastrado
+                      </button>
+                      <button
+                        type="button"
+                        className={budgetForm.modo === 'rapido' ? 'active' : ''}
+                        onClick={() => setBudgetForm(prev => ({ ...prev, modo: 'rapido', clienteId: '' }))}
+                      >
+                        Orçamento rápido
+                      </button>
+                    </div>
+
+                    {budgetForm.modo === 'rapido' && (
+                      <div className="budget-form-grid quick-budget-grid">
+                        <label>
+                          Nome do cliente
+                          <input value={budgetForm.clienteNome} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteNome: event.target.value }))} placeholder="Ex: João da Silva" required />
+                        </label>
+                        <label>
+                          Cidade
+                          <input value={budgetForm.clienteCidade} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteCidade: event.target.value }))} placeholder="Ex: Imperatriz" required />
+                        </label>
+                        <label>
+                          WhatsApp (opcional)
+                          <input value={budgetForm.clienteTelefone} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteTelefone: event.target.value }))} placeholder="Ex: 99999999999" />
+                        </label>
+                        <label>
+                          E-mail (opcional)
+                          <input value={budgetForm.clienteEmail} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteEmail: event.target.value }))} placeholder="Ex: cliente@email.com" />
+                        </label>
+                      </div>
+                    )}
+
                     <div className="budget-form-grid">
                       <label>
                         Kit/catálogo base
@@ -5431,6 +5675,38 @@ const AdminDashboard = () => {
                     </div>
                     {budgetStatus && <p className="muted-text">{budgetStatus}</p>}
                   </form>
+                ) : !selectedOrcClient ? (
+                  <div className="admin-card orc-empty-state">
+                    <div className="orc-empty-icon">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 1.5L18.5 9H13V3.5ZM8 17h8v1.5H8V17Zm0-3.5h8v1.5H8v-1.5Zm0-3.5h5v1.5H8V10Z" fill="currentColor"/></svg>
+                    </div>
+                    <h4>Orçamentos rápidos</h4>
+                    <p>Selecione um cliente ao lado para o fluxo completo ou use o botão Novo orçamento para criar uma proposta rápida com poucos dados.</p>
+                    <div className="quick-budget-empty-actions">
+                      <button type="button" className="btn btn-primary" onClick={() => openBudgetFormForClient()}>Novo orçamento rápido</button>
+                    </div>
+                    {quickBudgets.length > 0 && (
+                      <div className="quick-budget-list">
+                        {quickBudgets.slice(0, 8).map((orc) => (
+                          <div className="quick-budget-card" key={orc.id}>
+                            <div>
+                              <span className="quick-budget-badge">Rápido</span>
+                              <strong>{orc.clienteNome}</strong>
+                              <p>{orc.clienteCidade || 'Cidade não informada'} • {orc.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</p>
+                            </div>
+                            <div className="quick-budget-card-actions">
+                              {hasPermission('contratos') && (
+                                <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => aprovarOrcamentoParaContrato(orc)}>
+                                  Gerar contrato
+                                </button>
+                              )}
+                              <a className="btn btn-outline btn-sm-admin" href={getOrcamentoDownloadUrl(orc.id)} target="_blank" rel="noopener noreferrer">Baixar PDF</a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="admin-card orc-detail-card">
                     {/* ── Client info header ── */}
@@ -5951,13 +6227,95 @@ const AdminDashboard = () => {
 
                     {selectedContrato.status === 'Aprovado' && (
                       <div className="approved-actions">
-                        <div><strong>Contrato liberado</strong><span>{isMasterAdmin ? 'Admin master pode salvar ajustes finais.' : 'Contrato aprovado disponível somente para download.'}</span></div>
+                        <div>
+                          <strong>Contrato liberado</strong>
+                          <span>{isMasterAdmin ? 'Admin master pode salvar ajustes finais.' : 'Contrato aprovado disponível somente para download.'}</span>
+                          <small className={`contract-signature-chip tone-${getContractSignatureMeta(selectedContrato).tone}`}>{getContractSignatureMeta(selectedContrato).label}</small>
+                          <small className="contract-signature-chip tone-success">Assinatura DRM aplicada automaticamente na aprovação</small>
+                        </div>
                         <div className="approved-actions-buttons">
                           {canEditReviewedContract(selectedContrato) && <button type="button" className="btn btn-outline" onClick={() => saveContractReview(selectedContrato)}>Salvar alterações</button>}
+                          {adminUser.role === 'ADM' && <button type="button" className="btn btn-outline" onClick={() => generateContractSignatureLink(selectedContrato)}>Gerar link do cliente</button>}
+                          {selectedContrato.dados?.assinatura?.link?.token && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => copyToClipboard(
+                                  `${window.location.origin}/assinatura/contrato/${selectedContrato.dados.assinatura.link.token}`,
+                                  'Link de assinatura copiado.'
+                                )}
+                              >
+                                Copiar link
+                              </button>
+                              {selectedContrato.clienteTelefone && (
+                                <a
+                                  className="btn btn-outline"
+                                  href={getPanelWhatsAppUrl(
+                                    selectedContrato.clienteTelefone,
+                                    `Olá ${selectedContrato.clienteNome || ''}! Aqui está o link para assinar seu contrato digital da DRM Energia Solar: ${window.location.origin}/assinatura/contrato/${selectedContrato.dados.assinatura.link.token}`
+                                  )}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Enviar para cliente
+                                </a>
+                              )}
+                            </>
+                          )}
                           <a className="btn btn-outline" href={getContratoDownloadUrl(selectedContrato.id)} target="_blank" rel="noopener noreferrer">Baixar contrato</a>
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              ), document.body)}
+
+              {contractSignatureModal.open && typeof document !== 'undefined' && createPortal((
+                <div className="contract-modal-backdrop ctr-review-backdrop">
+                  <div className="contract-modal ctr-review-modal contract-signature-modal" role="dialog" aria-modal="true" aria-labelledby="contract-signature-title">
+                    <div className="contract-modal-header">
+                      <div>
+                        <span>Assinatura DRM</span>
+                        <h3 id="contract-signature-title">{contractSignatureModal.contract ? contractNumber(contractSignatureModal.contract) : 'Contrato'}</h3>
+                        <p>Assine pela DRM e depois gere o link para o cliente concluir a assinatura digital.</p>
+                      </div>
+                      <button type="button" className="lead-modal-close" onClick={closeDrmSignatureModal} aria-label="Fechar">×</button>
+                    </div>
+                    <div className="contract-signature-form">
+                      <label className="ctr-review-field">
+                        <span>Responsável pela assinatura</span>
+                        <input value={contractSignatureModal.signerName} onChange={(event) => setContractSignatureModal(prev => ({ ...prev, signerName: event.target.value }))} placeholder="Nome de quem está assinando pela DRM" />
+                      </label>
+                      <div className="contract-signature-pad">
+                        <div className="contract-signature-pad-head">
+                          <strong>Assinatura</strong>
+                          <button type="button" className="btn btn-outline btn-sm-admin" onClick={clearContractSignatureCanvas}>Limpar</button>
+                        </div>
+                        <canvas
+                          ref={contractSignatureCanvasRef}
+                          className="contract-signature-canvas"
+                          onMouseDown={startContractSignature}
+                          onMouseMove={moveContractSignature}
+                          onMouseUp={stopContractSignature}
+                          onMouseLeave={stopContractSignature}
+                          onTouchStart={startContractSignature}
+                          onTouchMove={moveContractSignature}
+                          onTouchEnd={stopContractSignature}
+                        />
+                      </div>
+                      {contractSignatureModal.signatureLink && (
+                        <div className="contract-signature-link-box">
+                          <span>Link do cliente</span>
+                          <strong>{contractSignatureModal.signatureLink}</strong>
+                        </div>
+                      )}
+                      <div className="contract-modal-actions">
+                        <button type="button" className="btn btn-outline" onClick={closeDrmSignatureModal}>Cancelar</button>
+                        <button type="button" className="btn btn-outline" onClick={() => contractSignatureModal.contract && generateContractSignatureLink(contractSignatureModal.contract)}>Gerar link</button>
+                        <button type="button" className="btn btn-primary" onClick={signContractAsDrm}>Salvar assinatura DRM</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ), document.body)}

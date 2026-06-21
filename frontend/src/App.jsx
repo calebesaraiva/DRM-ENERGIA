@@ -20,6 +20,7 @@ const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = React.lazy(() => import('./pages/VerifyEmail'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const ContractSignaturePage = React.lazy(() => import('./pages/ContractSignaturePage'));
 const ChangePassword = React.lazy(() => import('./pages/ChangePassword'));
 
 // Componente de fallback para o Suspense
@@ -39,6 +40,7 @@ function AppShell() {
     '/verificar-email',
     '/acesso',
     '/portal-cliente',
+    '/assinatura',
     '/sistema-drm',
     '/login',
     '/register',
@@ -77,6 +79,7 @@ function AppShell() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/leads" element={<AdminDashboard />} />
+          <Route path="/assinatura/contrato/:token" element={<ContractSignaturePage />} />
         </Routes>
       </Suspense>
       {!isSystemRoute && <StickyCTA />}
