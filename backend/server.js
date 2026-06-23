@@ -13,7 +13,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const ffmpegPath = require('ffmpeg-static');
 const PDFDocument = require('pdfkit');
@@ -32,6 +32,7 @@ const PORT = Number(process.env.PORT) || 3001;
 const DEFAULT_WHATSAPP_PHONE = '559985127056';
 const WHATSAPP_AUTH_DIR = path.join(__dirname, 'whatsapp-session');
 const WHATSAPP_MEDIA_DIR = path.join(__dirname, 'uploads', 'whatsapp');
+const WHATSAPP_MEDIA_ARCHIVE_REMOTE = process.env.WHATSAPP_MEDIA_ARCHIVE_REMOTE || 'gdrive:DRM-Solar-Backups/media/whatsapp';
 const WHATSAPP_CONTACTS_CACHE_FILE = path.join(__dirname, 'whatsapp-contacts-cache.json');
 const execFileAsync = promisify(execFile);
 const ROUND_ROBIN_SELLERS = [
@@ -149,19 +150,35 @@ app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '25mb' }));
 app.use('/assets', express.static(path.join(__dirname, '../frontend/public/assets')));
-app.use('/uploads/whatsapp', express.static(WHATSAPP_MEDIA_DIR, {
-  maxAge: '7d',
-  immutable: true,
-  fallthrough: false,
-}));
-app.get('/api/whatsapp/media/:fileName', (req, res) => {
+
+const sendWhatsappMedia = (req, res) => {
   const fileName = path.basename(String(req.params.fileName || ''));
   if (!fileName || fileName !== req.params.fileName) return res.status(400).send('Arquivo inválido.');
   const filePath = path.join(WHATSAPP_MEDIA_DIR, fileName);
   res.sendFile(filePath, (error) => {
-    if (error && !res.headersSent) res.status(error.statusCode || 404).send('Mídia não encontrada.');
+    if (!error || res.headersSent) return;
+
+    const remotePath = `${WHATSAPP_MEDIA_ARCHIVE_REMOTE}/${fileName}`;
+    const rclone = spawn('rclone', ['cat', remotePath]);
+    let hasOutput = false;
+
+    rclone.stdout.on('data', () => {
+      hasOutput = true;
+    });
+    rclone.stdout.on('error', () => {});
+    rclone.stderr.on('data', () => {});
+    rclone.on('spawn', () => {
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+      rclone.stdout.pipe(res);
+    });
+    rclone.on('close', (code) => {
+      if (code !== 0 && !hasOutput && !res.headersSent) res.status(404).send('Mídia não encontrada.');
+    });
   });
-});
+};
+
+app.get('/uploads/whatsapp/:fileName', sendWhatsappMedia);
+app.get('/api/whatsapp/media/:fileName', sendWhatsappMedia);
 
 // Limita tentativas de login para mitigar força bruta (por IP).
 const loginRateLimiter = rateLimit({
