@@ -33,6 +33,17 @@ lerna-debug.log*
 # dados de usuários e evitar conflitos.
 backend/database.db
 !backend/database.template.db
+backend/database.db-shm
+backend/database.db-wal
+
+# Arquivos temporários de debug e smoke test
+tmp-*
+tmp_os_pdf/
+tmp_os_pdf_page1.png
+extract_pdf.mjs
+frontend/nul
+MANUAL_FUNCOES_SISTEMA_DRM.md
+ss_*.png
 
 # Arquivos de sistema operacional e de editores de código
 .DS_Store
