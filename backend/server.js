@@ -3392,7 +3392,7 @@ const buildContratoPdf = async (contrato) => {
       }
     } else if (assinatura?.drm?.signedAt) {
       const autoDrmName = assinatura?.drm?.signedByName || DRM_SIGNATORY.nome;
-      doc.font('Helvetica-Oblique').fontSize(17).fillColor(accent).text(
+      doc.font('Helvetica-Oblique').fontSize(17).fillColor(orange).text(
         autoDrmName,
         doc.page.margins.left + 18,
         signatureY - 34,
