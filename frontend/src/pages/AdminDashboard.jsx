@@ -1111,6 +1111,7 @@ const AdminDashboard = () => {
 
   const isMasterAdmin = adminUser.role === 'ADM' && String(adminUser.username || '').toLowerCase() === 'deivson';
   const canArchiveWhatsappNotLead = isMasterAdmin || String(adminUser.username || '').toLowerCase() === 'renejr';
+  const isConsultorOnly = adminUser.role !== 'ADM' && String(adminUser.username || '').toLowerCase() !== 'renejr';
   const leadAssignableUsers = useMemo(
     () => usuarios.filter(user => user.active !== 0 && user.permissions?.leads && String(user.username || '').toLowerCase() !== 'deivson'),
     [usuarios]
@@ -1212,7 +1213,7 @@ const AdminDashboard = () => {
         { id: 'whatsapp', label: 'WhatsApp', permission: 'whatsapp' },
         { id: 'orcamentos', label: 'Orçamentos', permission: 'orcamentos' },
         { id: 'contratos', label: 'Contratos', permission: 'contratos' },
-        { id: 'procuracoes', label: 'Procurações', permission: 'contratos' },
+        ...(!isConsultorOnly ? [{ id: 'procuracoes', label: 'Procurações', permission: 'contratos' }] : []),
       ],
     },
     {
@@ -1435,6 +1436,17 @@ const AdminDashboard = () => {
     aprovados: contratos.filter(contrato => contrato.status === 'Aprovado').length,
     recusados: contratos.filter(contrato => contrato.status === 'Recusado').length,
   }), [contratos]);
+
+  const CLIENTE_REQUIRED_FIELDS = ['nome', 'cpfCnpj', 'whatsapp', 'cidade', 'endereco', 'cep', 'estado'];
+  const clientesAptos = useMemo(() => {
+    const clienteComContrato = new Set(
+      contratos.map(ct => Number(ct.dados?.cliente?.id)).filter(Boolean)
+    );
+    return clientes.filter(c =>
+      CLIENTE_REQUIRED_FIELDS.every(f => String(c[f] || '').trim() !== '') &&
+      !clienteComContrato.has(Number(c.id))
+    );
+  }, [clientes, contratos]);
 
   const ORC_CLIENTS_PER_PAGE = 10;
 
@@ -1928,6 +1940,12 @@ const AdminDashboard = () => {
       if (canSee) setOrcamentos(prev => [novoOrcamento, ...prev]);
     };
 
+    const handleOrcamentoExcluido = ({ id } = {}) => {
+      if (!id) return;
+      setOrcamentos(prev => prev.filter(orcamento => Number(orcamento.id) !== Number(id)));
+      setSelectedOrcamento(prev => (Number(prev?.id) === Number(id) ? null : prev));
+    };
+
     const handleNewLead = (novoLead) => {
       const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson')
         || Number(novoLead.assignedUserId) === Number(loggedInUser.id);
@@ -2034,6 +2052,7 @@ const AdminDashboard = () => {
     };
 
     socket.on('novo_orcamento', handleNewOrcamento);
+    socket.on('orcamento_excluido', handleOrcamentoExcluido);
     socket.on('novo_lead', handleNewLead);
     socket.on('contrato_atualizado', handleContratoAtualizado);
     socket.on('projeto_atualizado', handleProjetoAtualizado);
@@ -2056,6 +2075,7 @@ const AdminDashboard = () => {
 
     return () => {
       socket.off('novo_orcamento', handleNewOrcamento);
+      socket.off('orcamento_excluido', handleOrcamentoExcluido);
       socket.off('novo_lead', handleNewLead);
       socket.off('contrato_atualizado', handleContratoAtualizado);
       socket.off('projeto_atualizado', handleProjetoAtualizado);
@@ -3353,6 +3373,25 @@ const AdminDashboard = () => {
       setSelectedOrcamento(updated);
       showToast(`Orçamento #${updated.id} aprovado. Gerando contrato com o kit escolhido.`, 'success');
       await openContractModal(updated);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const excluirOrcamentoTeste = async (orcamento) => {
+    if (!orcamento?.id) return;
+    const nomeCliente = orcamento.clienteNome || 'cliente sem nome';
+    const confirmed = window.confirm(
+      `Excluir o orçamento #${orcamento.id} de ${nomeCliente}?\n\nUse isso apenas para orçamentos fake/teste. Se ele já tiver contrato vinculado, o sistema vai bloquear.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await request(`/api/admin/orcamentos/${orcamento.id}`, { method: 'DELETE' });
+      setOrcamentos(prev => prev.filter(item => Number(item.id) !== Number(orcamento.id)));
+      setSelectedOrcamento(prev => (Number(prev?.id) === Number(orcamento.id) ? null : prev));
+      showToast(`Orçamento #${orcamento.id} excluído da lista.`, 'success');
+      request('/api/admin/resumo').then(setResumo).catch(() => {});
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -5701,6 +5740,15 @@ const AdminDashboard = () => {
                                 </button>
                               )}
                               <a className="btn btn-outline btn-sm-admin" href={getOrcamentoDownloadUrl(orc.id)} target="_blank" rel="noopener noreferrer">Baixar PDF</a>
+                              {hasPermission('orcamentos') && (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm-admin quick-budget-delete"
+                                  onClick={() => excluirOrcamentoTeste(orc)}
+                                >
+                                  Excluir teste
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -5817,6 +5865,16 @@ const AdminDashboard = () => {
                                         >
                                           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" fill="currentColor"/></svg>
                                         </a>
+                                        {hasPermission('orcamentos') && (
+                                          <button
+                                            type="button"
+                                            className="orc-action-btn orc-action-delete"
+                                            title="Excluir orçamento de teste"
+                                            onClick={() => excluirOrcamentoTeste(orc)}
+                                          >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4V2h8v2h5v2H3V4h5Zm-2 4h12l-1 14H7L6 8Zm4 3v8h2v-8h-2Zm4 0v8h2v-8h-2Z" fill="currentColor"/></svg>
+                                          </button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>
@@ -5860,6 +5918,12 @@ const AdminDashboard = () => {
                           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" fill="currentColor"/></svg>
                           Enviar via WhatsApp
                         </a>
+                        {hasPermission('orcamentos') && (
+                          <button type="button" className="orc-bar-btn orc-bar-btn-delete" onClick={() => excluirOrcamentoTeste(selectedOrcamento)}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4V2h8v2h5v2H3V4h5Zm-2 4h12l-1 14H7L6 8Zm4 3v8h2v-8h-2Zm4 0v8h2v-8h-2Z" fill="currentColor"/></svg>
+                            Excluir teste
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -5924,14 +5988,43 @@ const AdminDashboard = () => {
 
           {activeTab === 'contratos' && (
             <div className="ctr-screen">
-              <h3 className="ctr-page-title">Contratos</h3>
+              {/* ── Page header ── */}
+              <div className="ctr-page-header">
+                <div>
+                  <h3 className="ctr-page-title">Contratos</h3>
+                  <p className="ctr-page-subtitle">Somente clientes com cadastro completo podem gerar contrato.</p>
+                </div>
+              </div>
+
+              {/* ── 4-step flow indicator ── */}
+              <div className="ctr-flow-steps">
+                <div className="ctr-flow-step ctr-flow-step-done">
+                  <div className="ctr-flow-step-num">1</div>
+                  <div className="ctr-flow-step-label">Venda realizada</div>
+                </div>
+                <div className="ctr-flow-arrow">›</div>
+                <div className="ctr-flow-step ctr-flow-step-done">
+                  <div className="ctr-flow-step-num">2</div>
+                  <div className="ctr-flow-step-label">Cadastro completo</div>
+                </div>
+                <div className="ctr-flow-arrow">›</div>
+                <div className="ctr-flow-step ctr-flow-step-active">
+                  <div className="ctr-flow-step-num">3</div>
+                  <div className="ctr-flow-step-label">Emitir contrato</div>
+                </div>
+                <div className="ctr-flow-arrow">›</div>
+                <div className="ctr-flow-step">
+                  <div className="ctr-flow-step-num">4</div>
+                  <div className="ctr-flow-step-label">Documentos para homologação</div>
+                </div>
+              </div>
 
               {/* ── Stats cards ── */}
               <div className="ctr-stats-grid">
                 <div className="ctr-stat-card">
                   <div className="ctr-stat-num">{contratoSummary.total}</div>
-                  <div className="ctr-stat-label">CONTRATOS</div>
-                  <div className="ctr-stat-desc">Total de contratos gerados</div>
+                  <div className="ctr-stat-label">TOTAL DE CONTRATOS</div>
+                  <div className="ctr-stat-desc">Contratos gerados no sistema</div>
                 </div>
                 <div className="ctr-stat-card ctr-stat-card-blue">
                   <div className="ctr-stat-row">
@@ -5940,18 +6033,8 @@ const AdminDashboard = () => {
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z" fill="currentColor"/></svg>
                     </div>
                   </div>
-                  <div className="ctr-stat-label">PENDENTES DE APROVAÇÃO</div>
-                  <div className="ctr-stat-desc">Aguardando validação do Sr. DRM</div>
-                </div>
-                <div className="ctr-stat-card ctr-stat-card-red">
-                  <div className="ctr-stat-row">
-                    <div className="ctr-stat-num">{contratoSummary.recusados}</div>
-                    <div className="ctr-stat-icon ctr-icon-red">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2Zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59Z" fill="currentColor"/></svg>
-                    </div>
-                  </div>
-                  <div className="ctr-stat-label">REJEITADOS</div>
-                  <div className="ctr-stat-desc">Precisam de ajustes</div>
+                  <div className="ctr-stat-label">AGUARDANDO ASSINATURA</div>
+                  <div className="ctr-stat-desc">Contratos pendentes de aprovação</div>
                 </div>
                 <div className="ctr-stat-card ctr-stat-card-green">
                   <div className="ctr-stat-row">
@@ -5960,60 +6043,74 @@ const AdminDashboard = () => {
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9Z" fill="currentColor"/></svg>
                     </div>
                   </div>
-                  <div className="ctr-stat-label">APROVADOS</div>
-                  <div className="ctr-stat-desc">Contratos disponíveis</div>
+                  <div className="ctr-stat-label">ASSINADOS</div>
+                  <div className="ctr-stat-desc">Contratos aprovados e assinados</div>
+                </div>
+                <div className="ctr-stat-card ctr-stat-card-orange">
+                  <div className="ctr-stat-row">
+                    <div className="ctr-stat-num">{clientesAptos.length}</div>
+                    <div className="ctr-stat-icon ctr-icon-orange">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12Zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8Z" fill="currentColor"/></svg>
+                    </div>
+                  </div>
+                  <div className="ctr-stat-label">CLIENTES APTOS</div>
+                  <div className="ctr-stat-desc">Cadastro completo, sem contrato</div>
                 </div>
               </div>
 
               {/* ── Filters bar ── */}
               <div className="admin-card ctr-filters-card">
                 <div className="ctr-filters-row">
-                  <div className="ctr-filter-group">
-                    <label className="ctr-filter-label">Filtros</label>
-                    <div className="ctr-filter-status-wrap">
-                      <span className="ctr-filter-status-label">Status</span>
-                      <select
-                        className="ctr-filter-select"
-                        value={contratoStatusFilter}
-                        onChange={(e) => setContratoStatusFilter(e.target.value)}
-                      >
-                        <option value="todos">Todos</option>
-                        <option value="Pendente">Pendente</option>
-                        <option value="Aprovado">Aprovado</option>
-                        <option value="Recusado">Recusado</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="ctr-filter-dates">
-                    <div className="ctr-filter-date-field">
-                      <label className="ctr-filter-label">Data inicial</label>
-                      <div className="ctr-date-input-wrap">
-                        <input
-                          type="date"
-                          className="ctr-date-input"
-                          value={contratoDateFrom}
-                          onChange={(e) => setContratoDateFrom(e.target.value)}
-                          placeholder="dd/mm/aaaa"
-                        />
+                  {!isConsultorOnly && (
+                    <>
+                      <div className="ctr-filter-group">
+                        <label className="ctr-filter-label">Filtros</label>
+                        <div className="ctr-filter-status-wrap">
+                          <span className="ctr-filter-status-label">Status</span>
+                          <select
+                            className="ctr-filter-select"
+                            value={contratoStatusFilter}
+                            onChange={(e) => setContratoStatusFilter(e.target.value)}
+                          >
+                            <option value="todos">Todos</option>
+                            <option value="Pendente">Pendente</option>
+                            <option value="Aprovado">Aprovado</option>
+                            <option value="Recusado">Recusado</option>
+                          </select>
+                        </div>
                       </div>
-                    </div>
-                    <div className="ctr-filter-date-field">
-                      <label className="ctr-filter-label">Data final</label>
-                      <div className="ctr-date-input-wrap">
-                        <input
-                          type="date"
-                          className="ctr-date-input"
-                          value={contratoDateTo}
-                          onChange={(e) => setContratoDateTo(e.target.value)}
-                          placeholder="dd/mm/aaaa"
-                        />
+                      <div className="ctr-filter-dates">
+                        <div className="ctr-filter-date-field">
+                          <label className="ctr-filter-label">Data inicial</label>
+                          <div className="ctr-date-input-wrap">
+                            <input
+                              type="date"
+                              className="ctr-date-input"
+                              value={contratoDateFrom}
+                              onChange={(e) => setContratoDateFrom(e.target.value)}
+                              placeholder="dd/mm/aaaa"
+                            />
+                          </div>
+                        </div>
+                        <div className="ctr-filter-date-field">
+                          <label className="ctr-filter-label">Data final</label>
+                          <div className="ctr-date-input-wrap">
+                            <input
+                              type="date"
+                              className="ctr-date-input"
+                              value={contratoDateTo}
+                              onChange={(e) => setContratoDateTo(e.target.value)}
+                              placeholder="dd/mm/aaaa"
+                            />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                   <div className="ctr-filter-search-wrap">
                     <input
                       className="ctr-filter-search"
-                      placeholder="Buscar por cliente ou número do contrato..."
+                      placeholder="Buscar pelo nome do cliente..."
                       value={contratoSearch}
                       onChange={(e) => setContratoSearch(e.target.value)}
                     />
@@ -6028,37 +6125,43 @@ const AdminDashboard = () => {
                   <table className="ctr-table">
                     <thead>
                       <tr>
-                        <th>ID</th>
                         <th>Nº CONTRATO</th>
                         <th>CLIENTE</th>
-                        <th>DATA DO CONTRATO</th>
+                        <th>CIDADE</th>
+                        <th>SISTEMA</th>
                         <th>VALOR TOTAL</th>
                         <th>STATUS</th>
-                        <th>CONSULTOR</th>
+                        <th>DATA DE EMISSÃO</th>
                         <th>AÇÕES</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedContratos.map((contrato, idx) => {
+                      {paginatedContratos.map((contrato) => {
                         const year = String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear();
                         const numContrato = `CT-${year}-${String(contrato.id).padStart(4, '0')}`;
                         const dataFormatada = dateBr(contrato.dataCriacao);
+                        const potencia = contrato.dados?.manual?.potenciaKwp ?? contrato.dados?.dimensionamento?.potencia_real_instalada_kwp ?? '';
+                        const sistemaLabel = potencia ? `${potencia} kWp` : '—';
+                        const statusLabel = isConsultorOnly
+                          ? (contrato.status === 'Aprovado' ? 'Assinado' : contrato.status === 'Pendente' ? 'Aguardando assinatura' : contrato.status)
+                          : contrato.status;
+                        const statusClass = contrato.status === 'Aprovado' ? 'ctr-status-aprovado' : contrato.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente';
                         return (
                           <tr
                             key={contrato.id}
                             onClick={() => abrirRevisaoContrato(contrato)}
                           >
-                            <td className="ctr-td-id">#{String((contratoPage - 1) * CONTRATOS_PER_PAGE + idx + 1).padStart(4, '0').replace(/^0+/, '') || 1}</td>
                             <td className="ctr-td-num">{numContrato}</td>
                             <td className="ctr-td-cliente">{contrato.clienteNome}</td>
-                            <td>{dataFormatada}</td>
+                            <td>{contrato.clienteCidade || '—'}</td>
+                            <td>{sistemaLabel}</td>
                             <td className="ctr-td-valor">{money(contrato.valorProjeto)}</td>
                             <td>
-                              <span className={`ctr-status-badge ${contrato.status === 'Aprovado' ? 'ctr-status-aprovado' : contrato.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente'}`}>
-                                {contrato.status}
+                              <span className={`ctr-status-badge ${statusClass}`}>
+                                {statusLabel}
                               </span>
                             </td>
-                            <td>{getContractConsultantLabel(contrato)}</td>
+                            <td>{dataFormatada}</td>
                             <td>
                               <div className="ctr-table-actions" onClick={e => e.stopPropagation()}>
                                 {adminUser.role === 'ADM' && contrato.status === 'Pendente' && (
@@ -6096,7 +6199,7 @@ const AdminDashboard = () => {
                   </table>
                   {paginatedContratos.length === 0 && (
                     <div className="ctr-empty">
-                      <p>Nenhum contrato encontrado para os filtros selecionados.</p>
+                      <p>Nenhum contrato encontrado.</p>
                     </div>
                   )}
                 </div>
