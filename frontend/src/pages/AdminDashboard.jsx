@@ -784,6 +784,7 @@ const emptyBudgetForm = {
   placaModelo: '',
   numeroPaineis: '',
   potenciaInversorKw: '',
+  inversorMarca: '',
   inversorModelo: '',
   quantidadeInversores: '1',
   quantidadeCaboCc: '',
@@ -916,6 +917,7 @@ const AdminDashboard = () => {
   const [budgetForm, setBudgetForm] = useState(getInitialBudgetForm);
   const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(() => localStorage.getItem(budgetDraftOpenStorageKey) === '1');
   const [budgetStatus, setBudgetStatus] = useState('');
+  const [budgetFieldErrors, setBudgetFieldErrors] = useState({});
   const [contratos, setContratos] = useState([]);
   const [procuracoes, setProcuracoes] = useState([]);
   const [homologacaoModal, setHomologacaoModal] = useState(null);
@@ -1508,6 +1510,31 @@ const AdminDashboard = () => {
       geracaoAnualKwh: Number((geracaoKwh * 12).toFixed(2)),
     };
   }, [budgetForm]);
+
+  const placaModelsFromEquip = useMemo(() => {
+    const seen = new Set();
+    return equipamentos
+      .filter(e => e.active && e.placaModelo)
+      .map(e => e.placaModelo)
+      .filter(v => { if (seen.has(v)) return false; seen.add(v); return true; });
+  }, [equipamentos]);
+
+  const inversorBrandsFromEquip = useMemo(() => {
+    const seen = new Set();
+    return equipamentos
+      .filter(e => e.active && e.inversorModelo)
+      .map(e => (e.inversorModelo || '').split(' ')[0])
+      .filter(v => v && !seen.has(v) && seen.add(v));
+  }, [equipamentos]);
+
+  const inversorModelsForBrand = useMemo(() => {
+    if (!budgetForm.inversorMarca) return [];
+    const seen = new Set();
+    return equipamentos
+      .filter(e => e.active && (e.inversorModelo || '').startsWith(budgetForm.inversorMarca))
+      .map(e => e.inversorModelo)
+      .filter(v => v && !seen.has(v) && seen.add(v));
+  }, [equipamentos, budgetForm.inversorMarca]);
 
   const CONTRATOS_PER_PAGE = 10;
 
@@ -3184,6 +3211,9 @@ const AdminDashboard = () => {
   const openBudgetFormForClient = (cliente = null) => {
     rememberPanelStep();
     setBudgetStatus('');
+    setBudgetFieldErrors({});
+    const firstEquip = equipamentos.find(e => e.active);
+    const inversorMarca = firstEquip?.inversorModelo ? (firstEquip.inversorModelo.split(' ')[0] || '') : '';
     setBudgetForm({
       ...emptyBudgetForm,
       modo: cliente?.id ? 'cliente' : 'rapido',
@@ -3192,11 +3222,12 @@ const AdminDashboard = () => {
       clienteCidade: cliente?.cidade || '',
       clienteTelefone: cliente?.whatsapp || '',
       clienteEmail: cliente?.email || '',
-      placaModelo: equipamentos.find(item => item.active)?.placaModelo || '',
-      inversorModelo: equipamentos.find(item => item.active)?.inversorModelo || '',
-      potenciaPlacaW: equipamentos.find(item => item.active)?.potenciaPlacaW || emptyBudgetForm.potenciaPlacaW,
-      potenciaInversorKw: equipamentos.find(item => item.active)?.potenciaInversorKw || '',
-      equipamentoId: equipamentos.find(item => item.active)?.id ? String(equipamentos.find(item => item.active).id) : '',
+      placaModelo: firstEquip?.placaModelo || '',
+      inversorMarca,
+      inversorModelo: firstEquip?.inversorModelo || '',
+      potenciaPlacaW: firstEquip?.potenciaPlacaW || emptyBudgetForm.potenciaPlacaW,
+      potenciaInversorKw: firstEquip?.potenciaInversorKw || '',
+      equipamentoId: firstEquip?.id ? String(firstEquip.id) : '',
     });
     setSelectedOrcClient(cliente || null);
     setIsBudgetFormOpen(true);
@@ -3223,13 +3254,25 @@ const AdminDashboard = () => {
 
   const createManualBudget = async (event) => {
     event.preventDefault();
+
+    const errors = {};
+    if (!budgetForm.clienteNome?.trim()) errors.clienteNome = true;
+    if (!budgetForm.clienteCidade?.trim()) errors.clienteCidade = true;
+    if (!budgetForm.geracaoKwh || Number(budgetForm.geracaoKwh) <= 0) errors.geracaoKwh = true;
+    if (!budgetForm.valorSistema || Number(budgetForm.valorSistema) <= 0) errors.valorSistema = true;
+    if (!budgetForm.placaModelo) errors.placaModelo = true;
+    if (!budgetForm.numeroPaineis || Number(budgetForm.numeroPaineis) < 1) errors.numeroPaineis = true;
+    if (!budgetForm.inversorMarca) errors.inversorMarca = true;
+    if (!budgetForm.inversorModelo) errors.inversorModelo = true;
+    if (!budgetForm.quantidadeInversores || Number(budgetForm.quantidadeInversores) < 1) errors.quantidadeInversores = true;
+    if (Object.keys(errors).length > 0) {
+      setBudgetFieldErrors(errors);
+      setBudgetStatus('Preencha todos os campos obrigatórios.');
+      return;
+    }
+    setBudgetFieldErrors({});
     setBudgetStatus('Salvando orçamento...');
     try {
-      const isQuickBudget = budgetForm.modo === 'rapido' || !budgetForm.clienteId;
-      if (budgetForm.modo === 'cliente' && !budgetForm.clienteId) {
-        setBudgetStatus('Selecione um cliente cadastrado ou troque para orçamento rápido.');
-        return;
-      }
       const orcamento = await request('/api/admin/orcamentos', {
         method: 'POST',
         body: JSON.stringify({
@@ -3238,8 +3281,8 @@ const AdminDashboard = () => {
           clienteCidade: budgetForm.clienteCidade,
           clienteTelefone: budgetForm.clienteTelefone,
           clienteEmail: budgetForm.clienteEmail,
-          tipo: isQuickBudget ? 'rapido' : 'completo',
-          status: 'Orçamento salvo',
+          tipo: 'rapido',
+          status: 'Novo orçamento',
           dimensionamento: {
             potencia_placa_w: budgetForm.potenciaPlacaW,
             placa_modelo: budgetForm.placaModelo,
@@ -3247,13 +3290,14 @@ const AdminDashboard = () => {
             potencia_real_instalada_kwp: budgetCalculations.potenciaKwp,
             area_ocupada_m2: budgetCalculations.areaOcupadaM2,
             potencia_inversor_kw: budgetForm.potenciaInversorKw,
+            inversor_marca: budgetForm.inversorMarca,
             inversor_modelo: budgetForm.inversorModelo,
             quantidade_inversores: budgetForm.quantidadeInversores,
             quantidade_cabo_cc: budgetForm.quantidadeCaboCc,
             irradiacao_solar: budgetForm.irradiacaoSolar,
             perda_percentual: budgetForm.perdaPercentual,
-            geracao_estimada_kwh: budgetCalculations.geracaoKwh,
-            geracao_anual_kwh: budgetCalculations.geracaoAnualKwh,
+            geracao_estimada_kwh: Number(budgetForm.geracaoKwh) || budgetCalculations.geracaoKwh,
+            geracao_anual_kwh: (Number(budgetForm.geracaoKwh) || budgetCalculations.geracaoKwh) * 12,
             cidade_base: budgetClient?.cidade || budgetForm.clienteCidade,
             observacoes: budgetForm.observacoes,
             modelo_orcamento: 'Solaris',
@@ -3273,9 +3317,7 @@ const AdminDashboard = () => {
       localStorage.removeItem(budgetDraftStorageKey);
       localStorage.removeItem(budgetDraftOpenStorageKey);
       setBudgetForm(emptyBudgetForm);
-      setBudgetStatus(isQuickBudget
-        ? 'Orçamento rápido criado. Você já pode baixar o PDF ou seguir para contrato quando o cliente avançar.'
-        : 'Orçamento criado. Agora você pode gerar o contrato a partir dele.');
+      setBudgetStatus('Orçamento criado com sucesso.');
       setIsBudgetFormOpen(false);
       if (!orcamento.clienteId) setSelectedOrcClient(null);
       request('/api/admin/resumo').then(setResumo).catch(() => {});
@@ -5464,7 +5506,200 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {activeTab === 'orcamentos' && (
+          {activeTab === 'orcamentos' && isBudgetFormOpen && (
+            <div className="orc-rapido-page">
+              <form className="orc-rapido-card" onSubmit={createManualBudget} noValidate>
+
+                {/* Header */}
+                <div className="orc-rapido-header">
+                  <div className="orc-rapido-title-area">
+                    <div className="orc-rapido-icon-wrap">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v11h3v9l7-12h-4l4-8z" fill="currentColor"/></svg>
+                    </div>
+                    <div>
+                      <h2 className="orc-rapido-title">ORÇAMENTO RÁPIDO</h2>
+                      <p className="orc-rapido-subtitle">Preencha apenas os dados essenciais para um orçamento sem compromisso.</p>
+                    </div>
+                  </div>
+                  <div className="orc-rapido-badge">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2ZM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8ZM12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67V7Z" fill="currentColor"/></svg>
+                    Rápido, simples e sem compromisso
+                  </div>
+                </div>
+
+                {/* Form body */}
+                <div className="orc-rapido-body">
+
+                  {/* Row 1 — 4 columns */}
+                  <div className="orc-rapido-row-4">
+                    <div className={`orc-rapido-field${budgetFieldErrors.clienteNome ? ' field-error' : ''}`}>
+                      <label>1. Nome do cliente</label>
+                      <input
+                        type="text"
+                        value={budgetForm.clienteNome}
+                        onChange={e => { setBudgetForm(prev => ({ ...prev, clienteNome: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, clienteNome: false })); }}
+                        placeholder="Ex: João da Silva"
+                      />
+                    </div>
+                    <div className={`orc-rapido-field${budgetFieldErrors.clienteCidade ? ' field-error' : ''}`}>
+                      <label>2. Cidade</label>
+                      <input
+                        type="text"
+                        value={budgetForm.clienteCidade}
+                        onChange={e => { setBudgetForm(prev => ({ ...prev, clienteCidade: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, clienteCidade: false })); }}
+                        placeholder="Ex: Imperatriz"
+                      />
+                    </div>
+                    <div className={`orc-rapido-field${budgetFieldErrors.geracaoKwh ? ' field-error' : ''}`}>
+                      <label>3. Geração do sistema (kWh)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={budgetForm.geracaoKwh}
+                        onChange={e => { setBudgetForm(prev => ({ ...prev, geracaoKwh: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, geracaoKwh: false })); }}
+                        placeholder="Ex: 610"
+                      />
+                    </div>
+                    <div className={`orc-rapido-field${budgetFieldErrors.valorSistema ? ' field-error' : ''}`}>
+                      <label>4. Valor do projeto</label>
+                      <div className="orc-rapido-currency-wrap">
+                        <span className="orc-rapido-currency-prefix">R$</span>
+                        <CurrencyInput
+                          value={budgetForm.valorSistema}
+                          onValueChange={value => { setBudgetForm(prev => ({ ...prev, valorSistema: value })); setBudgetFieldErrors(prev => ({ ...prev, valorSistema: false })); }}
+                          placeholder="Ex: 24.900,00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2 — placa */}
+                  <div className="orc-rapido-row-placa">
+                    <div className={`orc-rapido-field${budgetFieldErrors.placaModelo ? ' field-error' : ''}`}>
+                      <label>5. Modelo da placa</label>
+                      <select
+                        value={budgetForm.placaModelo}
+                        onChange={e => { setBudgetForm(prev => ({ ...prev, placaModelo: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, placaModelo: false })); }}
+                      >
+                        <option value="">Selecione o modelo</option>
+                        {placaModelsFromEquip.map(model => (
+                          <option key={model} value={model}>{model}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={`orc-rapido-field${budgetFieldErrors.numeroPaineis ? ' field-error' : ''}`}>
+                      <label>6. Quantidade de placas</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={budgetForm.numeroPaineis}
+                        onChange={e => { setBudgetForm(prev => ({ ...prev, numeroPaineis: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, numeroPaineis: false })); }}
+                        placeholder="Ex: 14"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3 — inversor */}
+                  <div className="orc-rapido-row-inversor">
+                    <div className={`orc-rapido-field${budgetFieldErrors.inversorMarca ? ' field-error' : ''}`}>
+                      <label>7. Marca do inversor</label>
+                      <select
+                        value={budgetForm.inversorMarca}
+                        onChange={e => {
+                          const brand = e.target.value;
+                          setBudgetForm(prev => ({ ...prev, inversorMarca: brand, inversorModelo: '' }));
+                          setBudgetFieldErrors(prev => ({ ...prev, inversorMarca: false, inversorModelo: false }));
+                        }}
+                      >
+                        <option value="">Selecione a marca</option>
+                        {inversorBrandsFromEquip.map(brand => (
+                          <option key={brand} value={brand}>{brand}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="orc-rapido-arrow" aria-hidden="true">
+                      <svg viewBox="0 0 56 16" width="56" height="16"><circle cx="4" cy="8" r="2" fill="#f97316"/><circle cx="13" cy="8" r="2" fill="#f97316"/><circle cx="22" cy="8" r="2" fill="#f97316"/><circle cx="31" cy="8" r="2" fill="#f97316"/><path d="M38 8h10M44 3l6 5-6 5" stroke="#f97316" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </div>
+
+                    <div className={`orc-rapido-field${budgetFieldErrors.inversorModelo ? ' field-error' : ''}`}>
+                      <label>8. Modelo do inversor</label>
+                      <div className="orc-rapido-locked-wrap">
+                        <select
+                          value={budgetForm.inversorModelo}
+                          onChange={e => { setBudgetForm(prev => ({ ...prev, inversorModelo: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, inversorModelo: false })); }}
+                          disabled={!budgetForm.inversorMarca}
+                        >
+                          <option value="">{budgetForm.inversorMarca ? 'Selecione o modelo' : 'Selecione a marca primeiro'}</option>
+                          {inversorModelsForBrand.map(model => (
+                            <option key={model} value={model}>{model}</option>
+                          ))}
+                        </select>
+                        {!budgetForm.inversorMarca && (
+                          <svg className="orc-rapido-lock" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={`orc-rapido-field${budgetFieldErrors.quantidadeInversores ? ' field-error' : ''}`}>
+                      <label>9. Quantidade de inversores</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={budgetForm.quantidadeInversores}
+                        onChange={e => { setBudgetForm(prev => ({ ...prev, quantidadeInversores: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, quantidadeInversores: false })); }}
+                        placeholder="Ex: 1"
+                      />
+                    </div>
+                  </div>
+
+                </div>{/* /orc-rapido-body */}
+
+                {/* Footer */}
+                <div className="orc-rapido-footer">
+                  <div className="orc-rapido-disclaimer">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" fill="#f97316"/></svg>
+                    <div>
+                      <strong>Orçamentos sem compromisso.</strong>
+                      <span> Você pode ajustar os dados depois.</span>
+                    </div>
+                  </div>
+                  <div className="orc-rapido-actions">
+                    <button
+                      type="button"
+                      className="orc-rapido-btn-clear"
+                      onClick={() => {
+                        setBudgetForm(emptyBudgetForm);
+                        setBudgetFieldErrors({});
+                        setBudgetStatus('');
+                        localStorage.removeItem(budgetDraftStorageKey);
+                        localStorage.removeItem(budgetDraftOpenStorageKey);
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/></svg>
+                      Limpar
+                    </button>
+                    <button type="submit" className="orc-rapido-btn-submit">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zm-5 8v-2h8v2H8zm0-4v-2h8v2H8z" fill="currentColor"/></svg>
+                      Gerar orçamento
+                    </button>
+                  </div>
+                </div>
+
+                {budgetStatus && (
+                  <p className={`orc-rapido-status ${budgetStatus.includes('criado') || budgetStatus.includes('sucesso') ? 'orc-status-success' : 'orc-status-error'}`}>
+                    {budgetStatus}
+                  </p>
+                )}
+
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'orcamentos' && !isBudgetFormOpen && (
             <div className="orc-layout">
 
               {/* ── LEFT: Client selector ── */}
@@ -5499,7 +5734,6 @@ const AdminDashboard = () => {
                         onClick={() => {
                           if (selectedOrcClient?.id !== c.id) rememberPanelStep();
                           setSelectedOrcClient(c);
-                          setIsBudgetFormOpen(false);
                           setSelectedOrcamento(null);
                         }}
                       >
@@ -5536,185 +5770,7 @@ const AdminDashboard = () => {
 
               {/* ── RIGHT: Client budgets ── */}
               <div className="orc-right-panel">
-                {isBudgetFormOpen ? (
-                  <form className="admin-card orc-budget-form" onSubmit={createManualBudget}>
-                    <div className="card-header-flex">
-                      <div>
-                        <span className="section-kicker">{budgetForm.modo === 'rapido' ? 'Orçamento rápido' : 'Novo orçamento'}</span>
-                        <h4>{budgetForm.modo === 'rapido' ? 'Proposta ágil para lead ainda não convertido' : `Proposta para ${selectedOrcClient?.nome || budgetForm.clienteNome || 'cliente'}`}</h4>
-                        <p className="muted-text">{budgetForm.modo === 'rapido' ? 'Use só nome, cidade e kit técnico. O restante pode ser completado depois.' : 'Fluxo completo com o cliente já cadastrado no sistema.'}</p>
-                      </div>
-                      <button type="button" className="btn btn-outline btn-sm-admin" onClick={() => setIsBudgetFormOpen(false)}>← Voltar</button>
-                    </div>
-
-                    <div className="orc-budget-mode-switch" role="tablist" aria-label="Modo do orçamento">
-                      <button
-                        type="button"
-                        className={budgetForm.modo === 'cliente' ? 'active' : ''}
-                        onClick={() => setBudgetForm(prev => ({
-                          ...prev,
-                          modo: 'cliente',
-                          clienteNome: selectedOrcClient?.nome || prev.clienteNome,
-                          clienteCidade: selectedOrcClient?.cidade || prev.clienteCidade,
-                          clienteTelefone: selectedOrcClient?.whatsapp || prev.clienteTelefone,
-                          clienteEmail: selectedOrcClient?.email || prev.clienteEmail,
-                          clienteId: selectedOrcClient?.id ? String(selectedOrcClient.id) : prev.clienteId,
-                        }))}
-                      >
-                        Cliente cadastrado
-                      </button>
-                      <button
-                        type="button"
-                        className={budgetForm.modo === 'rapido' ? 'active' : ''}
-                        onClick={() => setBudgetForm(prev => ({ ...prev, modo: 'rapido', clienteId: '' }))}
-                      >
-                        Orçamento rápido
-                      </button>
-                    </div>
-
-                    {budgetForm.modo === 'rapido' && (
-                      <div className="budget-form-grid quick-budget-grid">
-                        <label>
-                          Nome do cliente
-                          <input value={budgetForm.clienteNome} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteNome: event.target.value }))} placeholder="Ex: João da Silva" required />
-                        </label>
-                        <label>
-                          Cidade
-                          <input value={budgetForm.clienteCidade} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteCidade: event.target.value }))} placeholder="Ex: Imperatriz" required />
-                        </label>
-                        <label>
-                          WhatsApp (opcional)
-                          <input value={budgetForm.clienteTelefone} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteTelefone: event.target.value }))} placeholder="Ex: 99999999999" />
-                        </label>
-                        <label>
-                          E-mail (opcional)
-                          <input value={budgetForm.clienteEmail} onChange={(event) => setBudgetForm(prev => ({ ...prev, clienteEmail: event.target.value }))} placeholder="Ex: cliente@email.com" />
-                        </label>
-                      </div>
-                    )}
-
-                    <div className="budget-form-grid">
-                      <label>
-                        Kit/catálogo base
-                        <select value={budgetForm.equipamentoId} onChange={(event) => applyEquipmentToBudget(event.target.value)}>
-                          <option value="">Preencher manualmente</option>
-                          {equipamentos.filter(item => item.active).map(item => (
-                            <option key={item.id} value={item.id}>{item.nome}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        Potência da placa
-                        <select value={budgetForm.potenciaPlacaW} onChange={(event) => setBudgetForm(prev => ({ ...prev, potenciaPlacaW: event.target.value }))}>
-                          {[550, 560, 570, 580, 590, 600, 605, 610, 615, 620, 630, 650, 700].map(value => <option key={value} value={value}>{value} W</option>)}
-                        </select>
-                      </label>
-                      <label>
-                        Modelo da placa
-                        <input value={budgetForm.placaModelo} onChange={(event) => setBudgetForm(prev => ({ ...prev, placaModelo: event.target.value }))} placeholder="Ex: JA Solar 610 W" required />
-                      </label>
-                      <label>
-                        Quantidade de placas
-                        <input type="number" min="1" value={budgetForm.numeroPaineis} onChange={(event) => setBudgetForm(prev => ({ ...prev, numeroPaineis: event.target.value }))} required />
-                      </label>
-                      <label>
-                        Potência do inversor
-                        <input type="number" min="0" step="0.01" value={budgetForm.potenciaInversorKw} onChange={(event) => setBudgetForm(prev => ({ ...prev, potenciaInversorKw: event.target.value }))} placeholder="Ex: 8" required />
-                      </label>
-                      <label>
-                        Modelo do inversor
-                        <input value={budgetForm.inversorModelo} onChange={(event) => setBudgetForm(prev => ({ ...prev, inversorModelo: event.target.value }))} placeholder="Ex: Growatt 8 kW" required />
-                      </label>
-                      <label>
-                        Quantidade de inversores
-                        <input type="number" min="1" value={budgetForm.quantidadeInversores} onChange={(event) => setBudgetForm(prev => ({ ...prev, quantidadeInversores: event.target.value }))} />
-                      </label>
-                      <label>
-                        Cabo CC
-                        <input value={budgetForm.quantidadeCaboCc} onChange={(event) => setBudgetForm(prev => ({ ...prev, quantidadeCaboCc: event.target.value }))} placeholder="Ex: 60 m cabo solar 6 mm" />
-                      </label>
-                      <label>
-                        Área por placa
-                        <input type="number" min="0" step="0.01" value={budgetForm.areaPorPainelM2} onChange={(event) => setBudgetForm(prev => ({ ...prev, areaPorPainelM2: event.target.value }))} />
-                      </label>
-                      <label>
-                        Geração
-                        <select value={budgetForm.generationMode} onChange={(event) => setBudgetForm(prev => ({ ...prev, generationMode: event.target.value }))}>
-                          <option value="manual">Informar manualmente</option>
-                          <option value="auto">Calcular por irradiação</option>
-                        </select>
-                      </label>
-                      {budgetForm.generationMode === 'auto' ? (
-                        <>
-                          <label>
-                            Irradiação solar
-                            <input type="number" step="0.01" value={budgetForm.irradiacaoSolar} onChange={(event) => setBudgetForm(prev => ({ ...prev, irradiacaoSolar: event.target.value }))} placeholder="Ex: 5.2" required />
-                          </label>
-                          <label>
-                            Perda média
-                            <select value={budgetForm.perdaPercentual} onChange={(event) => setBudgetForm(prev => ({ ...prev, perdaPercentual: event.target.value }))}>
-                              <option value="15">15%</option>
-                              <option value="20">20%</option>
-                              <option value="25">25%</option>
-                            </select>
-                          </label>
-                        </>
-                      ) : (
-                        <label className="span-2">
-                          Geração mensal kWh
-                          <input type="number" min="0" step="0.01" value={budgetForm.geracaoKwh} onChange={(event) => setBudgetForm(prev => ({ ...prev, geracaoKwh: event.target.value }))} required />
-                        </label>
-                      )}
-                      <label>
-                        Valor do sistema
-                        <CurrencyInput value={budgetForm.valorSistema} onValueChange={(value) => setBudgetForm(prev => ({ ...prev, valorSistema: value }))} required />
-                      </label>
-                      <label>
-                        Entrada
-                        <CurrencyInput value={budgetForm.valorEntrada} onValueChange={(value) => setBudgetForm(prev => ({ ...prev, valorEntrada: value }))} placeholder="Opcional" />
-                      </label>
-                      <label>
-                        Saldo
-                        <CurrencyInput value={budgetForm.valorSaldo} onValueChange={(value) => setBudgetForm(prev => ({ ...prev, valorSaldo: value }))} placeholder="Opcional" />
-                      </label>
-                      <label>
-                        Forma de pagamento
-                        <select value={budgetForm.formaPagamentoTipo} onChange={(event) => setBudgetForm(prev => ({ ...prev, formaPagamentoTipo: event.target.value }))}>
-                          {pagamentoTypeOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-                        </select>
-                      </label>
-                      <label className="span-2">
-                        Condições
-                        <textarea value={budgetForm.condicoesPagamento} onChange={(event) => setBudgetForm(prev => ({ ...prev, condicoesPagamento: event.target.value }))} placeholder="Ex: entrada + saldo financiado, validade da proposta, parcelas..." required />
-                      </label>
-                      <label className="span-2">
-                        Observações
-                        <textarea value={budgetForm.observacoes} onChange={(event) => setBudgetForm(prev => ({ ...prev, observacoes: event.target.value }))} placeholder="Detalhes técnicos, observações comerciais ou premissas da proposta." />
-                      </label>
-                    </div>
-                    <div className="budget-result-strip">
-                      <div><span>Potência</span><strong>{budgetCalculations.potenciaKwp} kWp</strong></div>
-                      <div><span>Área</span><strong>{budgetCalculations.areaOcupadaM2} m²</strong></div>
-                      <div><span>Geração</span><strong>{budgetCalculations.geracaoKwh} kWh/mês</strong></div>
-                      <div><span>Valor</span><strong>{money(budgetForm.valorSistema)}</strong></div>
-                    </div>
-                    <div className="actions-footer">
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => {
-                          localStorage.removeItem(budgetDraftStorageKey);
-                          localStorage.removeItem(budgetDraftOpenStorageKey);
-                          setBudgetForm(emptyBudgetForm);
-                        }}
-                      >
-                        Limpar
-                      </button>
-                      <button type="submit" className="btn btn-primary">Salvar orçamento</button>
-                    </div>
-                    {budgetStatus && <p className="muted-text">{budgetStatus}</p>}
-                  </form>
-                ) : !selectedOrcClient ? (
+                {!selectedOrcClient ? (
                   <div className="admin-card orc-empty-state">
                     <div className="orc-empty-icon">
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 1.5L18.5 9H13V3.5ZM8 17h8v1.5H8V17Zm0-3.5h8v1.5H8v-1.5Zm0-3.5h5v1.5H8V10Z" fill="currentColor"/></svg>

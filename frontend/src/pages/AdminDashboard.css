@@ -16062,3 +16062,382 @@
     width: 100%;
   }
 }
+
+/* ─────────────────────────────────────────
+   ORÇAMENTO RÁPIDO — full-width form
+───────────────────────────────────────── */
+.orc-rapido-page {
+  width: 100%;
+}
+
+.orc-rapido-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e8eef4;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+
+/* Header */
+.orc-rapido-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.orc-rapido-title-area {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.orc-rapido-icon-wrap {
+  width: 54px;
+  height: 54px;
+  background: linear-gradient(135deg, #fff3e6 0%, #fed7aa 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.orc-rapido-icon-wrap svg {
+  width: 26px;
+  height: 26px;
+  fill: #f97316;
+}
+
+.orc-rapido-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 0.25rem;
+  letter-spacing: 0.03em;
+}
+
+.orc-rapido-subtitle {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.orc-rapido-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #fff7ed;
+  border: 1.5px solid #fed7aa;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #ea580c;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.orc-rapido-badge svg {
+  width: 15px;
+  height: 15px;
+  fill: #f97316;
+  flex-shrink: 0;
+}
+
+/* Form body */
+.orc-rapido-body {
+  padding: 1.75rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Row 1 — 4 equal columns */
+.orc-rapido-row-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+/* Row 2 — placa (wide) + quantity */
+.orc-rapido-row-placa {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 1rem;
+}
+
+/* Row 3 — marca + arrow + modelo + qty */
+.orc-rapido-row-inversor {
+  display: grid;
+  grid-template-columns: 1fr 64px 1fr 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+/* Field wrapper */
+.orc-rapido-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.orc-rapido-field label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.orc-rapido-field input,
+.orc-rapido-field select {
+  width: 100%;
+  padding: 0.6rem 0.875rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  appearance: auto;
+}
+
+.orc-rapido-field input:focus,
+.orc-rapido-field select:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
+}
+
+.orc-rapido-field select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+/* Field error state */
+.orc-rapido-field.field-error input,
+.orc-rapido-field.field-error select {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
+}
+
+/* Currency field */
+.orc-rapido-currency-wrap {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background: #fff;
+}
+
+.orc-rapido-currency-wrap:focus-within {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
+}
+
+.orc-rapido-field.field-error .orc-rapido-currency-wrap {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
+}
+
+.orc-rapido-currency-prefix {
+  padding: 0.6rem 0.75rem;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.orc-rapido-currency-wrap input {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Dotted arrow between marca and modelo */
+.orc-rapido-arrow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 0.7rem;
+  color: #f97316;
+}
+
+/* Locked modelo wrap */
+.orc-rapido-locked-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.orc-rapido-locked-wrap select {
+  width: 100%;
+  padding-right: 2.25rem;
+}
+
+.orc-rapido-lock {
+  position: absolute;
+  right: 0.7rem;
+  width: 16px;
+  height: 16px;
+  fill: #cbd5e1;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* Footer */
+.orc-rapido-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 2rem;
+  background: #fafbfd;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.orc-rapido-disclaimer {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  color: #475569;
+}
+
+.orc-rapido-disclaimer svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.orc-rapido-disclaimer strong {
+  color: #1e293b;
+}
+
+.orc-rapido-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.orc-rapido-btn-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.orc-rapido-btn-clear svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.orc-rapido-btn-clear:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.orc-rapido-btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.5rem;
+  background: #f97316;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.orc-rapido-btn-submit svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.orc-rapido-btn-submit:hover {
+  background: #ea580c;
+}
+
+/* Status message */
+.orc-rapido-status {
+  margin: 0;
+  padding: 0.75rem 2rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-top: 1px solid #f1f5f9;
+}
+
+.orc-status-error {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.orc-status-success {
+  color: #16a34a;
+  background: #f0fdf4;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .orc-rapido-row-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .orc-rapido-row-inversor {
+    grid-template-columns: 1fr 1fr;
+  }
+  .orc-rapido-arrow {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .orc-rapido-header {
+    flex-direction: column;
+    padding: 1.25rem;
+  }
+  .orc-rapido-body {
+    padding: 1.25rem;
+  }
+  .orc-rapido-row-4,
+  .orc-rapido-row-placa,
+  .orc-rapido-row-inversor {
+    grid-template-columns: 1fr;
+  }
+  .orc-rapido-footer {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem 1.25rem;
+  }
+  .orc-rapido-actions {
+    flex-direction: column;
+  }
+  .orc-rapido-btn-clear,
+  .orc-rapido-btn-submit {
+    justify-content: center;
+  }
+}
