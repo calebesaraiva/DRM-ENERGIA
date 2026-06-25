@@ -2092,11 +2092,21 @@ const getNextLeadOwner = async () => {
   return owner;
 };
 
+const LEAD_ROTATION_EXCLUDED_USERNAMES = new Set(['agdon']);
+
 const getLeadOwners = async () => {
   const users = await db.all('SELECT * FROM usuarios WHERE active = 1 ORDER BY id ASC');
   return users
     .map(user => ({ ...user, permissions: parsePermissions(user.permissions) }))
-    .filter(user => user.role !== 'ADM' && can(user, 'leads') && normalizeWhatsAppPhone(user.whatsapp));
+    .filter(user => {
+      const username = String(user.username || '').trim().toLowerCase();
+      return (
+        !LEAD_ROTATION_EXCLUDED_USERNAMES.has(username)
+        && user.role !== 'ADM'
+        && can(user, 'leads')
+        && normalizeWhatsAppPhone(user.whatsapp)
+      );
+    });
 };
 
 const normalizeLeadDistribution = async () => {
@@ -4167,6 +4177,34 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       sentAt TEXT,
       UNIQUE(campaignId, email),
       FOREIGN KEY (campaignId) REFERENCES email_campaigns(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS placas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      modelo TEXT NOT NULL UNIQUE,
+      potencia_w TEXT,
+      status TEXT NOT NULL DEFAULT 'ativo',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS marcas_inversor (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome_marca TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'ativo',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS modelos_inversor (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      marca_id INTEGER NOT NULL,
+      nome_modelo TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ativo',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(marca_id, nome_modelo),
+      FOREIGN KEY (marca_id) REFERENCES marcas_inversor(id) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_lead_redirect_logs_createdAt ON lead_redirect_logs(createdAt);
@@ -6900,6 +6938,123 @@ app.put('/api/admin/equipamentos/:id', authRequired, requirePermission('contrato
   );
   const equipamento = await db.get('SELECT * FROM equipamentos WHERE id = ?', req.params.id);
   res.json({ ...equipamento, active: Boolean(equipamento.active) });
+});
+
+// ── Placas ──────────────────────────────────────────────────────────────────
+app.get('/api/admin/placas', authRequired, requirePermission('contratos'), async (req, res) => {
+  const rows = await db.all('SELECT * FROM placas ORDER BY modelo ASC');
+  res.json(rows);
+});
+
+app.post('/api/admin/placas', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { modelo, potencia_w, status } = req.body;
+  if (!modelo?.trim()) return res.status(400).json({ message: 'Modelo é obrigatório.' });
+  try {
+    const result = await db.run(
+      'INSERT INTO placas (modelo, potencia_w, status) VALUES (?, ?, ?)',
+      modelo.trim(), potencia_w || null, status || 'ativo'
+    );
+    const row = await db.get('SELECT * FROM placas WHERE id = ?', result.lastID);
+    res.status(201).json(row);
+  } catch (err) {
+    if (err.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Modelo de placa já cadastrado.' });
+    throw err;
+  }
+});
+
+app.put('/api/admin/placas/:id', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { modelo, potencia_w, status } = req.body;
+  if (!modelo?.trim()) return res.status(400).json({ message: 'Modelo é obrigatório.' });
+  try {
+    await db.run(
+      'UPDATE placas SET modelo = ?, potencia_w = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      modelo.trim(), potencia_w || null, status || 'ativo', req.params.id
+    );
+    const row = await db.get('SELECT * FROM placas WHERE id = ?', req.params.id);
+    res.json(row);
+  } catch (err) {
+    if (err.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Modelo de placa já cadastrado.' });
+    throw err;
+  }
+});
+
+// ── Marcas de inversor ───────────────────────────────────────────────────────
+app.get('/api/admin/marcas-inversor', authRequired, requirePermission('contratos'), async (req, res) => {
+  const rows = await db.all('SELECT * FROM marcas_inversor ORDER BY nome_marca ASC');
+  res.json(rows);
+});
+
+app.post('/api/admin/marcas-inversor', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { nome_marca, status } = req.body;
+  if (!nome_marca?.trim()) return res.status(400).json({ message: 'Nome da marca é obrigatório.' });
+  try {
+    const result = await db.run(
+      'INSERT INTO marcas_inversor (nome_marca, status) VALUES (?, ?)',
+      nome_marca.trim(), status || 'ativo'
+    );
+    const row = await db.get('SELECT * FROM marcas_inversor WHERE id = ?', result.lastID);
+    res.status(201).json(row);
+  } catch (err) {
+    if (err.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Marca já cadastrada.' });
+    throw err;
+  }
+});
+
+app.put('/api/admin/marcas-inversor/:id', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { nome_marca, status } = req.body;
+  if (!nome_marca?.trim()) return res.status(400).json({ message: 'Nome da marca é obrigatório.' });
+  try {
+    await db.run(
+      'UPDATE marcas_inversor SET nome_marca = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      nome_marca.trim(), status || 'ativo', req.params.id
+    );
+    const row = await db.get('SELECT * FROM marcas_inversor WHERE id = ?', req.params.id);
+    res.json(row);
+  } catch (err) {
+    if (err.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Marca já cadastrada.' });
+    throw err;
+  }
+});
+
+// ── Modelos de inversor ──────────────────────────────────────────────────────
+app.get('/api/admin/modelos-inversor', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { marcaId } = req.query;
+  const rows = marcaId
+    ? await db.all('SELECT * FROM modelos_inversor WHERE marca_id = ? ORDER BY nome_modelo ASC', marcaId)
+    : await db.all('SELECT * FROM modelos_inversor ORDER BY nome_modelo ASC');
+  res.json(rows);
+});
+
+app.post('/api/admin/modelos-inversor', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { marca_id, nome_modelo, status } = req.body;
+  if (!marca_id || !nome_modelo?.trim()) return res.status(400).json({ message: 'Marca e modelo são obrigatórios.' });
+  try {
+    const result = await db.run(
+      'INSERT INTO modelos_inversor (marca_id, nome_modelo, status) VALUES (?, ?, ?)',
+      marca_id, nome_modelo.trim(), status || 'ativo'
+    );
+    const row = await db.get('SELECT * FROM modelos_inversor WHERE id = ?', result.lastID);
+    res.status(201).json(row);
+  } catch (err) {
+    if (err.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Modelo já cadastrado para esta marca.' });
+    throw err;
+  }
+});
+
+app.put('/api/admin/modelos-inversor/:id', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { nome_modelo, status } = req.body;
+  if (!nome_modelo?.trim()) return res.status(400).json({ message: 'Nome do modelo é obrigatório.' });
+  try {
+    await db.run(
+      'UPDATE modelos_inversor SET nome_modelo = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      nome_modelo.trim(), status || 'ativo', req.params.id
+    );
+    const row = await db.get('SELECT * FROM modelos_inversor WHERE id = ?', req.params.id);
+    res.json(row);
+  } catch (err) {
+    if (err.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Modelo já cadastrado para esta marca.' });
+    throw err;
+  }
 });
 
 app.get('/api/admin/contratos', authRequired, requirePermission('contratos'), async (req, res) => {
