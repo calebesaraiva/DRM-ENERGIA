@@ -817,8 +817,17 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     io.emit('whatsapp_message_created', { message: savedMessage, conversation: updatedConversation });
     io.emit('whatsapp_conversation_updated', updatedConversation);
     if (shouldNotifyNewLead && updatedConversation?.status === 'Aguardando atendimento') {
-      notifyConsultantsAboutNewWhatsAppLead({ conversation: updatedConversation, text })
-        .catch(error => console.error('Erro ao enviar avisos de lead novo:', error));
+      try {
+        const notificationResults = await notifyConsultantsAboutNewWhatsAppLead({ conversation: updatedConversation, text });
+        console.log('[WhatsApp] Aviso de lead novo enviado:', JSON.stringify({
+          conversationId: updatedConversation.id,
+          leadId: updatedConversation.leadId,
+          assignedUserId: updatedConversation.assignedUserId,
+          results: notificationResults,
+        }));
+      } catch (error) {
+        console.error('Erro ao enviar avisos de lead novo:', error);
+      }
       io.emit('whatsapp_new_lead_waiting', { conversation: updatedConversation });
     }
   } catch (error) {
@@ -1502,7 +1511,13 @@ const hasVerifiedEmail = (user = {}) => isRealEmail(user.email) && Boolean(user.
 const isInternalStaffUser = (user = {}) => user.userType === 'interno'
   || ['ADM', 'CONSULTOR', 'EQUIPE_TECNICA_COMERCIAL'].includes(user.role);
 
-const requiresEmailVerification = (user = {}) => !isLocalDevelopment && !isInternalStaffUser(user) && !hasVerifiedEmail(user);
+const requiresEmailVerification = (user = {}) => {
+  if (isLocalDevelopment || hasVerifiedEmail(user)) return false;
+  const email = normalizeEmail(user.email);
+  const hasLocalProvisionedEmail = email.endsWith('@drm.local');
+  if (isInternalStaffUser(user)) return isRealEmail(email) && !hasLocalProvisionedEmail;
+  return true;
+};
 const shouldForcePasswordChange = (user = {}) => !isLocalDevelopment && Boolean(user.mustChangePassword);
 
 const createEmailCode = () => String(crypto.randomInt(100000, 1000000));
@@ -5882,6 +5897,32 @@ app.post('/api/admin/whatsapp/test-new-lead-notifications', authRequired, requir
   res.json({ ok: results.every(item => item.ok), results });
 });
 
+app.post('/api/admin/whatsapp/conversations/:id/renotify-lead', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  if (!isMasterAdminUser(req.user)) {
+    return res.status(403).json({ message: 'Apenas o ADM master pode reenviar aviso de lead.' });
+  }
+
+  const conversation = await db.get('SELECT * FROM whatsapp_conversations WHERE id = ?', req.params.id);
+  if (!conversation) return res.status(404).json({ message: 'Conversa não encontrada.' });
+  if (!conversation.assignedUserId) return res.status(400).json({ message: 'Conversa sem consultor responsável.' });
+
+  const lastMessage = await db.get(
+    'SELECT text FROM whatsapp_messages WHERE conversationId = ? ORDER BY id DESC LIMIT 1',
+    conversation.id
+  );
+  const results = await notifyConsultantsAboutNewWhatsAppLead({
+    conversation,
+    text: req.body?.mensagem || lastMessage?.text || conversation.lastMessage || '',
+  });
+  console.log('[WhatsApp] Aviso de lead reenviado manualmente:', JSON.stringify({
+    conversationId: conversation.id,
+    leadId: conversation.leadId,
+    assignedUserId: conversation.assignedUserId,
+    results,
+  }));
+  res.json({ ok: results.every(item => item.ok), conversationId: conversation.id, results });
+});
+
 app.post('/api/admin/whatsapp/debug-classify-contact', authRequired, requirePermission('whatsapp'), async (req, res) => {
   if (!isMasterAdminUser(req.user)) {
     return res.status(403).json({ message: 'Apenas o ADM master pode usar o diagnóstico de contatos.' });
@@ -6710,6 +6751,25 @@ app.put('/api/admin/orcamentos/:id', authRequired, requirePermission('orcamentos
   });
 });
 
+app.delete('/api/admin/orcamentos/:id', authRequired, requirePermission('orcamentos'), async (req, res) => {
+  const orcamento = await db.get('SELECT * FROM orcamentos WHERE id = ?', req.params.id);
+  if (!orcamento) return res.status(404).json({ message: 'Orçamento não encontrado.' });
+  if (!can(req.user, 'verTodosLeads') && orcamento.assignedUserId !== req.user.id) {
+    return res.status(403).json({ message: 'Este orçamento pertence a outro responsável.' });
+  }
+
+  const contrato = await db.get('SELECT id, status FROM contratos WHERE orcamentoId = ?', req.params.id);
+  if (contrato) {
+    return res.status(409).json({
+      message: `Este orçamento já gerou o contrato #${contrato.id}. Para preservar o histórico, ele não pode ser excluído.`,
+    });
+  }
+
+  await db.run('DELETE FROM orcamentos WHERE id = ?', req.params.id);
+  io.emit('orcamento_excluido', { id: Number(req.params.id) });
+  res.json({ message: 'Orçamento excluído com sucesso.', id: Number(req.params.id) });
+});
+
 app.get('/api/admin/orcamentos/:id/download', authRequired, requirePermission('orcamentos'), async (req, res) => {
   const orcamento = await db.get('SELECT * FROM orcamentos WHERE id = ?', req.params.id);
   if (!orcamento) return res.status(404).json({ message: 'Orçamento não encontrado.' });
@@ -6747,8 +6807,19 @@ app.get('/api/admin/equipamentos', authRequired, requirePermission('contratos'),
 
 app.post('/api/admin/equipamentos', authRequired, requirePermission('contratos'), async (req, res) => {
   const data = normalizeEquipamentoPayload(req.body);
-  if (!data.nome || !data.placaModelo || !data.inversorModelo) {
-    return res.status(400).json({ message: 'Nome, modelo da placa e modelo do inversor são obrigatórios.' });
+  const isPlacaOnly = data.tipo === 'Placa solar';
+  const isInversorOnly = data.tipo === 'Inversor';
+  if (!data.nome) {
+    return res.status(400).json({ message: 'Nome é obrigatório.' });
+  }
+  if (!isPlacaOnly && !isInversorOnly && (!data.placaModelo || !data.inversorModelo)) {
+    return res.status(400).json({ message: 'Modelo da placa e modelo do inversor são obrigatórios para kits.' });
+  }
+  if (isPlacaOnly && !data.placaModelo) {
+    return res.status(400).json({ message: 'Modelo da placa é obrigatório.' });
+  }
+  if (isInversorOnly && !data.inversorModelo) {
+    return res.status(400).json({ message: 'Modelo do inversor é obrigatório.' });
   }
 
   const result = await db.run(

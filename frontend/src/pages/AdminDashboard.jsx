@@ -940,6 +940,11 @@ const AdminDashboard = () => {
   const [produtoSearch, setProdutoSearch] = useState('');
   const [produtoTipoFilter, setProdutoTipoFilter] = useState('todos');
   const [produtoStatusFilter, setProdutoStatusFilter] = useState('todos');
+  const [produtoSubTab, setProdutoSubTab] = useState('kits');
+  const [placaForm, setPlacaForm] = useState({ modelo: '', potenciaW: '', active: true });
+  const [editingPlacaId, setEditingPlacaId] = useState(null);
+  const [inversorForm, setInversorForm] = useState({ marca: '', modelo: '', potenciaKw: '', active: true });
+  const [editingInversorId, setEditingInversorId] = useState(null);
   const equipamentoNomeRef = useRef(null);
   const signatureCanvasRef = useRef(null);
   const signatureDrawingRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
@@ -1535,6 +1540,16 @@ const AdminDashboard = () => {
       .map(e => e.inversorModelo)
       .filter(v => v && !seen.has(v) && seen.add(v));
   }, [equipamentos, budgetForm.inversorMarca]);
+
+  const placasCadastradas = useMemo(
+    () => equipamentos.filter(e => e.tipo === 'Placa solar').sort((a, b) => a.placaModelo?.localeCompare(b.placaModelo || '') || 0),
+    [equipamentos]
+  );
+
+  const inversoresCadastrados = useMemo(
+    () => equipamentos.filter(e => e.tipo === 'Inversor').sort((a, b) => a.inversorModelo?.localeCompare(b.inversorModelo || '') || 0),
+    [equipamentos]
+  );
 
   const CONTRATOS_PER_PAGE = 10;
 
@@ -3945,6 +3960,77 @@ const AdminDashboard = () => {
     });
     setEquipamentos(prev => prev.map(current => current.id === equipamento.id ? equipamento : current));
     if (editingEquipamentoId === equipamento.id) setEquipamentoForm(equipamentoToForm(equipamento));
+  };
+
+  const savePlaca = async (event) => {
+    event.preventDefault();
+    if (!placaForm.modelo.trim()) return;
+    const isEditing = Boolean(editingPlacaId);
+    try {
+      const payload = {
+        nome: placaForm.modelo.trim(),
+        tipo: 'Placa solar',
+        placaModelo: placaForm.modelo.trim(),
+        inversorModelo: '',
+        potenciaPlacaW: placaForm.potenciaW || '',
+        active: placaForm.active,
+      };
+      const equipamento = await request(
+        isEditing ? `/api/admin/equipamentos/${editingPlacaId}` : '/api/admin/equipamentos',
+        { method: isEditing ? 'PUT' : 'POST', body: JSON.stringify(payload) }
+      );
+      setEquipamentos(prev => {
+        const exists = prev.some(e => e.id === equipamento.id);
+        return exists ? prev.map(e => e.id === equipamento.id ? equipamento : e) : [equipamento, ...prev];
+      });
+      setPlacaForm({ modelo: '', potenciaW: '', active: true });
+      setEditingPlacaId(null);
+      showToast(isEditing ? 'Placa atualizada.' : 'Placa cadastrada com sucesso.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const saveInversor = async (event) => {
+    event.preventDefault();
+    if (!inversorForm.marca.trim() || !inversorForm.modelo.trim()) return;
+    const isEditing = Boolean(editingInversorId);
+    const nomeCompleto = `${inversorForm.marca.trim()} ${inversorForm.modelo.trim()}`;
+    try {
+      const payload = {
+        nome: nomeCompleto,
+        tipo: 'Inversor',
+        placaModelo: '',
+        inversorModelo: nomeCompleto,
+        potenciaInversorKw: inversorForm.potenciaKw || '',
+        active: inversorForm.active,
+      };
+      const equipamento = await request(
+        isEditing ? `/api/admin/equipamentos/${editingInversorId}` : '/api/admin/equipamentos',
+        { method: isEditing ? 'PUT' : 'POST', body: JSON.stringify(payload) }
+      );
+      setEquipamentos(prev => {
+        const exists = prev.some(e => e.id === equipamento.id);
+        return exists ? prev.map(e => e.id === equipamento.id ? equipamento : e) : [equipamento, ...prev];
+      });
+      setInversorForm({ marca: '', modelo: '', potenciaKw: '', active: true });
+      setEditingInversorId(null);
+      showToast(isEditing ? 'Inversor atualizado.' : 'Inversor cadastrado com sucesso.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const togglePlacaActive = async (item) => {
+    try {
+      const equipamento = await request(`/api/admin/equipamentos/${item.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...item, active: !item.active }),
+      });
+      setEquipamentos(prev => prev.map(e => e.id === equipamento.id ? equipamento : e));
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const saveContractConfig = async (event) => {
@@ -6566,81 +6652,240 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="pkit-kpis">
-                <div className="pkit-kpi">
-                  <div className="pkit-kpi-icon">
-                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                  </div>
-                  <div className="pkit-kpi-body">
-                    <strong>{equipamentos.length}</strong>
-                    <span>Total de itens</span>
-                    <small>Itens técnicos cadastrados</small>
-                  </div>
-                </div>
-                <div className="pkit-kpi">
-                  <div className="pkit-kpi-icon">
-                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                  </div>
-                  <div className="pkit-kpi-body">
-                    <strong>{new Set(equipamentos.map(e => e.placaModelo).filter(Boolean)).size}</strong>
-                    <span>Placas cadastradas</span>
-                    <small>Modelos de placas</small>
-                  </div>
-                </div>
-                <div className="pkit-kpi">
-                  <div className="pkit-kpi-icon">
-                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
-                  </div>
-                  <div className="pkit-kpi-body">
-                    <strong>{new Set(equipamentos.map(e => e.inversorModelo).filter(Boolean)).size}</strong>
-                    <span>Inversores cadastrados</span>
-                    <small>Modelos de inversores</small>
-                  </div>
-                </div>
-                <div className="pkit-kpi">
-                  <div className="pkit-kpi-icon pkit-kpi-icon-green">
-                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><polyline points="9 12 12 15 17 9"/></svg>
-                  </div>
-                  <div className="pkit-kpi-body">
-                    <strong>{equipamentos.filter(e => e.active).length}</strong>
-                    <span>Ativos</span>
-                    <small>Itens ativos</small>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pkit-filter-bar">
-                <div className="pkit-filter-search">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
-                  <input
-                    value={produtoSearch}
-                    onChange={e => setProdutoSearch(e.target.value)}
-                    placeholder="Buscar por nome do cadastro, modelo de placa ou inversor..."
-                  />
-                </div>
-                <select className="pkit-filter-select" value={produtoTipoFilter} onChange={e => setProdutoTipoFilter(e.target.value)}>
-                  <option value="todos">Todos os tipos</option>
-                  {equipamentoTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <select className="pkit-filter-select" value={produtoStatusFilter} onChange={e => setProdutoStatusFilter(e.target.value)}>
-                  <option value="todos">Todos os status</option>
-                  <option value="ativo">Ativo</option>
-                  <option value="inativo">Inativo</option>
-                </select>
+              {/* Sub-abas */}
+              <div className="pkit-subtabs">
                 <button
                   type="button"
-                  className="pkit-clear-btn"
-                  onClick={() => { setProdutoSearch(''); setProdutoTipoFilter('todos'); setProdutoStatusFilter('todos'); }}
+                  className={`pkit-subtab${produtoSubTab === 'kits' ? ' active' : ''}`}
+                  onClick={() => setProdutoSubTab('kits')}
                 >
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-                  Limpar filtros
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  Kits
+                  <em>{equipamentos.filter(e => e.tipo !== 'Placa solar' && e.tipo !== 'Inversor').length}</em>
                 </button>
-                <button type="button" className="btn btn-primary pkit-new-btn" onClick={startNewEquipamento}>
-                  + Novo cadastro
+                <button
+                  type="button"
+                  className={`pkit-subtab${produtoSubTab === 'placas' ? ' active' : ''}`}
+                  onClick={() => setProdutoSubTab('placas')}
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                  Placas
+                  <em>{placasCadastradas.length}</em>
+                </button>
+                <button
+                  type="button"
+                  className={`pkit-subtab${produtoSubTab === 'inversores' ? ' active' : ''}`}
+                  onClick={() => setProdutoSubTab('inversores')}
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                  Inversores
+                  <em>{inversoresCadastrados.length}</em>
                 </button>
               </div>
 
-              {renderProdutosPacotes()}
+              {/* Kits */}
+              {produtoSubTab === 'kits' && (
+                <>
+                  <div className="pkit-filter-bar">
+                    <div className="pkit-filter-search">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+                      <input
+                        value={produtoSearch}
+                        onChange={e => setProdutoSearch(e.target.value)}
+                        placeholder="Buscar por nome, placa ou inversor..."
+                      />
+                    </div>
+                    <select className="pkit-filter-select" value={produtoStatusFilter} onChange={e => setProdutoStatusFilter(e.target.value)}>
+                      <option value="todos">Todos os status</option>
+                      <option value="ativo">Ativo</option>
+                      <option value="inativo">Inativo</option>
+                    </select>
+                    <button type="button" className="pkit-clear-btn" onClick={() => { setProdutoSearch(''); setProdutoStatusFilter('todos'); }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                      Limpar
+                    </button>
+                    <button type="button" className="btn btn-primary pkit-new-btn" onClick={startNewEquipamento}>
+                      + Novo kit
+                    </button>
+                  </div>
+                  {renderProdutosPacotes()}
+                </>
+              )}
+
+              {/* Placas */}
+              {produtoSubTab === 'placas' && (
+                <div className="pkit-simple-layout">
+                  {/* Lista */}
+                  <div className="pkit-simple-list">
+                    <div className="pkit-simple-list-hd">
+                      <strong>Placas cadastradas</strong>
+                      <span>{placasCadastradas.length} modelo{placasCadastradas.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {placasCadastradas.length === 0 && (
+                      <div className="pkit-simple-empty">Nenhuma placa cadastrada ainda.</div>
+                    )}
+                    {placasCadastradas.map(p => (
+                      <div key={p.id} className={`pkit-simple-item${!p.active ? ' pkit-item-off' : ''}`}>
+                        <div className="pkit-simple-item-info">
+                          <strong>{p.placaModelo}</strong>
+                          {p.potenciaPlacaW && <span>{p.potenciaPlacaW} W</span>}
+                        </div>
+                        <div className="pkit-simple-item-actions">
+                          <button
+                            type="button"
+                            className="pkit-simple-edit"
+                            onClick={() => {
+                              const marca = (p.inversorModelo || '').split(' ')[0];
+                              setEditingPlacaId(p.id);
+                              setPlacaForm({ modelo: p.placaModelo || '', potenciaW: String(p.potenciaPlacaW || ''), active: Boolean(p.active) });
+                            }}
+                          >Editar</button>
+                          <button
+                            type="button"
+                            className={`pkit-simple-toggle${p.active ? '' : ' off'}`}
+                            onClick={() => togglePlacaActive(p)}
+                          >{p.active ? 'Ativo' : 'Inativo'}</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Formulário */}
+                  <form className="pkit-simple-form" onSubmit={savePlaca}>
+                    <div className="pkit-simple-form-hd">
+                      <strong>{editingPlacaId ? 'Editar placa' : 'Nova placa'}</strong>
+                      {editingPlacaId && (
+                        <button type="button" className="pkit-simple-cancel" onClick={() => { setEditingPlacaId(null); setPlacaForm({ modelo: '', potenciaW: '', active: true }); }}>
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                    <label className="pkit-simple-label">
+                      Modelo da placa *
+                      <input
+                        required
+                        placeholder="Ex: Canadian Solar 610W"
+                        value={placaForm.modelo}
+                        onChange={e => setPlacaForm(prev => ({ ...prev, modelo: e.target.value }))}
+                      />
+                    </label>
+                    <label className="pkit-simple-label">
+                      Potência (W)
+                      <input
+                        type="number"
+                        placeholder="Ex: 610"
+                        value={placaForm.potenciaW}
+                        onChange={e => setPlacaForm(prev => ({ ...prev, potenciaW: e.target.value }))}
+                      />
+                    </label>
+                    <label className="pkit-simple-label pkit-simple-row">
+                      <span>Status</span>
+                      <select value={placaForm.active ? 'ativo' : 'inativo'} onChange={e => setPlacaForm(prev => ({ ...prev, active: e.target.value === 'ativo' }))}>
+                        <option value="ativo">Ativo</option>
+                        <option value="inativo">Inativo</option>
+                      </select>
+                    </label>
+                    <button type="submit" className="btn btn-primary pkit-simple-save">
+                      {editingPlacaId ? 'Salvar alterações' : '+ Cadastrar placa'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* Inversores */}
+              {produtoSubTab === 'inversores' && (
+                <div className="pkit-simple-layout">
+                  {/* Lista */}
+                  <div className="pkit-simple-list">
+                    <div className="pkit-simple-list-hd">
+                      <strong>Inversores cadastrados</strong>
+                      <span>{inversoresCadastrados.length} modelo{inversoresCadastrados.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {inversoresCadastrados.length === 0 && (
+                      <div className="pkit-simple-empty">Nenhum inversor cadastrado ainda.</div>
+                    )}
+                    {inversoresCadastrados.map(inv => {
+                      const partes = (inv.inversorModelo || '').split(' ');
+                      const marca = partes[0] || '';
+                      const modelo = partes.slice(1).join(' ') || inv.inversorModelo || '';
+                      return (
+                        <div key={inv.id} className={`pkit-simple-item${!inv.active ? ' pkit-item-off' : ''}`}>
+                          <div className="pkit-simple-item-info">
+                            <strong>{inv.inversorModelo}</strong>
+                            {inv.potenciaInversorKw && <span>{inv.potenciaInversorKw} kW</span>}
+                          </div>
+                          <div className="pkit-simple-item-actions">
+                            <button
+                              type="button"
+                              className="pkit-simple-edit"
+                              onClick={() => {
+                                setEditingInversorId(inv.id);
+                                setInversorForm({ marca, modelo, potenciaKw: String(inv.potenciaInversorKw || ''), active: Boolean(inv.active) });
+                              }}
+                            >Editar</button>
+                            <button
+                              type="button"
+                              className={`pkit-simple-toggle${inv.active ? '' : ' off'}`}
+                              onClick={() => togglePlacaActive(inv)}
+                            >{inv.active ? 'Ativo' : 'Inativo'}</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Formulário */}
+                  <form className="pkit-simple-form" onSubmit={saveInversor}>
+                    <div className="pkit-simple-form-hd">
+                      <strong>{editingInversorId ? 'Editar inversor' : 'Novo inversor'}</strong>
+                      {editingInversorId && (
+                        <button type="button" className="pkit-simple-cancel" onClick={() => { setEditingInversorId(null); setInversorForm({ marca: '', modelo: '', potenciaKw: '', active: true }); }}>
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                    <label className="pkit-simple-label">
+                      Marca *
+                      <input
+                        required
+                        placeholder="Ex: Growatt"
+                        value={inversorForm.marca}
+                        onChange={e => setInversorForm(prev => ({ ...prev, marca: e.target.value }))}
+                      />
+                    </label>
+                    <label className="pkit-simple-label">
+                      Modelo *
+                      <input
+                        required
+                        placeholder="Ex: MIN 5KTL-X"
+                        value={inversorForm.modelo}
+                        onChange={e => setInversorForm(prev => ({ ...prev, modelo: e.target.value }))}
+                      />
+                    </label>
+                    <label className="pkit-simple-label">
+                      Potência (kW)
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Ex: 5"
+                        value={inversorForm.potenciaKw}
+                        onChange={e => setInversorForm(prev => ({ ...prev, potenciaKw: e.target.value }))}
+                      />
+                    </label>
+                    <label className="pkit-simple-label pkit-simple-row">
+                      <span>Status</span>
+                      <select value={inversorForm.active ? 'ativo' : 'inativo'} onChange={e => setInversorForm(prev => ({ ...prev, active: e.target.value === 'ativo' }))}>
+                        <option value="ativo">Ativo</option>
+                        <option value="inativo">Inativo</option>
+                      </select>
+                    </label>
+                    <button type="submit" className="btn btn-primary pkit-simple-save">
+                      {editingInversorId ? 'Salvar alterações' : '+ Cadastrar inversor'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
             </div>
           )}
 
