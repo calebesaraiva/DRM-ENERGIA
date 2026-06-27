@@ -3636,12 +3636,16 @@ const buildOrcamentoPdf = async (orcamento) => {
 
     // ── footer helper ─────────────────────────────────────────────────────
     const drawPageFooter = () => {
+      // Temporarily disable bottom margin so text in the footer zone doesn't trigger auto-pagination
+      const savedBottom = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
       const fy = doc.page.height - 38;
       doc.moveTo(ML, fy).lineTo(ML + W, fy).lineWidth(0.5).strokeColor('#E2E8F0').stroke();
       doc.font('Helvetica-Bold').fontSize(8.5).fillColor(dark)
         .text('DRM Energia Solar', ML, fy + 6, { width: W, align: 'center' });
       doc.font('Helvetica').fontSize(7.5).fillColor(muted)
         .text('Proposta comercial gerada pelo sistema DRM Solar', ML, fy + 18, { width: W, align: 'center' });
+      doc.page.margins.bottom = savedBottom;
     };
 
     // ── metric card helper ────────────────────────────────────────────────
@@ -3690,7 +3694,7 @@ const buildOrcamentoPdf = async (orcamento) => {
 
     // CLIENTE section
     doc.moveDown(0.9);
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(orange).text('CLIENTE', { align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(orange).text('CLIENTE', ML, doc.y, { width: W, align: 'center' });
     doc.moveDown(0.3);
     doc.moveTo(ML, doc.y).lineTo(ML + W, doc.y).lineWidth(0.5).strokeColor('#E2E8F0').stroke();
     doc.moveDown(0.3);
@@ -3710,7 +3714,7 @@ const buildOrcamentoPdf = async (orcamento) => {
 
     // SISTEMA FOTOVOLTAICO table
     doc.moveDown(0.9);
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(orange).text('SISTEMA FOTOVOLTAICO', { align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(orange).text('SISTEMA FOTOVOLTAICO', ML, doc.y, { width: W, align: 'center' });
     doc.moveDown(0.5);
 
     const c1 = 120; // ITEM
