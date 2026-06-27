@@ -3609,91 +3609,270 @@ const buildOrcamentoPdf = async (orcamento) => {
   const logoPath = path.join(__dirname, '../frontend/public/assets/logo.png');
 
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 44, info: { Title: `Orçamento Solar #${orcamento.id}` } });
+    const ML = 44; // margin left/right
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 44, left: ML, right: ML, bottom: 44 }, info: { Title: `Orçamento Solar #${orcamento.id}` } });
     const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('data', c => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
     const orange = '#F97316';
-    const dark = '#111827';
-    const muted = '#64748B';
-    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const ensureSpace = (height = 70) => {
-      if (doc.y + height > doc.page.height - doc.page.margins.bottom) doc.addPage();
-    };
-    const sectionTitle = (title) => {
-      ensureSpace(40);
-      doc.moveDown(0.75).font('Helvetica-Bold').fontSize(12).fillColor(orange).text(title.toUpperCase());
-      doc.moveDown(0.25).strokeColor('#E2E8F0').moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.margins.left + pageWidth, doc.y).stroke();
-      doc.moveDown(0.55);
-    };
-    const infoRow = (label, value) => {
-      ensureSpace(30);
-      const startY = doc.y;
-      doc.font('Helvetica-Bold').fontSize(8).fillColor(muted).text(String(label).toUpperCase(), doc.page.margins.left, startY, { width: 150 });
-      doc.font('Helvetica').fontSize(10).fillColor(dark).text(String(value || 'Não informado'), doc.page.margins.left + 155, startY, { width: pageWidth - 155 });
-      doc.y = Math.max(doc.y, startY + 22);
-      doc.strokeColor('#EEF2F7').moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.margins.left + pageWidth, doc.y).stroke();
-      doc.moveDown(0.35);
-    };
-    const metricCard = (x, y, width, label, value) => {
-      doc.roundedRect(x, y, width, 58, 8).fillAndStroke('#FFF7ED', '#FED7AA');
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#9A3412').text(label.toUpperCase(), x + 10, y + 10, { width: width - 20 });
-      doc.font('Helvetica-Bold').fontSize(15).fillColor(dark).text(String(value || '-'), x + 10, y + 28, { width: width - 20 });
+    const dark   = '#1E293B';
+    const muted  = '#64748B';
+    const W = doc.page.width - ML * 2; // usable width
+
+    // ── shared header helper ──────────────────────────────────────────────
+    const drawPageHeader = (subtitle) => {
+      if (fs.existsSync(logoPath)) doc.image(logoPath, ML, 34, { fit: [100, 54] });
+      doc.font('Helvetica-Bold').fontSize(20).fillColor(dark)
+        .text(subtitle, ML + 110, 34, { width: W - 110, align: 'right' });
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(orange)
+        .text(`ORÇAMENTO #${orcamento.id} - ${formatDateBr(orcamento.data)}`, ML + 110, 62, { width: W - 110, align: 'right' });
+      doc.font('Helvetica').fontSize(8).fillColor(muted)
+        .text(template.empresa.nome || 'DRM ENERGIA SOLAR LTDA', ML + 110, 78, { width: W - 110, align: 'right' });
+      doc.moveTo(ML, 102).lineTo(ML + W, 102).lineWidth(2).strokeColor(orange).stroke();
+      doc.y = 118;
     };
 
-    if (fs.existsSync(logoPath)) doc.image(logoPath, doc.page.margins.left, 34, { fit: [110, 58] });
-    doc.font('Helvetica-Bold').fontSize(20).fillColor(dark).text('PROPOSTA COMERCIAL SOLAR', 170, 38, { width: pageWidth - 125, align: 'right' });
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(orange).text(`ORÇAMENTO #${orcamento.id} - ${formatDateBr(orcamento.data)}`, 170, 72, { width: pageWidth - 125, align: 'right' });
-    doc.font('Helvetica').fontSize(8.5).fillColor(muted).text(template.empresa.nome || 'DRM Energia Solar', 170, 88, { width: pageWidth - 125, align: 'right' });
-    doc.moveTo(doc.page.margins.left, 112).lineTo(doc.page.margins.left + pageWidth, 112).lineWidth(2).strokeColor(orange).stroke();
-    doc.y = 132;
+    // ── footer helper ─────────────────────────────────────────────────────
+    const drawPageFooter = () => {
+      const fy = doc.page.height - 38;
+      doc.moveTo(ML, fy).lineTo(ML + W, fy).lineWidth(0.5).strokeColor('#E2E8F0').stroke();
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(dark)
+        .text('DRM Energia Solar', ML, fy + 6, { width: W, align: 'center' });
+      doc.font('Helvetica').fontSize(7.5).fillColor(muted)
+        .text('Proposta comercial gerada pelo sistema DRM Solar', ML, fy + 18, { width: W, align: 'center' });
+    };
 
-    doc.font('Helvetica-Bold').fontSize(12).fillColor(dark).text(`Olá, ${orcamento.clienteNome || 'cliente'}!`);
-    doc.font('Helvetica').fontSize(10).fillColor(muted).text('Esta proposta apresenta o dimensionamento do sistema fotovoltaico, equipamentos previstos, geração estimada e condições comerciais para análise antes da emissão do contrato.', { lineGap: 3 });
+    // ── metric card helper ────────────────────────────────────────────────
+    const metricCard = (x, y, w, label, value) => {
+      doc.roundedRect(x, y, w, 60, 6).fillAndStroke('#FFF7ED', '#FED7AA');
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#9A3412').text(label.toUpperCase(), x + 10, y + 10, { width: w - 20 });
+      doc.font('Helvetica-Bold').fontSize(16).fillColor(dark).text(String(value || '-'), x + 10, y + 27, { width: w - 20 });
+    };
 
-    const cardY = doc.y + 16;
-    const cardWidth = (pageWidth - 24) / 4;
-    metricCard(doc.page.margins.left, cardY, cardWidth, 'Potência', `${dimensionamento.potencia_real_instalada_kwp || 0} kWp`);
-    metricCard(doc.page.margins.left + cardWidth + 8, cardY, cardWidth, 'Geração', `${dimensionamento.geracao_estimada_kwh || 0} kWh/mês`);
-    metricCard(doc.page.margins.left + (cardWidth + 8) * 2, cardY, cardWidth, 'Área', `${dimensionamento.area_ocupada_m2 || 0} m²`);
-    metricCard(doc.page.margins.left + (cardWidth + 8) * 3, cardY, cardWidth, 'Valor', formatCurrency(financeiro.preco_final_cliente_rs));
-    doc.y = cardY + 76;
+    // ══════════════════════════════════════════════════════════════════════
+    //  PAGE 1 — PROPOSTA COMERCIAL SOLAR
+    // ══════════════════════════════════════════════════════════════════════
+    drawPageHeader('PROPOSTA COMERCIAL SOLAR');
 
-    sectionTitle('Cliente');
-    infoRow('Nome', orcamento.clienteNome);
-    infoRow('Cidade', orcamento.clienteCidade);
-    infoRow('Contato', orcamento.clienteTelefone);
-    infoRow('E-mail', orcamento.clienteEmail);
+    // Greeting
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(dark)
+      .text(`Olá, ${(orcamento.clienteNome || 'cliente').toUpperCase()}!`);
+    doc.moveDown(0.35);
+    doc.font('Helvetica').fontSize(9).fillColor(muted)
+      .text('Esta proposta apresenta o dimensionamento do sistema fotovoltaico, equipamentos\nprevistos, geração estimada e condições comerciais para análise antes da emissão do\ncontrato.', { lineGap: 2 });
+    doc.moveDown(1);
 
-    sectionTitle('Sistema fotovoltaico');
-    infoRow('Potência da placa', `${dimensionamento.potencia_placa_w || 0} W`);
-    infoRow('Modelo da placa', dimensionamento.placa_modelo);
-    infoRow('Quantidade de placas', dimensionamento.numero_paineis_necessarios);
-    infoRow('Potência do inversor', `${dimensionamento.potencia_inversor_kw || 0} kW`);
-    infoRow('Modelo do inversor', dimensionamento.inversor_modelo);
-    infoRow('Quantidade de inversores', dimensionamento.quantidade_inversores || 1);
-    infoRow('Cabo CC', dimensionamento.quantidade_cabo_cc);
-    infoRow('Área ocupada', `${dimensionamento.area_ocupada_m2 || 0} m²`);
+    // KPI cards (3)
+    const cardY = doc.y;
+    const cardW = (W - 16) / 3;
+    metricCard(ML,                    cardY, cardW, 'POTÊNCIA', `${dimensionamento.potencia_real_instalada_kwp || 0} kWp`);
+    metricCard(ML + cardW + 8,        cardY, cardW, 'GERAÇÃO',  `${dimensionamento.geracao_estimada_kwh || 0} kWh/mês`);
+    metricCard(ML + (cardW + 8) * 2,  cardY, cardW, 'VALOR',    formatCurrency(financeiro.preco_final_cliente_rs));
+    doc.y = cardY + 70;
 
-    sectionTitle('Geração e premissas');
-    infoRow('Geração mensal estimada', `${dimensionamento.geracao_estimada_kwh || 0} kWh`);
-    infoRow('Geração anual estimada', `${dimensionamento.geracao_anual_kwh || 0} kWh`);
-    infoRow('Irradiação solar', dimensionamento.irradiacao_solar ? `${dimensionamento.irradiacao_solar} kWh/m²/dia` : 'Informada manualmente');
-    infoRow('Perda média considerada', `${dimensionamento.perda_percentual || 20}%`);
-    infoRow('Observações', dimensionamento.observacoes);
+    // FORMA DE PAGAMENTO
+    doc.moveDown(0.8);
+    doc.roundedRect(ML, doc.y, W, 44, 6).fillAndStroke('#FFF7ED', '#FED7AA');
+    const fpY = doc.y;
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#9A3412').text('FORMA DE PAGAMENTO', ML + 10, fpY + 8, { width: W - 20 });
+    const tags = ['Financiado', 'Cartão de Crédito', 'À vista', 'Pagamento Híbrido'];
+    let tagX = ML + 10;
+    const tagY = fpY + 22;
+    tags.forEach(tag => {
+      const tw = doc.widthOfString(tag, { fontSize: 8 }) + 16;
+      doc.roundedRect(tagX, tagY, tw, 14, 3).fill('#1E293B');
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFFFFF').text(tag, tagX + 8, tagY + 3, { lineBreak: false });
+      tagX += tw + 6;
+    });
+    doc.y = fpY + 54;
 
-    sectionTitle('Condições comerciais');
-    infoRow('Valor do sistema', formatCurrency(financeiro.preco_final_cliente_rs));
-    infoRow('Forma de pagamento', financeiro.forma_pagamento);
-    infoRow('Condições', financeiro.condicoes_pagamento);
-    infoRow('Validade', 'Condição sujeita à disponibilidade de equipamentos e análise final do local.');
+    // CLIENTE section
+    doc.moveDown(0.9);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(orange).text('CLIENTE', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.moveTo(ML, doc.y).lineTo(ML + W, doc.y).lineWidth(0.5).strokeColor('#E2E8F0').stroke();
+    doc.moveDown(0.3);
 
-    ensureSpace(90);
-    doc.moveDown(1.2).font('Helvetica-Bold').fontSize(10).fillColor(dark).text('DRM Energia Solar', { align: 'center' });
-    doc.font('Helvetica').fontSize(8.5).fillColor(muted).text(`${template.empresa.telefone || ''} ${template.empresa.email ? `• ${template.empresa.email}` : ''}`, { align: 'center' });
+    const clienteRows = [
+      ['NOME', orcamento.clienteNome || '-'],
+      ['CIDADE', orcamento.clienteCidade || '-'],
+    ];
+    clienteRows.forEach(([label, value]) => {
+      const ry = doc.y;
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(muted).text(label, ML, ry + 4, { width: 100, lineBreak: false });
+      doc.font('Helvetica').fontSize(9).fillColor(dark).text(value, ML + 105, ry + 3, { width: W - 105, lineBreak: false });
+      doc.y = ry + 20;
+      doc.moveTo(ML, doc.y).lineTo(ML + W, doc.y).lineWidth(0.5).strokeColor('#E2E8F0').stroke();
+      doc.moveDown(0.2);
+    });
 
+    // SISTEMA FOTOVOLTAICO table
+    doc.moveDown(0.9);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(orange).text('SISTEMA FOTOVOLTAICO', { align: 'center' });
+    doc.moveDown(0.5);
+
+    const c1 = 120; // ITEM
+    const c3 = 36;  // QTD
+    const c2 = W - c1 - c3; // MODELO/DESCRIÇÃO
+
+    const tableRows = [
+      ['Placas',                  (dimensionamento.placa_modelo || '-'),
+        String(dimensionamento.numero_paineis_necessarios || 1), true],
+      ['Inversor',
+        [`${dimensionamento.inversor_marca || ''}`, `${dimensionamento.inversor_modelo || ''}`].filter(Boolean).join(' ').trim() || '-',
+        String(dimensionamento.quantidade_inversores || 1), true],
+      ['Estruturas de fixação',   'Inclusas - quantidade necessária para instalação', '1', false],
+      ['Cabos',                   'Inclusos - quantidade necessária para instalação',  '1', false],
+      ['Conectores',              'Inclusos - quantidade necessária para instalação',  '1', false],
+      ['Proteções',               'Inclusas - quantidade necessária para instalação',  '1', false],
+      ['Materiais',               'Inclusos',   '1', false],
+      ['Instalação',              'Inclusa',    '1', false],
+      ['Homologação',             'Inclusa',    '1', false],
+      ['Pós-venda',               'Incluso',    '1', false],
+    ];
+
+    // header row
+    let ty = doc.y;
+    doc.rect(ML, ty, W, 20).fill('#1E293B');
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFF')
+      .text('ITEM', ML + 6, ty + 6, { width: c1 - 10, lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFF')
+      .text('MODELO / DESCRIÇÃO', ML + c1 + 6, ty + 6, { width: c2 - 10, lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFF')
+      .text('QTD', ML + c1 + c2 + 4, ty + 6, { width: c3 - 6, align: 'right', lineBreak: false });
+    ty += 20;
+
+    tableRows.forEach(([item, desc, qty, isBold], idx) => {
+      // Measure height needed for wrapped desc
+      doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5);
+      const dh = doc.heightOfString(desc, { width: c2 - 14 });
+      const rh = Math.max(22, dh + 12);
+
+      if (ty + rh > doc.page.height - doc.page.margins.bottom - 50) {
+        drawPageFooter();
+        doc.addPage();
+        drawPageHeader('PROPOSTA COMERCIAL SOLAR (cont.)');
+        ty = doc.y;
+      }
+
+      const bg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+      doc.rect(ML, ty, W, rh).fill(bg);
+      doc.rect(ML, ty, W, rh).lineWidth(0.5).stroke('#E2E8F0');
+
+      const textVY = ty + Math.floor((rh - 10) / 2);
+      doc.font('Helvetica').fontSize(8.5).fillColor('#374151')
+        .text(item, ML + 6, textVY, { width: c1 - 10, lineBreak: false });
+      doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5).fillColor(dark)
+        .text(desc, ML + c1 + 6, ty + 7, { width: c2 - 14 });
+      doc.font('Helvetica').fontSize(8.5).fillColor('#374151')
+        .text(qty, ML + c1 + c2 + 4, textVY, { width: c3 - 6, align: 'right', lineBreak: false });
+
+      ty += rh;
+    });
+    doc.y = ty;
+
+    // Note about included items
+    doc.moveDown(0.6);
+    doc.roundedRect(ML, doc.y, W, 34, 4).fill('#F8FAFC').stroke('#E2E8F0');
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(dark)
+      .text('Itens inclusos em conjunto completo para instalação:', ML + 8, doc.y - 26);
+    doc.font('Helvetica').fontSize(7.5).fillColor(muted)
+      .text('estruturas de fixação, cabos, conectores, proteções, materiais, instalação, homologação e pós-venda inclusos, conforme projeto executivo e normas aplicáveis.', ML + 8, doc.y - 14, { width: W - 16 });
+    doc.y = doc.y + 8;
+
+    // OBSERVAÇÃO IMPORTANTE
+    doc.moveDown(0.8);
+    doc.roundedRect(ML, doc.y, W, 52, 4).fill('#FFFBEB').stroke('#FCD34D');
+    const obsY = doc.y;
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#92400E').text('OBSERVAÇÃO IMPORTANTE', ML + 10, obsY + 8, { width: W - 20 });
+    doc.font('Helvetica').fontSize(8.5).fillColor('#92400E')
+      .text('Reforma, melhoria ou reforço em telhado, bem como adequação do padrão de entrada da concessionária, ', ML + 10, obsY + 22, { continued: true, width: W - 20 });
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#92400E')
+      .text('não estão inclusos', { continued: true });
+    doc.font('Helvetica').fontSize(8.5).fillColor('#92400E')
+      .text(' nesta proposta. Caso sejam necessários, deverão ser avaliados e orçados separadamente.', { width: W - 20 });
+    doc.y = obsY + 62;
+
+    drawPageFooter();
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  PAGE 2 — GARANTIAS E PÓS-VENDA
+    // ══════════════════════════════════════════════════════════════════════
+    doc.addPage();
+    drawPageHeader('GARANTIAS E PÓS-VENDA');
+
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(dark).text('Informações complementares do seu orçamento');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).fillColor(muted)
+      .text('A seguir, apresentamos as condições de garantia e os serviços de pós-venda oferecidos pela DRM Energia Solar para este sistema fotovoltaico.', { lineGap: 2 });
+    doc.moveDown(1.2);
+
+    // GARANTIAS DRM section
+    doc.rect(ML, doc.y, W, 24).fill(dark);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#FFF').text('GARANTIAS DRM', ML + 10, doc.y - 17, { width: W - 20, align: 'center' });
+    doc.y = doc.y + 8;
+    doc.moveDown(0.8);
+
+    const garantias = [
+      'Materiais CA e CC de excelente qualidade',
+      '10 anos de garantia do inversor',
+      '15 anos de garantia de fábrica dos módulos e 30 anos de garantia de desempenho',
+      '5 anos de garantia de instalação',
+      'Geração prometida garantida',
+    ];
+    doc.roundedRect(ML, doc.y, W, garantias.length * 22 + 16, 6).fill('#FFFFFF').stroke('#E2E8F0');
+    const gbY = doc.y;
+    garantias.forEach((g, i) => {
+      const gy = gbY + 10 + i * 22;
+      doc.circle(ML + 16, gy + 5, 5).fill(orange);
+      doc.font('Helvetica').fontSize(9).fillColor(dark).text(g, ML + 28, gy, { width: W - 40, lineBreak: false });
+    });
+    doc.y = gbY + garantias.length * 22 + 20;
+    doc.moveDown(0.4);
+
+    // Disclaimer garantias
+    doc.roundedRect(ML, doc.y, W, 26, 4).fill('#F8FAFC').stroke('#E2E8F0');
+    doc.font('Helvetica').fontSize(7.5).fillColor(muted)
+      .text('As garantias apresentadas seguem as condições dos fabricantes e os padrões de instalação adotados pela DRM Energia Solar.', ML + 8, doc.y - 18, { width: W - 16 });
+    doc.y = doc.y + 8;
+    doc.moveDown(1.2);
+
+    // PÓS-VENDA DRM section
+    doc.rect(ML, doc.y, W, 24).fill(dark);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#FFF').text('PÓS-VENDA DRM', ML + 10, doc.y - 17, { width: W - 20, align: 'center' });
+    doc.y = doc.y + 8;
+    doc.moveDown(0.8);
+
+    const posVenda = [
+      'Análise das contas de energia após a instalação do sistema, bem como medidas cabíveis se necessário.',
+      'Análise e acompanhamento do monitoramento do sistema através do aplicativo.',
+      'A empresa é responsável por acionar a garantia e realizar todos os ensaios nos módulos e inversores necessários para tal.',
+      'Em caso de goteira, a empresa envia técnico quantas vezes forem necessárias até que os vazamentos relativos à instalação sejam sanados, principalmente aqueles abaixo das placas.',
+    ];
+    const pvBoxH = posVenda.reduce((acc, txt) => {
+      doc.font('Helvetica').fontSize(9);
+      return acc + Math.max(22, doc.heightOfString(txt, { width: W - 40 }) + 8);
+    }, 16);
+    doc.roundedRect(ML, doc.y, W, pvBoxH, 6).fill('#FFFFFF').stroke('#E2E8F0');
+    let pvY = doc.y;
+    posVenda.forEach(txt => {
+      const ty2 = pvY + 10;
+      doc.circle(ML + 16, ty2 + 5, 5).fill(orange);
+      doc.font('Helvetica').fontSize(9).fillColor(dark).text(txt, ML + 28, ty2, { width: W - 40 });
+      pvY += Math.max(22, doc.heightOfString(txt, { width: W - 40 }) + 8);
+    });
+    doc.y = pvY + 10;
+    doc.moveDown(1.5);
+
+    // Disclaimer pós-venda
+    doc.roundedRect(ML, doc.y, W, 26, 4).fill('#F8FAFC').stroke('#E2E8F0');
+    doc.font('Helvetica').fontSize(7.5).fillColor(muted)
+      .text('O suporte pós-venda é parte integrante do atendimento DRM, garantindo acompanhamento após a instalação do sistema.', ML + 8, doc.y - 18, { width: W - 16 });
+    doc.y = doc.y + 8;
+
+    drawPageFooter();
     doc.end();
   });
 };
@@ -4177,6 +4356,37 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       sentAt TEXT,
       UNIQUE(campaignId, email),
       FOREIGN KEY (campaignId) REFERENCES email_campaigns(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS marcas_inversor_hibrido (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome_marca TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'ativo',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS modelos_inversor_hibrido (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      marca_id INTEGER NOT NULL,
+      nome_modelo TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ativo',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(marca_id, nome_modelo),
+      FOREIGN KEY (marca_id) REFERENCES marcas_inversor_hibrido(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS baterias_litio_compativeis (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      modelo_hibrido_id INTEGER NOT NULL,
+      nome_bateria TEXT NOT NULL,
+      capacidade_kwh TEXT,
+      status TEXT NOT NULL DEFAULT 'ativo',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(modelo_hibrido_id, nome_bateria),
+      FOREIGN KEY (modelo_hibrido_id) REFERENCES modelos_inversor_hibrido(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS placas (
@@ -6938,6 +7148,93 @@ app.put('/api/admin/equipamentos/:id', authRequired, requirePermission('contrato
   );
   const equipamento = await db.get('SELECT * FROM equipamentos WHERE id = ?', req.params.id);
   res.json({ ...equipamento, active: Boolean(equipamento.active) });
+});
+
+// ── Marcas Inversor Híbrido ──────────────────────────────────────────────────
+app.get('/api/admin/marcas-inversor-hibrido', authRequired, requirePermission('contratos'), async (req, res) => {
+  res.json(await db.all('SELECT * FROM marcas_inversor_hibrido ORDER BY nome_marca ASC'));
+});
+app.post('/api/admin/marcas-inversor-hibrido', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { nome_marca, status } = req.body;
+  if (!nome_marca?.trim()) return res.status(400).json({ message: 'Nome da marca é obrigatório.' });
+  try {
+    const r = await db.run('INSERT INTO marcas_inversor_hibrido (nome_marca, status) VALUES (?, ?)', nome_marca.trim(), status || 'ativo');
+    res.status(201).json(await db.get('SELECT * FROM marcas_inversor_hibrido WHERE id = ?', r.lastID));
+  } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Marca já cadastrada.' });
+    throw e;
+  }
+});
+app.put('/api/admin/marcas-inversor-hibrido/:id', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { nome_marca, status } = req.body;
+  if (!nome_marca?.trim()) return res.status(400).json({ message: 'Nome da marca é obrigatório.' });
+  try {
+    await db.run('UPDATE marcas_inversor_hibrido SET nome_marca=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', nome_marca.trim(), status||'ativo', req.params.id);
+    res.json(await db.get('SELECT * FROM marcas_inversor_hibrido WHERE id=?', req.params.id));
+  } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Marca já cadastrada.' });
+    throw e;
+  }
+});
+
+// ── Modelos Inversor Híbrido ─────────────────────────────────────────────────
+app.get('/api/admin/modelos-inversor-hibrido', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { marcaId } = req.query;
+  res.json(marcaId
+    ? await db.all('SELECT * FROM modelos_inversor_hibrido WHERE marca_id=? ORDER BY nome_modelo ASC', marcaId)
+    : await db.all('SELECT * FROM modelos_inversor_hibrido ORDER BY nome_modelo ASC'));
+});
+app.post('/api/admin/modelos-inversor-hibrido', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { marca_id, nome_modelo, status } = req.body;
+  if (!marca_id || !nome_modelo?.trim()) return res.status(400).json({ message: 'Marca e modelo são obrigatórios.' });
+  try {
+    const r = await db.run('INSERT INTO modelos_inversor_hibrido (marca_id, nome_modelo, status) VALUES (?,?,?)', marca_id, nome_modelo.trim(), status||'ativo');
+    res.status(201).json(await db.get('SELECT * FROM modelos_inversor_hibrido WHERE id=?', r.lastID));
+  } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Modelo já cadastrado para esta marca.' });
+    throw e;
+  }
+});
+app.put('/api/admin/modelos-inversor-hibrido/:id', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { nome_modelo, status } = req.body;
+  if (!nome_modelo?.trim()) return res.status(400).json({ message: 'Nome do modelo é obrigatório.' });
+  try {
+    await db.run('UPDATE modelos_inversor_hibrido SET nome_modelo=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', nome_modelo.trim(), status||'ativo', req.params.id);
+    res.json(await db.get('SELECT * FROM modelos_inversor_hibrido WHERE id=?', req.params.id));
+  } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Modelo já cadastrado para esta marca.' });
+    throw e;
+  }
+});
+
+// ── Baterias de Lítio Compatíveis ───────────────────────────────────────────
+app.get('/api/admin/baterias-litio', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { modeloId } = req.query;
+  res.json(modeloId
+    ? await db.all('SELECT * FROM baterias_litio_compativeis WHERE modelo_hibrido_id=? ORDER BY nome_bateria ASC', modeloId)
+    : await db.all('SELECT * FROM baterias_litio_compativeis ORDER BY nome_bateria ASC'));
+});
+app.post('/api/admin/baterias-litio', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { modelo_hibrido_id, nome_bateria, capacidade_kwh, status } = req.body;
+  if (!modelo_hibrido_id || !nome_bateria?.trim()) return res.status(400).json({ message: 'Modelo e nome da bateria são obrigatórios.' });
+  try {
+    const r = await db.run('INSERT INTO baterias_litio_compativeis (modelo_hibrido_id, nome_bateria, capacidade_kwh, status) VALUES (?,?,?,?)', modelo_hibrido_id, nome_bateria.trim(), capacidade_kwh||null, status||'ativo');
+    res.status(201).json(await db.get('SELECT * FROM baterias_litio_compativeis WHERE id=?', r.lastID));
+  } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Bateria já cadastrada para este modelo.' });
+    throw e;
+  }
+});
+app.put('/api/admin/baterias-litio/:id', authRequired, requirePermission('contratos'), async (req, res) => {
+  const { nome_bateria, capacidade_kwh, status } = req.body;
+  if (!nome_bateria?.trim()) return res.status(400).json({ message: 'Nome da bateria é obrigatório.' });
+  try {
+    await db.run('UPDATE baterias_litio_compativeis SET nome_bateria=?, capacidade_kwh=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', nome_bateria.trim(), capacidade_kwh||null, status||'ativo', req.params.id);
+    res.json(await db.get('SELECT * FROM baterias_litio_compativeis WHERE id=?', req.params.id));
+  } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(400).json({ message: 'Bateria já cadastrada para este modelo.' });
+    throw e;
+  }
 });
 
 // ── Placas ──────────────────────────────────────────────────────────────────

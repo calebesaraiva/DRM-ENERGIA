@@ -16817,11 +16817,34 @@
   margin: 0;
 }
 
-.prod-inv-layout {
-  display: grid;
-  grid-template-columns: 220px 28px 1fr 1fr;
-  gap: 0.75rem;
+/* Outer wrapper: catálogos + painel direito */
+.prod-inv-outer {
+  display: flex;
+  gap: 1rem;
   align-items: start;
+}
+
+/* Área dos catálogos (esquerda) */
+.prod-inv-left-area {
+  display: flex;
+  align-items: start;
+  gap: 0;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.prod-inv-left-area .prod-inv-col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Painel direito: formulário + guia */
+.prod-inv-right-area {
+  width: 360px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .prod-inv-col {
@@ -16974,14 +16997,16 @@
 }
 
 /* Seta entre colunas */
-.prod-inv-arrow {
+.prod-inv-arrow-sm {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: 1rem;
   color: #f97316;
-  padding-top: 2.5rem;
   font-weight: 700;
+  padding: 0 4px;
+  margin-top: 2.5rem;
+  flex-shrink: 0;
 }
 
 /* Formulário inversores */
@@ -16993,12 +17018,6 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-}
-
-.prod-inv-form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
 }
 
 /* Guia */
@@ -17045,13 +17064,36 @@
   margin: 0;
 }
 
+/* Nota no guia */
+.prod-inv-guide-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.prod-inv-guide-icon span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
 /* Responsivo */
-@media (max-width: 1100px) {
-  .prod-inv-layout {
-    grid-template-columns: 1fr 24px 1fr;
+@media (max-width: 1200px) {
+  .prod-inv-right-area {
+    width: 300px;
   }
-  .prod-inv-right-col {
-    grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .prod-inv-outer {
+    flex-direction: column;
+  }
+  .prod-inv-right-area {
+    width: 100%;
   }
 }
 
@@ -17059,15 +17101,14 @@
   .prod-placas-layout {
     grid-template-columns: 1fr;
   }
-  .prod-inv-layout {
-    grid-template-columns: 1fr;
+  .prod-inv-left-area {
+    flex-direction: column;
   }
-  .prod-inv-arrow {
-    padding-top: 0;
+  .prod-inv-arrow-sm {
     transform: rotate(90deg);
+    margin-top: 0;
   }
-  .prod-form-row-2,
-  .prod-inv-form-row {
+  .prod-form-row-2 {
     grid-template-columns: 1fr;
   }
 }

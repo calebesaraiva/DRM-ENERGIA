@@ -956,6 +956,19 @@ const AdminDashboard = () => {
   const [showMarcaForm, setShowMarcaForm] = useState(false);
   const [modeloForm, setModeloForm] = useState({ marca_id: '', nome_modelo: '', status: 'ativo' });
   const [editingModeloId, setEditingModeloId] = useState(null);
+  // Inversor Híbrido
+  const [marcasHibrido, setMarcasHibrido] = useState([]);
+  const [modelosHibrido, setModelosHibrido] = useState([]);
+  const [bateriasHibrido, setBateriasHibrido] = useState([]);
+  const [selectedMarcaHibridoId, setSelectedMarcaHibridoId] = useState(null);
+  const [selectedModeloHibridoId, setSelectedModeloHibridoId] = useState(null);
+  const [marcaHibridoForm, setMarcaHibridoForm] = useState({ nome_marca: '', status: 'ativo' });
+  const [showMarcaHibridoForm, setShowMarcaHibridoForm] = useState(false);
+  const [modeloHibridoForm, setModeloHibridoForm] = useState({ marca_id: '', nome_modelo: '', status: 'ativo' });
+  const [showModeloHibridoForm, setShowModeloHibridoForm] = useState(false);
+  const [bateriaForm, setBateriaForm] = useState({ modelo_hibrido_id: '', nome_bateria: '', capacidade_kwh: '', status: 'ativo' });
+  const [showBateriaForm, setShowBateriaForm] = useState(false);
+  const [hibridoCadForm, setHibridoCadForm] = useState({ marca_id: '', modelo_hibrido_id: '', nome_bateria: '', capacidade_kwh: '', status: 'ativo' });
   const equipamentoNomeRef = useRef(null);
   const signatureCanvasRef = useRef(null);
   const signatureDrawingRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
@@ -1561,6 +1574,16 @@ const AdminDashboard = () => {
     [modelosInversor, selectedMarcaId]
   );
 
+  const modelosHibridoForMarca = useMemo(
+    () => modelosHibrido.filter(m => m.marca_id === selectedMarcaHibridoId),
+    [modelosHibrido, selectedMarcaHibridoId]
+  );
+
+  const bateriasForModelo = useMemo(
+    () => bateriasHibrido.filter(b => b.modelo_hibrido_id === selectedModeloHibridoId),
+    [bateriasHibrido, selectedModeloHibridoId]
+  );
+
   const CONTRATOS_PER_PAGE = 10;
 
   const filteredContratos = useMemo(() => {
@@ -1845,6 +1868,9 @@ const AdminDashboard = () => {
       calls.push(request('/api/admin/placas').then(setPlacas));
       calls.push(request('/api/admin/marcas-inversor').then(setMarcasInversor));
       calls.push(request('/api/admin/modelos-inversor').then(setModelosInversor));
+      calls.push(request('/api/admin/marcas-inversor-hibrido').then(setMarcasHibrido));
+      calls.push(request('/api/admin/modelos-inversor-hibrido').then(setModelosHibrido));
+      calls.push(request('/api/admin/baterias-litio').then(setBateriasHibrido));
       calls.push(request('/api/admin/contrato-config').then(setContractConfig));
     }
     if (user.role === 'ADM' || user.permissions?.equipeTecnica) {
@@ -4038,6 +4064,59 @@ const AdminDashboard = () => {
     } catch (err) {
       showToast(err.message, 'error');
     }
+  };
+
+  const saveMarcaHibrido = async (event) => {
+    event.preventDefault();
+    if (!marcaHibridoForm.nome_marca.trim()) return;
+    try {
+      const marca = await request('/api/admin/marcas-inversor-hibrido', { method: 'POST', body: JSON.stringify(marcaHibridoForm) });
+      setMarcasHibrido(prev => [...prev, marca]);
+      setMarcaHibridoForm({ nome_marca: '', status: 'ativo' });
+      setShowMarcaHibridoForm(false);
+      setSelectedMarcaHibridoId(marca.id);
+      showToast('Marca híbrida cadastrada.', 'success');
+    } catch (err) { showToast(err.message, 'error'); }
+  };
+
+  const saveModeloHibrido = async (event) => {
+    event.preventDefault();
+    if (!modeloHibridoForm.marca_id || !modeloHibridoForm.nome_modelo.trim()) return;
+    try {
+      const modelo = await request('/api/admin/modelos-inversor-hibrido', { method: 'POST', body: JSON.stringify(modeloHibridoForm) });
+      setModelosHibrido(prev => [...prev, modelo]);
+      setModeloHibridoForm({ marca_id: selectedMarcaHibridoId || '', nome_modelo: '', status: 'ativo' });
+      setShowModeloHibridoForm(false);
+      setSelectedModeloHibridoId(modelo.id);
+      showToast('Modelo híbrido cadastrado.', 'success');
+    } catch (err) { showToast(err.message, 'error'); }
+  };
+
+  const saveBateria = async (event) => {
+    event.preventDefault();
+    if (!bateriaForm.modelo_hibrido_id || !bateriaForm.nome_bateria.trim()) return;
+    try {
+      const bateria = await request('/api/admin/baterias-litio', { method: 'POST', body: JSON.stringify(bateriaForm) });
+      setBateriasHibrido(prev => [...prev, bateria]);
+      setBateriaForm({ modelo_hibrido_id: selectedModeloHibridoId || '', nome_bateria: '', capacidade_kwh: '', status: 'ativo' });
+      setShowBateriaForm(false);
+      showToast('Bateria cadastrada.', 'success');
+    } catch (err) { showToast(err.message, 'error'); }
+  };
+
+  const saveHibridoCad = async (event) => {
+    event.preventDefault();
+    const { marca_id, modelo_hibrido_id, nome_bateria, capacidade_kwh, status } = hibridoCadForm;
+    if (!modelo_hibrido_id || !nome_bateria.trim()) return;
+    try {
+      const bateria = await request('/api/admin/baterias-litio', {
+        method: 'POST',
+        body: JSON.stringify({ modelo_hibrido_id, nome_bateria, capacidade_kwh, status }),
+      });
+      setBateriasHibrido(prev => [...prev, bateria]);
+      setHibridoCadForm(prev => ({ ...prev, nome_bateria: '', capacidade_kwh: '' }));
+      showToast('Bateria cadastrada com sucesso.', 'success');
+    } catch (err) { showToast(err.message, 'error'); }
   };
 
   const saveContractConfig = async (event) => {
@@ -6660,26 +6739,22 @@ const AdminDashboard = () => {
               {/* Banner informativo */}
               <div className="prod-info-banner">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                A aba Produtos cadastra somente dois grupos: <strong>Placas e Inversores.</strong>
+                A aba Produtos agora possui três grupos: <strong>Placas, Inversores e Inversor híbrido.</strong>
               </div>
 
               {/* Sub-abas */}
               <div className="prod-tabs">
-                <button
-                  type="button"
-                  className={`prod-tab${produtoSubTab === 'placas' ? ' active' : ''}`}
-                  onClick={() => setProdutoSubTab('placas')}
-                >
+                <button type="button" className={`prod-tab${produtoSubTab === 'placas' ? ' active' : ''}`} onClick={() => setProdutoSubTab('placas')}>
                   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                   Placas
                 </button>
-                <button
-                  type="button"
-                  className={`prod-tab${produtoSubTab === 'inversores' ? ' active' : ''}`}
-                  onClick={() => setProdutoSubTab('inversores')}
-                >
+                <button type="button" className={`prod-tab${produtoSubTab === 'inversores' ? ' active' : ''}`} onClick={() => setProdutoSubTab('inversores')}>
                   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
                   Inversores
+                </button>
+                <button type="button" className={`prod-tab${produtoSubTab === 'hibrido' ? ' active' : ''}`} onClick={() => setProdutoSubTab('hibrido')}>
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  Inversor híbrido
                 </button>
               </div>
 
@@ -6812,181 +6887,249 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="prod-inv-layout">
-                    {/* Coluna 1: Catálogo de marcas */}
-                    <div className="prod-inv-col prod-inv-brands-col">
-                      <div className="prod-inv-col-hd">
-                        <strong>Catálogo de marcas</strong>
-                      </div>
-                      {marcasInversor.length === 0 && (
-                        <div className="prod-catalog-empty">Nenhuma marca cadastrada.</div>
-                      )}
-                      {marcasInversor.map(m => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          className={`prod-inv-brand-item${selectedMarcaId === m.id ? ' selected' : ''}`}
-                          onClick={() => {
-                            setSelectedMarcaId(m.id);
-                            setModeloForm(prev => ({ ...prev, marca_id: m.id }));
-                            setEditingModeloId(null);
-                          }}
-                        >
-                          <span>{m.nome_marca}</span>
-                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
-                        </button>
-                      ))}
-
-                      {/* Mini-form nova marca */}
-                      {showMarcaForm ? (
-                        <form className="prod-inv-marca-mini" onSubmit={saveMarca}>
-                          <input
-                            autoFocus
-                            required
-                            placeholder="Nome da marca"
-                            value={marcaForm.nome_marca}
-                            onChange={e => setMarcaForm(prev => ({ ...prev, nome_marca: e.target.value }))}
-                          />
-                          <div className="prod-inv-marca-mini-btns">
-                            <button type="submit" className="prod-inv-mini-save">Salvar</button>
-                            <button type="button" className="prod-inv-mini-cancel" onClick={() => { setShowMarcaForm(false); setMarcaForm({ nome_marca: '', status: 'ativo' }); setEditingMarcaId(null); }}>Cancelar</button>
-                          </div>
-                        </form>
-                      ) : (
-                        <button
-                          type="button"
-                          className="prod-inv-nova-marca-btn"
-                          onClick={() => { setShowMarcaForm(true); setEditingMarcaId(null); setMarcaForm({ nome_marca: '', status: 'ativo' }); }}
-                        >
-                          + Nova marca
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Seta */}
-                    <div className="prod-inv-arrow">→</div>
-
-                    {/* Coluna 2: Modelos da marca selecionada */}
-                    <div className="prod-inv-col prod-inv-models-col">
-                      <div className="prod-inv-col-hd">
-                        <strong>Modelos da marca</strong>
-                        {selectedMarcaId && (
-                          <span className="prod-inv-marca-selecionada">
-                            {marcasInversor.find(m => m.id === selectedMarcaId)?.nome_marca}
-                          </span>
+                  <div className="prod-inv-outer">
+                    {/* Esquerda: catálogos */}
+                    <div className="prod-inv-left-area">
+                      {/* Coluna marcas */}
+                      <div className="prod-inv-col prod-inv-brands-col">
+                        <div className="prod-inv-col-hd"><strong>Catálogo de marcas</strong></div>
+                        {marcasInversor.length === 0 && <div className="prod-catalog-empty">Nenhuma marca.</div>}
+                        {marcasInversor.map(m => (
+                          <button key={m.id} type="button"
+                            className={`prod-inv-brand-item${selectedMarcaId === m.id ? ' selected' : ''}`}
+                            onClick={() => { setSelectedMarcaId(m.id); setModeloForm(prev => ({ ...prev, marca_id: m.id })); setEditingModeloId(null); }}>
+                            <span>{m.nome_marca}</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                          </button>
+                        ))}
+                        {showMarcaForm ? (
+                          <form className="prod-inv-marca-mini" onSubmit={saveMarca}>
+                            <input autoFocus required placeholder="Nome da marca" value={marcaForm.nome_marca} onChange={e => setMarcaForm(prev => ({ ...prev, nome_marca: e.target.value }))} />
+                            <div className="prod-inv-marca-mini-btns">
+                              <button type="submit" className="prod-inv-mini-save">Salvar</button>
+                              <button type="button" className="prod-inv-mini-cancel" onClick={() => { setShowMarcaForm(false); setMarcaForm({ nome_marca: '', status: 'ativo' }); }}>Cancelar</button>
+                            </div>
+                          </form>
+                        ) : (
+                          <button type="button" className="prod-inv-nova-marca-btn" onClick={() => { setShowMarcaForm(true); setMarcaForm({ nome_marca: '', status: 'ativo' }); }}>+ Nova marca</button>
                         )}
                       </div>
-                      {!selectedMarcaId && (
-                        <div className="prod-catalog-empty">Selecione uma marca ao lado.</div>
-                      )}
-                      {selectedMarcaId && modelosForSelectedMarca.length === 0 && (
-                        <div className="prod-catalog-empty">Nenhum modelo cadastrado.</div>
-                      )}
-                      {modelosForSelectedMarca.map(m => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          className={`prod-inv-model-item${editingModeloId === m.id ? ' selected' : ''}`}
-                          onClick={() => {
-                            setEditingModeloId(m.id);
-                            setModeloForm({ marca_id: m.marca_id, nome_modelo: m.nome_modelo, status: m.status });
-                          }}
-                        >
-                          <span>{m.nome_modelo}</span>
-                          <span className={`prod-badge${m.status === 'ativo' ? ' prod-badge-ativo' : ' prod-badge-inativo'}`}>
-                            {m.status === 'ativo' ? 'Ativo' : 'Inativo'}
-                          </span>
-                        </button>
-                      ))}
+
+                      <div className="prod-inv-arrow-sm">→</div>
+
+                      {/* Coluna modelos */}
+                      <div className="prod-inv-col prod-inv-models-col">
+                        <div className="prod-inv-col-hd">
+                          <strong>Modelos da marca</strong>
+                          {selectedMarcaId && <span className="prod-inv-marca-selecionada">{marcasInversor.find(m => m.id === selectedMarcaId)?.nome_marca}</span>}
+                        </div>
+                        {!selectedMarcaId && <div className="prod-catalog-empty">Selecione uma marca.</div>}
+                        {selectedMarcaId && modelosForSelectedMarca.length === 0 && <div className="prod-catalog-empty">Nenhum modelo.</div>}
+                        {modelosForSelectedMarca.map(m => (
+                          <button key={m.id} type="button"
+                            className={`prod-inv-model-item${editingModeloId === m.id ? ' selected' : ''}`}
+                            onClick={() => { setEditingModeloId(m.id); setModeloForm({ marca_id: m.marca_id, nome_modelo: m.nome_modelo, status: m.status }); }}>
+                            <span>{m.nome_modelo}</span>
+                            <span className={`prod-badge${m.status === 'ativo' ? ' prod-badge-ativo' : ' prod-badge-inativo'}`}>{m.status === 'ativo' ? 'Ativo' : 'Inativo'}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Coluna 3: Formulário + guia */}
-                    <div className="prod-inv-col prod-inv-right-col">
+                    {/* Direita: formulário + guia */}
+                    <div className="prod-inv-right-area">
                       <form className="prod-inv-form" onSubmit={saveModelo}>
-                        <div className="prod-form-accent-title">
-                          <span className="prod-form-accent-bar" />
-                          Novo cadastro de inversor
-                        </div>
-
-                        <div className="prod-inv-form-row">
-                          <label className="prod-form-label">
-                            Marca do inversor *
-                            <select
-                              required
-                              value={modeloForm.marca_id}
-                              onChange={e => { setModeloForm(prev => ({ ...prev, marca_id: Number(e.target.value) })); setSelectedMarcaId(Number(e.target.value)); }}
-                            >
-                              <option value="">Selecione a marca</option>
-                              {marcasInversor.map(m => (
-                                <option key={m.id} value={m.id}>{m.nome_marca}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="prod-form-label">
-                            Modelo do inversor *
-                            <input
-                              required
-                              placeholder="Ex: MIN 5000TL-X"
-                              value={modeloForm.nome_modelo}
-                              onChange={e => setModeloForm(prev => ({ ...prev, nome_modelo: e.target.value }))}
-                            />
-                          </label>
-                        </div>
-
-                        <label className="prod-form-label" style={{ maxWidth: 280 }}>
+                        <div className="prod-form-accent-title"><span className="prod-form-accent-bar" />Novo cadastro de inversor</div>
+                        <label className="prod-form-label">
+                          Marca do inversor *
+                          <select required value={modeloForm.marca_id} onChange={e => { setModeloForm(prev => ({ ...prev, marca_id: Number(e.target.value) })); setSelectedMarcaId(Number(e.target.value)); }}>
+                            <option value="">Selecione a marca</option>
+                            {marcasInversor.map(m => <option key={m.id} value={m.id}>{m.nome_marca}</option>)}
+                          </select>
+                        </label>
+                        <label className="prod-form-label">
+                          Modelo do inversor *
+                          <input required placeholder="Ex: MIN 5000TL-X" value={modeloForm.nome_modelo} onChange={e => setModeloForm(prev => ({ ...prev, nome_modelo: e.target.value }))} />
+                        </label>
+                        <label className="prod-form-label">
                           Status *
-                          <select
-                            value={modeloForm.status}
-                            onChange={e => setModeloForm(prev => ({ ...prev, status: e.target.value }))}
-                          >
+                          <select value={modeloForm.status} onChange={e => setModeloForm(prev => ({ ...prev, status: e.target.value }))}>
                             <option value="ativo">Ativo</option>
                             <option value="inativo">Inativo</option>
                           </select>
                         </label>
-
                         <div className="prod-form-btns">
-                          <button
-                            type="button"
-                            className="prod-btn-limpar"
-                            onClick={() => { setEditingModeloId(null); setModeloForm({ marca_id: selectedMarcaId || '', nome_modelo: '', status: 'ativo' }); }}
-                          >
-                            Limpar
-                          </button>
+                          <button type="button" className="prod-btn-limpar" onClick={() => { setEditingModeloId(null); setModeloForm({ marca_id: selectedMarcaId || '', nome_modelo: '', status: 'ativo' }); }}>Limpar</button>
                           <button type="submit" className="prod-btn-salvar">
                             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                             Salvar cadastro
                           </button>
                         </div>
                       </form>
-
-                      {/* Guia de uso */}
                       <div className="prod-inv-guide">
-                        <div className="prod-inv-guide-step">
-                          <div className="prod-inv-guide-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+                        {[['Busque por marca ou modelo','Use a busca para encontrar rapidamente.'],['Selecione a marca','Veja os modelos cadastrados da marca escolhida.'],['Cadastre ou edite','Adicione novos modelos de inversores com status.']].map(([t,d],i) => (
+                          <div key={i} className="prod-inv-guide-step">
+                            <div className="prod-inv-guide-icon"><span>{i+1}</span></div>
+                            <div><strong>{t}</strong><p>{d}</p></div>
                           </div>
-                          <div>
-                            <strong>1. Busque por marca ou modelo</strong>
-                            <p>Use a busca para encontrar rapidamente.</p>
-                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ─── ABA INVERSOR HÍBRIDO ─── */}
+              {produtoSubTab === 'hibrido' && (
+                <>
+                  <div className="prod-inv-header">
+                    <div>
+                      <h3 className="prod-inv-header-title">Inversor híbrido</h3>
+                      <p className="prod-inv-header-sub">Cadastre marcas, modelos e baterias de lítio compatíveis.</p>
+                    </div>
+                  </div>
+
+                  <div className="prod-inv-outer">
+                    {/* Esquerda: 3 catálogos */}
+                    <div className="prod-inv-left-area prod-inv-left-3col">
+                      {/* Marcas */}
+                      <div className="prod-inv-col">
+                        <div className="prod-inv-col-hd"><strong>Catálogo de marcas</strong></div>
+                        {marcasHibrido.length === 0 && <div className="prod-catalog-empty">Nenhuma marca.</div>}
+                        {marcasHibrido.map(m => (
+                          <button key={m.id} type="button"
+                            className={`prod-inv-brand-item${selectedMarcaHibridoId === m.id ? ' selected' : ''}`}
+                            onClick={() => { setSelectedMarcaHibridoId(m.id); setSelectedModeloHibridoId(null); setHibridoCadForm(prev => ({ ...prev, marca_id: m.id, modelo_hibrido_id: '' })); }}>
+                            <span>{m.nome_marca}</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                          </button>
+                        ))}
+                        {showMarcaHibridoForm ? (
+                          <form className="prod-inv-marca-mini" onSubmit={saveMarcaHibrido}>
+                            <input autoFocus required placeholder="Nome da marca" value={marcaHibridoForm.nome_marca} onChange={e => setMarcaHibridoForm(prev => ({ ...prev, nome_marca: e.target.value }))} />
+                            <div className="prod-inv-marca-mini-btns">
+                              <button type="submit" className="prod-inv-mini-save">Salvar</button>
+                              <button type="button" className="prod-inv-mini-cancel" onClick={() => { setShowMarcaHibridoForm(false); setMarcaHibridoForm({ nome_marca: '', status: 'ativo' }); }}>Cancelar</button>
+                            </div>
+                          </form>
+                        ) : (
+                          <button type="button" className="prod-inv-nova-marca-btn" onClick={() => setShowMarcaHibridoForm(true)}>+ Nova marca</button>
+                        )}
+                      </div>
+
+                      <div className="prod-inv-arrow-sm">→</div>
+
+                      {/* Modelos híbridos */}
+                      <div className="prod-inv-col">
+                        <div className="prod-inv-col-hd">
+                          <strong>Modelos do inversor híbrido</strong>
+                          {selectedMarcaHibridoId && <span className="prod-inv-marca-selecionada">{marcasHibrido.find(m => m.id === selectedMarcaHibridoId)?.nome_marca}</span>}
                         </div>
-                        <div className="prod-inv-guide-step">
-                          <div className="prod-inv-guide-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                          </div>
-                          <div>
-                            <strong>2. Selecione a marca</strong>
-                            <p>Veja os modelos cadastrados da marca escolhida.</p>
-                          </div>
+                        {!selectedMarcaHibridoId && <div className="prod-catalog-empty">Selecione uma marca.</div>}
+                        {selectedMarcaHibridoId && modelosHibridoForMarca.length === 0 && <div className="prod-catalog-empty">Nenhum modelo.</div>}
+                        {modelosHibridoForMarca.map(m => (
+                          <button key={m.id} type="button"
+                            className={`prod-inv-model-item${selectedModeloHibridoId === m.id ? ' selected' : ''}`}
+                            onClick={() => { setSelectedModeloHibridoId(m.id); setHibridoCadForm(prev => ({ ...prev, modelo_hibrido_id: m.id })); }}>
+                            <span>{m.nome_modelo}</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                          </button>
+                        ))}
+                        {selectedMarcaHibridoId && (showModeloHibridoForm ? (
+                          <form className="prod-inv-marca-mini" onSubmit={saveModeloHibrido}>
+                            <input autoFocus required placeholder="Nome do modelo" value={modeloHibridoForm.nome_modelo} onChange={e => setModeloHibridoForm(prev => ({ ...prev, nome_modelo: e.target.value, marca_id: selectedMarcaHibridoId }))} />
+                            <div className="prod-inv-marca-mini-btns">
+                              <button type="submit" className="prod-inv-mini-save">Salvar</button>
+                              <button type="button" className="prod-inv-mini-cancel" onClick={() => setShowModeloHibridoForm(false)}>Cancelar</button>
+                            </div>
+                          </form>
+                        ) : (
+                          <button type="button" className="prod-inv-nova-marca-btn" onClick={() => setShowModeloHibridoForm(true)}>+ Novo modelo</button>
+                        ))}
+                      </div>
+
+                      <div className="prod-inv-arrow-sm">→</div>
+
+                      {/* Baterias compatíveis */}
+                      <div className="prod-inv-col">
+                        <div className="prod-inv-col-hd">
+                          <strong>Baterias de lítio compatíveis</strong>
+                          {selectedModeloHibridoId && <span className="prod-inv-marca-selecionada">{modelosHibrido.find(m => m.id === selectedModeloHibridoId)?.nome_modelo}</span>}
                         </div>
-                        <div className="prod-inv-guide-step">
-                          <div className="prod-inv-guide-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        {!selectedModeloHibridoId && <div className="prod-catalog-empty">Selecione um modelo.</div>}
+                        {selectedModeloHibridoId && bateriasForModelo.length === 0 && <div className="prod-catalog-empty">Nenhuma bateria.</div>}
+                        {bateriasForModelo.map(b => (
+                          <div key={b.id} className="prod-inv-model-item" style={{ cursor: 'default' }}>
+                            <span>{b.nome_bateria}{b.capacidade_kwh ? ` ${b.capacidade_kwh} kWh` : ''}</span>
+                            <span className={`prod-badge${b.status === 'ativo' ? ' prod-badge-ativo' : ' prod-badge-inativo'}`}>{b.status === 'ativo' ? 'Ativo' : 'Inativo'}</span>
                           </div>
-                          <div>
-                            <strong>3. Cadastre ou edite</strong>
-                            <p>Adicione novos modelos de inversores com status.</p>
+                        ))}
+                        {selectedModeloHibridoId && (showBateriaForm ? (
+                          <form className="prod-inv-marca-mini" onSubmit={saveBateria}>
+                            <input autoFocus required placeholder="Nome da bateria" value={bateriaForm.nome_bateria} onChange={e => setBateriaForm(prev => ({ ...prev, nome_bateria: e.target.value, modelo_hibrido_id: selectedModeloHibridoId }))} />
+                            <input type="number" step="0.01" placeholder="Capacidade kWh" value={bateriaForm.capacidade_kwh} onChange={e => setBateriaForm(prev => ({ ...prev, capacidade_kwh: e.target.value }))} />
+                            <div className="prod-inv-marca-mini-btns">
+                              <button type="submit" className="prod-inv-mini-save">Salvar</button>
+                              <button type="button" className="prod-inv-mini-cancel" onClick={() => setShowBateriaForm(false)}>Cancelar</button>
+                            </div>
+                          </form>
+                        ) : (
+                          <button type="button" className="prod-inv-nova-marca-btn" onClick={() => setShowBateriaForm(true)}>+ Nova bateria</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Direita: formulário + guia */}
+                    <div className="prod-inv-right-area">
+                      <form className="prod-inv-form" onSubmit={saveHibridoCad}>
+                        <div className="prod-form-accent-title"><span className="prod-form-accent-bar" />Novo cadastro híbrido</div>
+                        <label className="prod-form-label">
+                          Marca do inversor híbrido *
+                          <select required value={hibridoCadForm.marca_id} onChange={e => { const id = Number(e.target.value); setSelectedMarcaHibridoId(id); setSelectedModeloHibridoId(null); setHibridoCadForm(prev => ({ ...prev, marca_id: id, modelo_hibrido_id: '' })); }}>
+                            <option value="">Selecione a marca</option>
+                            {marcasHibrido.map(m => <option key={m.id} value={m.id}>{m.nome_marca}</option>)}
+                          </select>
+                        </label>
+                        <label className="prod-form-label">
+                          Modelo do inversor híbrido *
+                          <select required value={hibridoCadForm.modelo_hibrido_id} onChange={e => { const id = Number(e.target.value); setSelectedModeloHibridoId(id); setHibridoCadForm(prev => ({ ...prev, modelo_hibrido_id: id })); }}>
+                            <option value="">Selecione o modelo</option>
+                            {modelosHibridoForMarca.map(m => <option key={m.id} value={m.id}>{m.nome_modelo}</option>)}
+                          </select>
+                        </label>
+                        <label className="prod-form-label">
+                          Bateria de lítio compatível *
+                          <input required placeholder="Ex: Dyness 5,12 kWh" value={hibridoCadForm.nome_bateria} onChange={e => setHibridoCadForm(prev => ({ ...prev, nome_bateria: e.target.value }))} />
+                        </label>
+                        <label className="prod-form-label">
+                          Capacidade da bateria (kWh)
+                          <input type="number" step="0.01" placeholder="Ex: 5,12" value={hibridoCadForm.capacidade_kwh} onChange={e => setHibridoCadForm(prev => ({ ...prev, capacidade_kwh: e.target.value }))} />
+                        </label>
+                        <label className="prod-form-label">
+                          Status *
+                          <select value={hibridoCadForm.status} onChange={e => setHibridoCadForm(prev => ({ ...prev, status: e.target.value }))}>
+                            <option value="ativo">Ativo</option>
+                            <option value="inativo">Inativo</option>
+                          </select>
+                        </label>
+                        <div className="prod-form-btns">
+                          <button type="button" className="prod-btn-limpar" onClick={() => setHibridoCadForm({ marca_id: '', modelo_hibrido_id: '', nome_bateria: '', capacidade_kwh: '', status: 'ativo' })}>Limpar</button>
+                          <button type="submit" className="prod-btn-salvar">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Salvar cadastro
+                          </button>
+                        </div>
+                      </form>
+                      <div className="prod-inv-guide">
+                        {[['Cadastre a marca','Adicione a marca do inversor híbrido.'],['Cadastre o modelo híbrido','Vincule o modelo à marca cadastrada.'],['Vincule as baterias compatíveis','Adicione baterias compatíveis com o modelo.']].map(([t,d],i) => (
+                          <div key={i} className="prod-inv-guide-step">
+                            <div className="prod-inv-guide-icon"><span>{i+1}</span></div>
+                            <div><strong>{t}</strong><p>{d}</p></div>
                           </div>
+                        ))}
+                        <div className="prod-inv-guide-note">
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                          Esses cadastros serão utilizados nos fluxos futuros de orçamentos e propostas.
                         </div>
                       </div>
                     </div>
