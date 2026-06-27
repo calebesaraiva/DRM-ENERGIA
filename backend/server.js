@@ -3775,12 +3775,13 @@ const buildOrcamentoPdf = async (orcamento) => {
 
     // Note about included items
     doc.moveDown(0.6);
-    doc.roundedRect(ML, doc.y, W, 34, 4).fill('#F8FAFC').stroke('#E2E8F0');
+    const noteY = doc.y;
+    doc.roundedRect(ML, noteY, W, 36, 4).fill('#F8FAFC').stroke('#E2E8F0');
     doc.font('Helvetica-Bold').fontSize(7.5).fillColor(dark)
-      .text('Itens inclusos em conjunto completo para instalação:', ML + 8, doc.y - 26);
+      .text('Itens inclusos em conjunto completo para instalação:', ML + 8, noteY + 6, { width: W - 16 });
     doc.font('Helvetica').fontSize(7.5).fillColor(muted)
-      .text('estruturas de fixação, cabos, conectores, proteções, materiais, instalação, homologação e pós-venda inclusos, conforme projeto executivo e normas aplicáveis.', ML + 8, doc.y - 14, { width: W - 16 });
-    doc.y = doc.y + 8;
+      .text('estruturas de fixação, cabos, conectores, proteções, materiais, instalação, homologação e pós-venda inclusos, conforme projeto executivo e normas aplicáveis.', ML + 8, noteY + 18, { width: W - 16 });
+    doc.y = noteY + 44;
 
     // OBSERVAÇÃO IMPORTANTE
     doc.moveDown(0.8);
@@ -3810,10 +3811,11 @@ const buildOrcamentoPdf = async (orcamento) => {
     doc.moveDown(1.2);
 
     // GARANTIAS DRM section
-    doc.rect(ML, doc.y, W, 24).fill(dark);
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#FFF').text('GARANTIAS DRM', ML + 10, doc.y - 17, { width: W - 20, align: 'center' });
-    doc.y = doc.y + 8;
-    doc.moveDown(0.8);
+    const g1hY = doc.y;
+    doc.rect(ML, g1hY, W, 24).fill(dark);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#FFF').text('GARANTIAS DRM', ML + 10, g1hY + 7, { width: W - 20, align: 'center' });
+    doc.y = g1hY + 30;
+    doc.moveDown(0.5);
 
     const garantias = [
       'Materiais CA e CC de excelente qualidade',
@@ -3833,17 +3835,19 @@ const buildOrcamentoPdf = async (orcamento) => {
     doc.moveDown(0.4);
 
     // Disclaimer garantias
-    doc.roundedRect(ML, doc.y, W, 26, 4).fill('#F8FAFC').stroke('#E2E8F0');
+    const g1dY = doc.y;
+    doc.roundedRect(ML, g1dY, W, 28, 4).fill('#F8FAFC').stroke('#E2E8F0');
     doc.font('Helvetica').fontSize(7.5).fillColor(muted)
-      .text('As garantias apresentadas seguem as condições dos fabricantes e os padrões de instalação adotados pela DRM Energia Solar.', ML + 8, doc.y - 18, { width: W - 16 });
-    doc.y = doc.y + 8;
-    doc.moveDown(1.2);
+      .text('As garantias apresentadas seguem as condições dos fabricantes e os padrões de instalação adotados pela DRM Energia Solar.', ML + 8, g1dY + 8, { width: W - 16 });
+    doc.y = g1dY + 36;
+    doc.moveDown(0.9);
 
     // PÓS-VENDA DRM section
-    doc.rect(ML, doc.y, W, 24).fill(dark);
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#FFF').text('PÓS-VENDA DRM', ML + 10, doc.y - 17, { width: W - 20, align: 'center' });
-    doc.y = doc.y + 8;
-    doc.moveDown(0.8);
+    const pv1hY = doc.y;
+    doc.rect(ML, pv1hY, W, 24).fill(dark);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#FFF').text('PÓS-VENDA DRM', ML + 10, pv1hY + 7, { width: W - 20, align: 'center' });
+    doc.y = pv1hY + 30;
+    doc.moveDown(0.5);
 
     const posVenda = [
       'Análise das contas de energia após a instalação do sistema, bem como medidas cabíveis se necessário.',
@@ -3867,10 +3871,11 @@ const buildOrcamentoPdf = async (orcamento) => {
     doc.moveDown(1.5);
 
     // Disclaimer pós-venda
-    doc.roundedRect(ML, doc.y, W, 26, 4).fill('#F8FAFC').stroke('#E2E8F0');
+    const pv2dY = doc.y;
+    doc.roundedRect(ML, pv2dY, W, 28, 4).fill('#F8FAFC').stroke('#E2E8F0');
     doc.font('Helvetica').fontSize(7.5).fillColor(muted)
-      .text('O suporte pós-venda é parte integrante do atendimento DRM, garantindo acompanhamento após a instalação do sistema.', ML + 8, doc.y - 18, { width: W - 16 });
-    doc.y = doc.y + 8;
+      .text('O suporte pós-venda é parte integrante do atendimento DRM, garantindo acompanhamento após a instalação do sistema.', ML + 8, pv2dY + 8, { width: W - 16 });
+    doc.y = pv2dY + 36;
 
     drawPageFooter();
     doc.end();

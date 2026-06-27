@@ -5752,7 +5752,16 @@ const AdminDashboard = () => {
                       <label>5. Modelo da placa</label>
                       <select
                         value={budgetForm.placaModelo}
-                        onChange={e => { setBudgetForm(prev => ({ ...prev, placaModelo: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, placaModelo: false })); }}
+                        onChange={e => {
+                          const model = e.target.value;
+                          const placa = placas.find(p => p.modelo === model);
+                          setBudgetForm(prev => ({
+                            ...prev,
+                            placaModelo: model,
+                            potenciaPlacaW: placa?.potencia_w ? String(placa.potencia_w) : prev.potenciaPlacaW,
+                          }));
+                          setBudgetFieldErrors(prev => ({ ...prev, placaModelo: false }));
+                        }}
                       >
                         <option value="">Selecione o modelo</option>
                         {placaModelsFromEquip.map(model => (
