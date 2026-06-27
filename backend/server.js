@@ -3609,8 +3609,8 @@ const buildOrcamentoPdf = async (orcamento) => {
   const logoPath = path.join(__dirname, '../frontend/public/assets/logo.png');
 
   return new Promise((resolve, reject) => {
-    const ML = 44; // margin left/right
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 44, left: ML, right: ML, bottom: 44 }, info: { Title: `Orçamento Solar #${orcamento.id}` } });
+    const ML = 42; // margin left/right
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 34, left: ML, right: ML, bottom: 30 }, info: { Title: `Orçamento Solar #${orcamento.id}` } });
     const chunks = [];
     doc.on('data', c => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -3623,15 +3623,15 @@ const buildOrcamentoPdf = async (orcamento) => {
 
     // ── shared header helper ──────────────────────────────────────────────
     const drawPageHeader = (subtitle) => {
-      if (fs.existsSync(logoPath)) doc.image(logoPath, ML, 34, { fit: [100, 54] });
-      doc.font('Helvetica-Bold').fontSize(20).fillColor(dark)
-        .text(subtitle, ML + 110, 34, { width: W - 110, align: 'right' });
+      if (fs.existsSync(logoPath)) doc.image(logoPath, ML, 28, { fit: [90, 48] });
+      doc.font('Helvetica-Bold').fontSize(18).fillColor(dark)
+        .text(subtitle, ML + 100, 30, { width: W - 100, align: 'right' });
       doc.font('Helvetica-Bold').fontSize(9).fillColor(orange)
-        .text(`ORÇAMENTO #${orcamento.id} - ${formatDateBr(orcamento.data)}`, ML + 110, 62, { width: W - 110, align: 'right' });
+        .text(`ORÇAMENTO #${orcamento.id} - ${formatDateBr(orcamento.data)}`, ML + 100, 56, { width: W - 100, align: 'right' });
       doc.font('Helvetica').fontSize(8).fillColor(muted)
-        .text(template.empresa.nome || 'DRM ENERGIA SOLAR LTDA', ML + 110, 78, { width: W - 110, align: 'right' });
-      doc.moveTo(ML, 102).lineTo(ML + W, 102).lineWidth(2).strokeColor(orange).stroke();
-      doc.y = 118;
+        .text(template.empresa.nome || 'DRM ENERGIA SOLAR LTDA', ML + 100, 72, { width: W - 100, align: 'right' });
+      doc.moveTo(ML, 94).lineTo(ML + W, 94).lineWidth(2).strokeColor(orange).stroke();
+      doc.y = 106;
     };
 
     // ── footer helper ─────────────────────────────────────────────────────
@@ -3639,12 +3639,12 @@ const buildOrcamentoPdf = async (orcamento) => {
       // Temporarily disable bottom margin so text in the footer zone doesn't trigger auto-pagination
       const savedBottom = doc.page.margins.bottom;
       doc.page.margins.bottom = 0;
-      const fy = doc.page.height - 38;
+      const fy = doc.page.height - 32;
       doc.moveTo(ML, fy).lineTo(ML + W, fy).lineWidth(0.5).strokeColor('#E2E8F0').stroke();
       doc.font('Helvetica-Bold').fontSize(8.5).fillColor(dark)
-        .text('DRM Energia Solar', ML, fy + 6, { width: W, align: 'center' });
+        .text('DRM Energia Solar', ML, fy + 5, { width: W, align: 'center' });
       doc.font('Helvetica').fontSize(7.5).fillColor(muted)
-        .text('Proposta comercial gerada pelo sistema DRM Solar', ML, fy + 18, { width: W, align: 'center' });
+        .text('Proposta comercial gerada pelo sistema DRM Solar', ML, fy + 16, { width: W, align: 'center' });
       doc.page.margins.bottom = savedBottom;
     };
 
@@ -3661,12 +3661,12 @@ const buildOrcamentoPdf = async (orcamento) => {
     drawPageHeader('PROPOSTA COMERCIAL SOLAR');
 
     // Greeting
-    doc.font('Helvetica-Bold').fontSize(13).fillColor(dark)
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(dark)
       .text(`Olá, ${(orcamento.clienteNome || 'cliente').toUpperCase()}!`);
-    doc.moveDown(0.35);
-    doc.font('Helvetica').fontSize(9).fillColor(muted)
-      .text('Esta proposta apresenta o dimensionamento do sistema fotovoltaico, equipamentos\nprevistos, geração estimada e condições comerciais para análise antes da emissão do\ncontrato.', { lineGap: 2 });
-    doc.moveDown(1);
+    doc.moveDown(0.25);
+    doc.font('Helvetica').fontSize(8.4).fillColor(muted)
+      .text('Esta proposta apresenta dimensionamento, equipamentos previstos, geração estimada e condições comerciais para análise antes da emissão do contrato.', { lineGap: 1 });
+    doc.moveDown(0.7);
 
     // KPI cards (3)
     const cardY = doc.y;
@@ -3677,27 +3677,27 @@ const buildOrcamentoPdf = async (orcamento) => {
     doc.y = cardY + 70;
 
     // FORMA DE PAGAMENTO
-    doc.moveDown(0.8);
-    doc.roundedRect(ML, doc.y, W, 44, 6).fillAndStroke('#FFF7ED', '#FED7AA');
+    doc.moveDown(0.45);
+    doc.roundedRect(ML, doc.y, W, 34, 6).fillAndStroke('#FFF7ED', '#FED7AA');
     const fpY = doc.y;
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#9A3412').text('FORMA DE PAGAMENTO', ML + 10, fpY + 8, { width: W - 20 });
+    doc.font('Helvetica-Bold').fontSize(7.2).fillColor('#9A3412').text('FORMA DE PAGAMENTO', ML + 10, fpY + 6, { width: W - 20 });
     const tags = ['Financiado', 'Cartão de Crédito', 'À vista', 'Pagamento Híbrido'];
     let tagX = ML + 10;
-    const tagY = fpY + 22;
+    const tagY = fpY + 18;
     tags.forEach(tag => {
-      const tw = doc.widthOfString(tag, { fontSize: 8 }) + 16;
-      doc.roundedRect(tagX, tagY, tw, 14, 3).fill('#1E293B');
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFFFFF').text(tag, tagX + 8, tagY + 3, { lineBreak: false });
+      const tw = doc.widthOfString(tag, { fontSize: 7 }) + 14;
+      doc.roundedRect(tagX, tagY, tw, 12, 3).fill('#1E293B');
+      doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFFFFF').text(tag, tagX + 7, tagY + 2.5, { lineBreak: false });
       tagX += tw + 6;
     });
-    doc.y = fpY + 54;
+    doc.y = fpY + 40;
 
     // CLIENTE section
-    doc.moveDown(0.9);
+    doc.moveDown(0.45);
     doc.font('Helvetica-Bold').fontSize(11).fillColor(orange).text('CLIENTE', ML, doc.y, { width: W, align: 'center' });
-    doc.moveDown(0.3);
+    doc.moveDown(0.2);
     doc.moveTo(ML, doc.y).lineTo(ML + W, doc.y).lineWidth(0.5).strokeColor('#E2E8F0').stroke();
-    doc.moveDown(0.3);
+    doc.moveDown(0.2);
 
     const clienteRows = [
       ['NOME', orcamento.clienteNome || '-'],
@@ -3705,17 +3705,17 @@ const buildOrcamentoPdf = async (orcamento) => {
     ];
     clienteRows.forEach(([label, value]) => {
       const ry = doc.y;
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(muted).text(label, ML, ry + 4, { width: 100, lineBreak: false });
-      doc.font('Helvetica').fontSize(9).fillColor(dark).text(value, ML + 105, ry + 3, { width: W - 105, lineBreak: false });
-      doc.y = ry + 20;
+      doc.font('Helvetica-Bold').fontSize(7.2).fillColor(muted).text(label, ML, ry + 3, { width: 100, lineBreak: false });
+      doc.font('Helvetica').fontSize(8.4).fillColor(dark).text(value, ML + 105, ry + 2, { width: W - 105, lineBreak: false });
+      doc.y = ry + 16;
       doc.moveTo(ML, doc.y).lineTo(ML + W, doc.y).lineWidth(0.5).strokeColor('#E2E8F0').stroke();
-      doc.moveDown(0.2);
+      doc.moveDown(0.1);
     });
 
     // SISTEMA FOTOVOLTAICO table
-    doc.moveDown(0.9);
+    doc.moveDown(0.45);
     doc.font('Helvetica-Bold').fontSize(11).fillColor(orange).text('SISTEMA FOTOVOLTAICO', ML, doc.y, { width: W, align: 'center' });
-    doc.moveDown(0.5);
+    doc.moveDown(0.3);
 
     const c1 = 120; // ITEM
     const c3 = 36;  // QTD
@@ -3757,20 +3757,20 @@ const buildOrcamentoPdf = async (orcamento) => {
 
     // header row
     let ty = doc.y;
-    doc.rect(ML, ty, W, 20).fill('#1E293B');
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFF')
-      .text('ITEM', ML + 6, ty + 6, { width: c1 - 10, lineBreak: false });
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFF')
-      .text('MODELO / DESCRIÇÃO', ML + c1 + 6, ty + 6, { width: c2 - 10, lineBreak: false });
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFF')
-      .text('QTD', ML + c1 + c2 + 4, ty + 6, { width: c3 - 6, align: 'right', lineBreak: false });
-    ty += 20;
+    doc.rect(ML, ty, W, 16).fill('#1E293B');
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFF')
+      .text('ITEM', ML + 6, ty + 5, { width: c1 - 10, lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFF')
+      .text('MODELO / DESCRIÇÃO', ML + c1 + 6, ty + 5, { width: c2 - 10, lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFF')
+      .text('QTD', ML + c1 + c2 + 4, ty + 5, { width: c3 - 6, align: 'right', lineBreak: false });
+    ty += 16;
 
     tableRows.forEach(([item, desc, qty, isBold], idx) => {
       // Measure height needed for wrapped desc
-      doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5);
-      const dh = doc.heightOfString(desc, { width: c2 - 14 });
-      const rh = Math.max(22, dh + 12);
+      doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.4);
+      const dh = doc.heightOfString(desc, { width: c2 - 14, lineGap: 0 });
+      const rh = Math.max(16, dh + 8);
 
       if (ty + rh > doc.page.height - doc.page.margins.bottom - 50) {
         drawPageFooter();
@@ -3783,12 +3783,12 @@ const buildOrcamentoPdf = async (orcamento) => {
       doc.rect(ML, ty, W, rh).fill(bg);
       doc.rect(ML, ty, W, rh).lineWidth(0.5).stroke('#E2E8F0');
 
-      const textVY = ty + Math.floor((rh - 10) / 2);
-      doc.font('Helvetica').fontSize(8.5).fillColor('#374151')
+      const textVY = ty + Math.floor((rh - 8) / 2);
+      doc.font('Helvetica').fontSize(7.4).fillColor('#374151')
         .text(item, ML + 6, textVY, { width: c1 - 10, lineBreak: false });
-      doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5).fillColor(dark)
-        .text(desc, ML + c1 + 6, ty + 7, { width: c2 - 14 });
-      doc.font('Helvetica').fontSize(8.5).fillColor('#374151')
+      doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.4).fillColor(dark)
+        .text(desc, ML + c1 + 6, ty + 5, { width: c2 - 14, lineGap: 0 });
+      doc.font('Helvetica').fontSize(7.4).fillColor('#374151')
         .text(qty, ML + c1 + c2 + 4, textVY, { width: c3 - 6, align: 'right', lineBreak: false });
 
       ty += rh;
@@ -3796,27 +3796,27 @@ const buildOrcamentoPdf = async (orcamento) => {
     doc.y = ty;
 
     // Note about included items
-    doc.moveDown(0.6);
+    doc.moveDown(0.35);
     const noteY = doc.y;
-    doc.roundedRect(ML, noteY, W, 36, 4).fill('#F8FAFC').stroke('#E2E8F0');
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(dark)
-      .text('Itens inclusos em conjunto completo para instalação:', ML + 8, noteY + 6, { width: W - 16 });
-    doc.font('Helvetica').fontSize(7.5).fillColor(muted)
-      .text('estruturas de fixação, cabos, conectores, proteções, materiais, instalação, homologação e pós-venda inclusos, conforme projeto executivo e normas aplicáveis.', ML + 8, noteY + 18, { width: W - 16 });
-    doc.y = noteY + 44;
+    doc.roundedRect(ML, noteY, W, 28, 4).fill('#F8FAFC').stroke('#E2E8F0');
+    doc.font('Helvetica-Bold').fontSize(6.8).fillColor(dark)
+      .text('Itens inclusos em conjunto completo para instalação:', ML + 8, noteY + 5, { width: W - 16 });
+    doc.font('Helvetica').fontSize(6.8).fillColor(muted)
+      .text('estruturas de fixação, cabos, conectores, proteções, materiais, instalação, homologação e pós-venda inclusos, conforme projeto executivo e normas aplicáveis.', ML + 8, noteY + 15, { width: W - 16, lineGap: 0 });
+    doc.y = noteY + 32;
 
     // OBSERVAÇÃO IMPORTANTE
-    doc.moveDown(0.8);
-    doc.roundedRect(ML, doc.y, W, 52, 4).fill('#FFFBEB').stroke('#FCD34D');
+    doc.moveDown(0.35);
+    doc.roundedRect(ML, doc.y, W, 38, 4).fill('#FFFBEB').stroke('#FCD34D');
     const obsY = doc.y;
-    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#92400E').text('OBSERVAÇÃO IMPORTANTE', ML + 10, obsY + 8, { width: W - 20 });
-    doc.font('Helvetica').fontSize(8.5).fillColor('#92400E')
-      .text('Reforma, melhoria ou reforço em telhado, bem como adequação do padrão de entrada da concessionária, ', ML + 10, obsY + 22, { continued: true, width: W - 20 });
-    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#92400E')
+    doc.font('Helvetica-Bold').fontSize(7.4).fillColor('#92400E').text('OBSERVAÇÃO IMPORTANTE', ML + 10, obsY + 7, { width: W - 20 });
+    doc.font('Helvetica').fontSize(7.3).fillColor('#92400E')
+      .text('Reforma, melhoria ou reforço em telhado, bem como adequação do padrão de entrada da concessionária, ', ML + 10, obsY + 19, { continued: true, width: W - 20, lineGap: 0 });
+    doc.font('Helvetica-Bold').fontSize(7.3).fillColor('#92400E')
       .text('não estão inclusos', { continued: true });
-    doc.font('Helvetica').fontSize(8.5).fillColor('#92400E')
-      .text(' nesta proposta. Caso sejam necessários, deverão ser avaliados e orçados separadamente.', { width: W - 20 });
-    doc.y = obsY + 62;
+    doc.font('Helvetica').fontSize(7.3).fillColor('#92400E')
+      .text(' nesta proposta. Caso sejam necessários, deverão ser avaliados e orçados separadamente.', { width: W - 20, lineGap: 0 });
+    doc.y = obsY + 44;
 
     drawPageFooter();
 

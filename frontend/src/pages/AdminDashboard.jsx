@@ -1551,21 +1551,41 @@ const AdminDashboard = () => {
     [marcasInversor]
   );
 
+  const getInversorPowerValue = useCallback((model = '') => {
+    const text = String(model || '').toLowerCase().replace(',', '.');
+    const matches = [...text.matchAll(/(\d+(?:\.\d+)?)\s*(k(?:w|va|tl)?|kwp|w)\b/g)];
+    const kwMatch = matches.find(match => match[2].startsWith('k'));
+    if (kwMatch) return Number(kwMatch[1]);
+    const wattMatch = matches.find(match => match[2] === 'w');
+    if (wattMatch) return Number(wattMatch[1]) / 1000;
+    const loose = text.match(/\b(\d+(?:\.\d+)?)\b/);
+    return loose ? Number(loose[1]) : Number.POSITIVE_INFINITY;
+  }, []);
+
+  const sortInversorModels = useCallback((models = []) => (
+    [...models].sort((a, b) => {
+      const powerDiff = getInversorPowerValue(a) - getInversorPowerValue(b);
+      if (Number.isFinite(powerDiff) && powerDiff !== 0) return powerDiff;
+      return String(a).localeCompare(String(b), 'pt-BR', { numeric: true, sensitivity: 'base' });
+    })
+  ), [getInversorPowerValue]);
+
   const inversorModelsForBrand = useMemo(() => {
     if (!budgetForm.inversorMarca) return [];
     const marca = marcasInversor.find(m => m.nome_marca === budgetForm.inversorMarca);
     if (!marca) return [];
-    return modelosInversor
+    const models = modelosInversor
       .filter(m => m.marca_id === marca.id && m.status === 'ativo')
       .map(m => m.nome_modelo);
-  }, [marcasInversor, modelosInversor, budgetForm.inversorMarca]);
+    return sortInversorModels(models);
+  }, [marcasInversor, modelosInversor, budgetForm.inversorMarca, sortInversorModels]);
 
   const getModelsForBrand = useCallback((brandName) => {
     if (!brandName) return [];
     const marca = marcasInversor.find(m => m.nome_marca === brandName);
     if (!marca) return [];
-    return modelosInversor.filter(m => m.marca_id === marca.id && m.status === 'ativo').map(m => m.nome_modelo);
-  }, [marcasInversor, modelosInversor]);
+    return sortInversorModels(modelosInversor.filter(m => m.marca_id === marca.id && m.status === 'ativo').map(m => m.nome_modelo));
+  }, [marcasInversor, modelosInversor, sortInversorModels]);
 
   const placasFiltradas = useMemo(() => {
     return placas
