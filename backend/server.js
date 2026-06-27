@@ -3721,12 +3721,30 @@ const buildOrcamentoPdf = async (orcamento) => {
     const c3 = 36;  // QTD
     const c2 = W - c1 - c3; // MODELO/DESCRIÇÃO
 
+    // Build inversor rows — group same models, separate different models
+    const allInversores = [
+      { marca: dimensionamento.inversor_marca || '', modelo: dimensionamento.inversor_modelo || '', quantidade: Number(dimensionamento.quantidade_inversores || 1) },
+      ...(Array.isArray(dimensionamento.inversores_adicionais) ? dimensionamento.inversores_adicionais : [])
+        .filter(i => i.marca || i.modelo)
+        .map(i => ({ marca: i.marca || '', modelo: i.modelo || '', quantidade: Number(i.quantidade || 1) })),
+    ];
+    const inversorMap = new Map();
+    allInversores.forEach(inv => {
+      const key = `${inv.marca} ${inv.modelo}`.trim() || 'Inversor';
+      if (inversorMap.has(key)) {
+        inversorMap.get(key).quantidade += inv.quantidade;
+      } else {
+        inversorMap.set(key, { desc: key, quantidade: inv.quantidade });
+      }
+    });
+    const inversorTableRows = Array.from(inversorMap.values()).map(inv => [
+      'Inversor', inv.desc || '-', String(inv.quantidade), true,
+    ]);
+
     const tableRows = [
       ['Placas',                  (dimensionamento.placa_modelo || '-'),
         String(dimensionamento.numero_paineis_necessarios || 1), true],
-      ['Inversor',
-        [`${dimensionamento.inversor_marca || ''}`, `${dimensionamento.inversor_modelo || ''}`].filter(Boolean).join(' ').trim() || '-',
-        String(dimensionamento.quantidade_inversores || 1), true],
+      ...inversorTableRows,
       ['Estruturas de fixação',   'Inclusas - quantidade necessária para instalação', '1', false],
       ['Cabos',                   'Inclusos - quantidade necessária para instalação',  '1', false],
       ['Conectores',              'Inclusos - quantidade necessária para instalação',  '1', false],

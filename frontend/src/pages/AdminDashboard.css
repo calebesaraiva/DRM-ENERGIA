@@ -16177,6 +16177,60 @@
   align-items: end;
 }
 
+/* Inversor extra row: marca + arrow + modelo + qtd + remove */
+.orc-rapido-inv-extra {
+  grid-template-columns: 1fr 48px 1fr 72px 32px;
+  padding: 0.6rem 0.75rem;
+  background: #f8fafc;
+  border: 1px dashed #e2e8f0;
+  border-radius: 8px;
+  margin-top: -0.25rem;
+}
+
+.orc-rapido-field-qty {
+  max-width: 72px;
+}
+
+.orc-rapido-inv-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 2px;
+  border: none;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #ef4444;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s;
+  align-self: end;
+}
+.orc-rapido-inv-remove:hover { background: #fecaca; }
+
+.orc-rapido-add-inv-wrap {
+  display: flex;
+  align-items: center;
+  padding-top: 0.25rem;
+}
+
+.orc-rapido-add-inv-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.45rem 1rem;
+  border: 1.5px dashed #f97316;
+  border-radius: 8px;
+  background: transparent;
+  color: #f97316;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.orc-rapido-add-inv-btn:hover { background: #fff7ed; }
+
 /* Field wrapper */
 .orc-rapido-field {
   display: flex;

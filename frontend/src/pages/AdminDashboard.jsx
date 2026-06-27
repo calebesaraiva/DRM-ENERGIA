@@ -787,6 +787,7 @@ const emptyBudgetForm = {
   inversorMarca: '',
   inversorModelo: '',
   quantidadeInversores: '1',
+  inversoresAdicionais: [],
   quantidadeCaboCc: '',
   areaPorPainelM2: '2.6',
   generationMode: 'manual',
@@ -1558,6 +1559,13 @@ const AdminDashboard = () => {
       .filter(m => m.marca_id === marca.id && m.status === 'ativo')
       .map(m => m.nome_modelo);
   }, [marcasInversor, modelosInversor, budgetForm.inversorMarca]);
+
+  const getModelsForBrand = useCallback((brandName) => {
+    if (!brandName) return [];
+    const marca = marcasInversor.find(m => m.nome_marca === brandName);
+    if (!marca) return [];
+    return modelosInversor.filter(m => m.marca_id === marca.id && m.status === 'ativo').map(m => m.nome_modelo);
+  }, [marcasInversor, modelosInversor]);
 
   const placasFiltradas = useMemo(() => {
     return placas
@@ -3347,6 +3355,7 @@ const AdminDashboard = () => {
             inversor_marca: budgetForm.inversorMarca,
             inversor_modelo: budgetForm.inversorModelo,
             quantidade_inversores: budgetForm.quantidadeInversores,
+            inversores_adicionais: budgetForm.inversoresAdicionais.filter(i => i.marca && i.modelo),
             quantidade_cabo_cc: budgetForm.quantidadeCaboCc,
             irradiacao_solar: budgetForm.irradiacaoSolar,
             perda_percentual: budgetForm.perdaPercentual,
@@ -5835,6 +5844,74 @@ const AdminDashboard = () => {
                         placeholder="Ex: 1"
                       />
                     </div>
+                  </div>
+
+                  {/* Inversores adicionais */}
+                  {budgetForm.inversoresAdicionais.map((inv, idx) => (
+                    <div key={idx} className="orc-rapido-row-inversor orc-rapido-inv-extra">
+                      <div className="orc-rapido-field">
+                        <label>Marca (inv. {idx + 2})</label>
+                        <select
+                          value={inv.marca}
+                          onChange={e => {
+                            const newInvs = budgetForm.inversoresAdicionais.map((it, i) => i === idx ? { ...it, marca: e.target.value, modelo: '' } : it);
+                            setBudgetForm(prev => ({ ...prev, inversoresAdicionais: newInvs }));
+                          }}
+                        >
+                          <option value="">Selecione a marca</option>
+                          {inversorBrandsFromEquip.map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                      </div>
+                      <div className="orc-rapido-arrow" aria-hidden="true">
+                        <svg viewBox="0 0 56 16" width="40" height="14"><circle cx="4" cy="8" r="2" fill="#f97316"/><circle cx="13" cy="8" r="2" fill="#f97316"/><circle cx="22" cy="8" r="2" fill="#f97316"/><path d="M28 8h10M34 3l6 5-6 5" stroke="#f97316" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </div>
+                      <div className="orc-rapido-field">
+                        <label>Modelo (inv. {idx + 2})</label>
+                        <select
+                          value={inv.modelo}
+                          disabled={!inv.marca}
+                          onChange={e => {
+                            const newInvs = budgetForm.inversoresAdicionais.map((it, i) => i === idx ? { ...it, modelo: e.target.value } : it);
+                            setBudgetForm(prev => ({ ...prev, inversoresAdicionais: newInvs }));
+                          }}
+                        >
+                          <option value="">{inv.marca ? 'Selecione o modelo' : 'Selecione a marca primeiro'}</option>
+                          {getModelsForBrand(inv.marca).map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                      <div className="orc-rapido-field orc-rapido-field-qty">
+                        <label>Qtd</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={inv.quantidade}
+                          onChange={e => {
+                            const newInvs = budgetForm.inversoresAdicionais.map((it, i) => i === idx ? { ...it, quantidade: e.target.value } : it);
+                            setBudgetForm(prev => ({ ...prev, inversoresAdicionais: newInvs }));
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="orc-rapido-inv-remove"
+                        title="Remover este inversor"
+                        onClick={() => setBudgetForm(prev => ({ ...prev, inversoresAdicionais: prev.inversoresAdicionais.filter((_, i) => i !== idx) }))}
+                      >
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Botão adicionar inversor */}
+                  <div className="orc-rapido-add-inv-wrap">
+                    <button
+                      type="button"
+                      className="orc-rapido-add-inv-btn"
+                      onClick={() => setBudgetForm(prev => ({ ...prev, inversoresAdicionais: [...prev.inversoresAdicionais, { marca: '', modelo: '', quantidade: '1' }] }))}
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      Adicionar outro inversor
+                    </button>
                   </div>
 
                 </div>{/* /orc-rapido-body */}
