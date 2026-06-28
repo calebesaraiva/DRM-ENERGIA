@@ -632,6 +632,7 @@ const emptyClientForm = {
   cidadeInstalacao: '',
   estadoInstalacao: '',
   observacoes: '',
+  consultorNome: '',
 };
 
 const projectStages = [
@@ -912,6 +913,8 @@ const AdminDashboard = () => {
   const [envioHomologacaoForm, setEnvioHomologacaoForm] = useState(emptyEnvioHomologacaoForm);
   const [novoCliente, setNovoCliente] = useState(emptyClientForm);
   const [clientView, setClientView] = useState('list');
+  const [selectedCliente, setSelectedCliente] = useState(null);
+  const [clientFichaTab, setClientFichaTab] = useState('resumo');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [orcamentos, setOrcamentos] = useState([]);
   const [selectedOrcamento, setSelectedOrcamento] = useState(null);
@@ -4341,24 +4344,39 @@ const AdminDashboard = () => {
 
           {activeTab === 'dashboard' && resumo && (
             <div className="crm-dashboard">
-              <div className="section-heading">
-                <div>
-                  <span className="section-kicker">Controle geral</span>
-                  <h3>Painel de ação</h3>
-                  <p>Comece pelo que exige resposta hoje: leads novos, retornos, contratos pendentes e projetos críticos.</p>
-                </div>
-                <div className="section-stats">
-                  <div><strong>{money(resumo.kpis?.valorAprovadoMes)}</strong><span>vendido no mês</span></div>
-                  <div><strong>{resumo.kpis?.retornosSemana || 0}</strong><span>retornos 7 dias</span></div>
-                  <div><strong>{resumo.kpis?.projetosAtivos || 0}</strong><span>projetos ativos</span></div>
-                </div>
+
+              {/* ── VISÃO GERAL ─────────────────────────────────────────── */}
+              <div className="pg-section-label">VISÃO GERAL</div>
+              <div className="pg-visao-row">
+                <button type="button" className="pg-visao-card pg-visao-primary" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                  <span className="pg-visao-title">Vendido no mês</span>
+                  <strong className="pg-visao-value">{money(resumo.kpis?.valorAprovadoMes)}</strong>
+                  <span className="pg-visao-sub">contratos aprovados</span>
+                </button>
+                <button type="button" className="pg-visao-card" onClick={() => navigatePanel({ activeTab: 'leads' })}>
+                  <span className="pg-visao-title">Retornos 7 dias</span>
+                  <strong className="pg-visao-value">{resumo.kpis?.retornosSemana || 0}</strong>
+                  <span className="pg-visao-sub">agendados esta semana</span>
+                </button>
+                <button type="button" className="pg-visao-card" onClick={() => navigatePanel({ activeTab: 'projetos' })}>
+                  <span className="pg-visao-title">Projetos ativos</span>
+                  <strong className="pg-visao-value">{resumo.kpis?.projetosAtivos || 0}</strong>
+                  <span className="pg-visao-sub">em andamento</span>
+                </button>
+                <button type="button" className="pg-visao-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                  <span className="pg-visao-title">Valor pendente</span>
+                  <strong className="pg-visao-value">{money(resumo.kpis?.valorPendenteContratos)}</strong>
+                  <span className="pg-visao-sub">aguardando aprovação</span>
+                </button>
               </div>
 
-              <div className="dashboard-action-strip">
+              {/* ── ATENDER AGORA ──────────────────────────────────────── */}
+              <div className="pg-section-label">ATENDER AGORA</div>
+              <div className="dashboard-action-strip pg-atender-strip">
                 <button type="button" className="dashboard-action-card urgent" onClick={() => navigatePanel({ activeTab: 'leads' })}>
-                  <span>Atender agora</span>
+                  <span>Leads novos</span>
                   <strong>{resumo.kpis?.novos || 0}</strong>
-                  <small>lead{(resumo.kpis?.novos || 0) === 1 ? '' : 's'} novo{(resumo.kpis?.novos || 0) === 1 ? '' : 's'}</small>
+                  <small>aguardando atendimento</small>
                 </button>
                 <button type="button" className="dashboard-action-card" onClick={() => navigatePanel({ activeTab: 'leads' })}>
                   <span>Retornos</span>
@@ -4366,7 +4384,7 @@ const AdminDashboard = () => {
                   <small>agendado{(resumo.proximosRetornos?.length || 0) === 1 ? '' : 's'}</small>
                 </button>
                 <button type="button" className="dashboard-action-card warning" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
-                  <span>Aprovar contratos</span>
+                  <span>Contratos pend.</span>
                   <strong>{resumo.kpis?.contratosPendentes || 0}</strong>
                   <small>pendente{(resumo.kpis?.contratosPendentes || 0) === 1 ? '' : 's'}</small>
                 </button>
@@ -4380,18 +4398,66 @@ const AdminDashboard = () => {
                   <strong>{resumo.kpis?.osAbertas || 0}</strong>
                   <small>{resumo.kpis?.osEmAtendimento || 0} em atendimento</small>
                 </button>
-                <button type="button" className="dashboard-action-card urgent" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
-                  <span>Acessos sem e-mail</span>
-                  <strong>{resumo.kpis?.acessosSemRecuperacao || 0}</strong>
-                  <small>usuário{(resumo.kpis?.acessosSemRecuperacao || 0) !== 1 ? 's' : ''} sem e-mail cadastrado</small>
-                </button>
               </div>
 
-              <div className="crm-kpi-grid">
-                <button type="button" className="crm-kpi-card primary" onClick={() => navigatePanel({ activeTab: 'leads' })}><span>Leads captados</span><strong>{resumo.kpis?.leads || 0}</strong><p>{resumo.kpis?.novos || 0} aguardando primeiro atendimento.</p></button>
-                <button type="button" className="crm-kpi-card" onClick={() => navigatePanel({ activeTab: 'orcamentos' })}><span>Orçamentos</span><strong>{resumo.kpis?.orcamentos || 0}</strong><p>Simulações registradas no sistema.</p></button>
-                <button type="button" className="crm-kpi-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}><span>Contratos</span><strong>{resumo.kpis?.contratos || 0}</strong><p>{resumo.kpis?.contratosPendentes || 0} pendentes, {resumo.kpis?.contratosAprovados || 0} aprovados.</p></button>
-                <button type="button" className="crm-kpi-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}><span>Valor pendente</span><strong>{money(resumo.kpis?.valorPendenteContratos)}</strong><p>Em contratos aguardando aprovação.</p></button>
+              {/* ── 3-COLUMN SECTION GRID ──────────────────────────────── */}
+              <div className="pg-columns-grid">
+                {/* COMERCIAL */}
+                <div className="pg-col">
+                  <div className="pg-col-header">COMERCIAL</div>
+                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'leads' })}>
+                    <span>Leads captados</span><strong>{resumo.kpis?.leads || 0}</strong>
+                  </button>
+                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'orcamentos' })}>
+                    <span>Orçamentos</span><strong>{resumo.kpis?.orcamentos || 0}</strong>
+                  </button>
+                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                    <span>Contratos</span><strong>{resumo.kpis?.contratos || 0}</strong>
+                  </button>
+                  <div className="pg-col-mini-section">
+                    <span className="pg-col-mini-label">Funil</span>
+                    {Object.entries(resumo.leadsPorStatus || {}).slice(0, 4).map(([status, total]) => (
+                      <div className="pg-mini-pipeline-item" key={status}>
+                        <div className="pg-mini-pipeline-top"><span>{status}</span><strong>{total}</strong></div>
+                        <div className="pipeline-bar"><span style={{ width: `${Math.min((total / Math.max(resumo.kpis?.leads || 1, 1)) * 100, 100)}%` }}></span></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* OPERAÇÃO */}
+                <div className="pg-col">
+                  <div className="pg-col-header">OPERAÇÃO</div>
+                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'projetos' })}>
+                    <span>Projetos críticos</span><strong>{resumo.projetosCriticos?.length || 0}</strong>
+                  </button>
+                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                    <span>Homologações</span><strong>{resumo.operacao?.contratosAprovados || 0}</strong>
+                  </button>
+                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'instalacoes' })}>
+                    <span>Instalações</span><strong>{resumo.kpis?.projetosAtivos || 0}</strong>
+                  </button>
+                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'ordensServico' })}>
+                    <span>Pend. técnicas</span><strong>{resumo.operacao?.ordensServicoAbertas || 0}</strong>
+                  </button>
+                </div>
+
+                {/* MARKETING + ACESSOS */}
+                <div className="pg-col">
+                  <div className="pg-col-header">MARKETING + ACESSOS</div>
+                  <div className="pg-col-item">
+                    <span>Visitas 30D</span><strong>{resumo.kpis?.visitasSite30d || 0}</strong>
+                  </div>
+                  <div className="pg-col-item">
+                    <span>WhatsApp</span><strong>{resumo.kpis?.clicksWhatsApp30d || 0}</strong>
+                  </div>
+                  <div className="pg-col-item">
+                    <span>Simular</span><strong>{resumo.kpis?.clicksSimular30d || 0}</strong>
+                  </div>
+                  <button type="button" className="pg-col-item pg-col-item-alert" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
+                    <span>Sem e-mail</span><strong>{resumo.kpis?.acessosSemRecuperacao || 0}</strong>
+                  </button>
+                </div>
               </div>
 
               {Array.isArray(resumo.vendasConsultores?.porAno) && resumo.vendasConsultores.porAno.length > 0 && (
@@ -4471,171 +4537,62 @@ const AdminDashboard = () => {
                 </div>
               )}
 
-              <div className="ops-insight-grid">
-                <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
-                  <span>Contratos por status</span>
-                  <strong>{resumo.operacao?.contratosTotal || 0} totais</strong>
-                  <p>{resumo.operacao?.contratosPendentes || 0} pendentes • {resumo.operacao?.contratosAprovados || 0} aprovados • {resumo.operacao?.contratosRecusados || 0} recusados</p>
-                </button>
-                <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'ordensServico' })}>
-                  <span>Pendências técnicas</span>
-                  <strong>{resumo.operacao?.ordensServicoAbertas || 0} O.S abertas</strong>
-                  <p>{resumo.operacao?.ordensServicoEmAtendimento || 0} já em atendimento pela equipe.</p>
-                </button>
-                <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
-                  <span>Usuários com e-mail</span>
-                  <strong>{resumo.operacao?.acessosComRecuperacao || 0} ativos</strong>
-                  <p>{resumo.operacao?.acessosSemRecuperacao || 0} usuário{(resumo.operacao?.acessosSemRecuperacao || 0) !== 1 ? 's' : ''} ainda precisam cadastrar e-mail de recuperação.</p>
-                </button>
-                <button type="button" className="ops-insight-card" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
-                  <span>Aguardando primeiro acesso</span>
-                  <strong>{resumo.operacao?.senhasTemporarias || 0}</strong>
-                  <p>Usuários que ainda não trocaram a senha temporária.</p>
-                </button>
-              </div>
-
-              {adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM' ? (
-                <>
-                  <div className="section-heading analytics-heading">
+              {/* ── PERFORMANCE POR CONSULTOR (existente) ──────────────── */}
+              {Array.isArray(resumo.vendasConsultores?.porAno) && resumo.vendasConsultores.porAno.length > 0 && (
+                <div className="admin-card consultor-sales-panel">
+                  <div className="section-heading consultor-sales-heading">
                     <div>
-                      <span className="section-kicker">Métricas do site</span>
-                      <h3>Cliques e conversão da LP</h3>
-                      <p>Acompanhe visitas, intenção de simular e procura pelo WhatsApp nos últimos 30 dias.</p>
+                      <span className="section-kicker">Performance comercial</span>
+                      <h3>Vendas por consultor</h3>
+                      <p>Faturamento e produção separados por consultor.</p>
                     </div>
                     <div className="section-stats">
-                      <div><strong>{resumo.siteAnalytics?.visitas7d || 0}</strong><span>visitas 7 dias</span></div>
-                      <div><strong>{resumo.siteAnalytics?.whatsapp7d || 0}</strong><span>WhatsApp 7 dias</span></div>
-                      <div><strong>{resumo.siteAnalytics?.concluidas7d || 0}</strong><span>simulações 7 dias</span></div>
+                      <div><strong>{money(resumo.vendasConsultores?.totalMes || 0)}</strong><span>mês atual</span></div>
+                      <div><strong>{money(resumo.vendasConsultores?.totalAno || 0)}</strong><span>ano atual</span></div>
+                      <div><strong>{resumo.vendasConsultores?.porAno?.length || 0}</strong><span>consultores</span></div>
                     </div>
                   </div>
-
-                  <div className="crm-kpi-grid analytics-kpi-grid">
-                    <div className="crm-kpi-card analytics-card"><span>Visitas no site</span><strong>{resumo.kpis?.visitasSite30d || 0}</strong><p>Total de páginas abertas nos últimos 30 dias.</p></div>
-                    <div className="crm-kpi-card analytics-card"><span>Cliques no WhatsApp</span><strong>{resumo.kpis?.clicksWhatsApp30d || 0}</strong><p>{percent(resumo.siteAnalytics?.conversaoWhatsApp30d)} de conversão por visita.</p></div>
-                    <div className="crm-kpi-card analytics-card"><span>Cliques em simular</span><strong>{resumo.kpis?.clicksSimular30d || 0}</strong><p>Pessoas que abriram intenção de calcular economia.</p></div>
-                    <div className="crm-kpi-card analytics-card"><span>Simulações concluídas</span><strong>{resumo.kpis?.simulacoesConcluidas30d || 0}</strong><p>{percent(resumo.siteAnalytics?.conversaoSimulacao30d)} concluem após clicar em simular.</p></div>
-                  </div>
-
-                  <div className="rr-leads-panel">
-                    <div className="section-heading rr-leads-heading">
-                      <div>
-                        <span className="section-kicker">Meta Ads</span>
-                        <h3>Captura via /rleads</h3>
-                        <p>Rodízio automático no servidor para os anúncios que apontam direto para o WhatsApp.</p>
+                  <div className="consultor-sales-grid">
+                    <section className="consultor-sales-card">
+                      <div className="consultor-sales-card-header">
+                        <div><span>Ranking mensal</span><strong>{resumo.vendasConsultores?.referenciaMes || 'Mês atual'}</strong></div>
                       </div>
-                      <div className="section-stats">
-                        <div><strong>{resumo.roundRobinLeads?.total || 0}</strong><span>leads totais</span></div>
-                        <div><strong>{resumo.roundRobinLeads?.last24h || 0}</strong><span>últimas 24h</span></div>
-                        <div><strong>{resumo.roundRobinLeads?.status?.ok ? 'OK' : 'Atenção'}</strong><span>distribuição</span></div>
-                      </div>
-                    </div>
-
-                    <div className="rr-status-card">
-                      <div>
-                        <strong>{resumo.roundRobinLeads?.status?.message || 'Aguardando primeiros acessos.'}</strong>
-                        <span>Próximo vendedor: {resumo.roundRobinLeads?.nextSeller?.phone || 'não definido'} • rota ativa em /rleads</span>
-                      </div>
-                      <span className={`status-badge ${resumo.roundRobinLeads?.status?.ok ? 'success' : 'warning'}`}>
-                        {resumo.roundRobinLeads?.enabled ? 'online' : 'offline'}
-                      </span>
-                    </div>
-
-                    <div className="rr-seller-grid">
-                      {(resumo.roundRobinLeads?.bySeller || []).map(seller => (
-                        <div className="rr-seller-card" key={seller.phone}>
-                          <div className="rr-seller-top">
-                            <span>Vendedor {seller.position}</span>
-                            <strong>{seller.total || 0}</strong>
-                          </div>
-                          <p>{seller.phone}</p>
-                          <div className="pipeline-bar orange"><span style={{ width: `${Math.min((seller.percent || 0) * 100, 100)}%` }}></span></div>
-                          <small>{percent(seller.percent || 0)} dos redirecionamentos</small>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="admin-card rr-recent-card">
-                      <div className="card-header-flex compact">
-                        <h3>Últimos acessos /rleads</h3>
-                        <span className="status-badge success">{resumo.roundRobinLeads?.recent?.length || 0}</span>
-                      </div>
-                      <div className="mobile-list">
-                        {(resumo.roundRobinLeads?.recent || []).slice(0, 8).map(item => (
-                          <div className="mobile-list-item rr-recent-item" key={item.id}>
-                            <div>
-                              <strong>Vendedor {item.sellerPosition} • {item.sellerPhone}</strong>
-                              <span>{item.ip || 'IP não identificado'} • {item.referer || 'Sem referer'}</span>
-                              {Object.keys(item.utmParams || {}).length > 0 && <small>{Object.entries(item.utmParams).map(([key, value]) => `${key}=${value}`).join(' • ')}</small>}
+                      <div className="consultor-sales-list">
+                        {(resumo.vendasConsultores?.porMes || []).map(item => {
+                          const width = resumo.vendasConsultores?.totalMes ? Math.max((Number(item.mes?.valor || 0) / Number(resumo.vendasConsultores.totalMes || 1)) * 100, item.mes?.valor ? 12 : 0) : 0;
+                          return (
+                            <div className="consultor-sales-item" key={`mes-${item.nome}`}>
+                              <div className="consultor-sales-row"><strong>{item.nome}</strong><span>{item.mes?.quantidade || 0} venda{(item.mes?.quantidade || 0) === 1 ? '' : 's'}</span></div>
+                              <div className="consultor-sales-bar"><span style={{ width: `${Math.min(width, 100)}%` }}></span></div>
+                              <div className="consultor-sales-row is-summary"><small>{money(item.mes?.valor || 0)}</small><small>{resumo.vendasConsultores?.totalMes ? percent((item.mes?.valor || 0) / resumo.vendasConsultores.totalMes) : '0,0%'}</small></div>
                             </div>
-                            <em>{item.createdAt ? new Date(item.createdAt).toLocaleString('pt-BR') : 'Sem data'}</em>
-                          </div>
-                        ))}
-                        {(resumo.roundRobinLeads?.recent || []).length === 0 && <p className="muted-text">Os acessos da campanha aparecerão aqui em tempo real após usar /rleads.</p>}
+                          );
+                        })}
                       </div>
-                    </div>
-                  </div>
-                </>
-              ) : null}
-
-              <div className="crm-grid">
-                <div className="admin-card">
-                  <div className="card-header-flex compact">
-                    <h3>Funil comercial</h3>
-                    <span className="status-badge warning">tempo real</span>
-                  </div>
-                  <div className="pipeline-list">
-                    {Object.entries(resumo.leadsPorStatus || {}).map(([status, total]) => (
-                      <div className="pipeline-item" key={status}>
-                        <div><strong>{status}</strong><span>{total} lead{total === 1 ? '' : 's'}</span></div>
-                        <div className="pipeline-bar"><span style={{ width: `${Math.min((total / Math.max(resumo.kpis?.leads || 1, 1)) * 100, 100)}%` }}></span></div>
+                    </section>
+                    <section className="consultor-sales-card">
+                      <div className="consultor-sales-card-header">
+                        <div><span>Ranking anual</span><strong>{resumo.vendasConsultores?.referenciaAno || 'Ano atual'}</strong></div>
                       </div>
-                    ))}
+                      <div className="consultor-sales-list">
+                        {(resumo.vendasConsultores?.porAno || []).map(item => {
+                          const width = resumo.vendasConsultores?.totalAno ? Math.max((Number(item.ano?.valor || 0) / Number(resumo.vendasConsultores.totalAno || 1)) * 100, item.ano?.valor ? 12 : 0) : 0;
+                          return (
+                            <div className="consultor-sales-item" key={`ano-${item.nome}`}>
+                              <div className="consultor-sales-row"><strong>{item.nome}</strong><span>{item.ano?.quantidade || 0} venda{(item.ano?.quantidade || 0) === 1 ? '' : 's'}</span></div>
+                              <div className="consultor-sales-bar annual"><span style={{ width: `${Math.min(width, 100)}%` }}></span></div>
+                              <div className="consultor-sales-row is-summary"><small>{money(item.ano?.valor || 0)}</small><small>{resumo.vendasConsultores?.totalAno ? percent((item.ano?.valor || 0) / resumo.vendasConsultores.totalAno) : '0,0%'}</small></div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
                   </div>
                 </div>
+              )}
 
-                <div className="admin-card">
-                  <div className="card-header-flex compact">
-                    <h3>{adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM' ? 'Origem dos cliques' : 'Projetos por etapa'}</h3>
-                    {adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM'
-                      ? <span className="status-badge success">30 dias</span>
-                      : <button className="btn btn-outline btn-sm-admin" onClick={() => navigatePanel({ activeTab: 'projetos' })}>Abrir projetos</button>}
-                  </div>
-                  <div className="pipeline-list">
-                    {(adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM'
-                      ? (resumo.siteAnalytics?.topSources || [])
-                      : (resumo.projetosPorEtapa || [])
-                    ).map(item => (
-                      <div className="pipeline-item" key={item.source || item.etapa}>
-                        <div>
-                          <strong>{item.source ? labelSiteEvent(item.source) : item.etapa}</strong>
-                          <span>{item.total} {item.source ? 'evento' : 'projeto'}{item.total === 1 ? '' : 's'}</span>
-                        </div>
-                        <div className="pipeline-bar orange"><span style={{ width: `${Math.min((item.total / Math.max(resumo.siteAnalytics?.totalEventos30d || resumo.kpis?.projetosAtivos || 1, 1)) * 100, 100)}%` }}></span></div>
-                      </div>
-                    ))}
-                    {(adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM') && (resumo.siteAnalytics?.topSources || []).length === 0 && <p className="muted-text">As métricas começam a aparecer após os primeiros acessos.</p>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="crm-grid">
-                <div className="admin-card">
-                  <div className="card-header-flex compact">
-                    <h3>Próximos retornos</h3>
-                    <span className="status-badge success">{resumo.proximosRetornos?.length || 0}</span>
-                  </div>
-                  <div className="mobile-list">
-                    {(resumo.proximosRetornos || []).slice(0, 5).map(lead => (
-                      <div className="mobile-list-item" key={lead.id}>
-                        <div><strong>{lead.nome}</strong><span>{lead.cidade || 'Cidade não informada'} • {getResponsibleName(lead.assignedUserName)}</span></div>
-                        <em>{dateBr(lead.proximoRetorno)}</em>
-                      </div>
-                    ))}
-                    {(resumo.proximosRetornos || []).length === 0 && <p className="muted-text">Nenhum retorno agendado.</p>}
-                    {(resumo.proximosRetornos || []).length > 5 && <button type="button" className="btn btn-outline btn-sm-admin dashboard-list-action" onClick={() => navigatePanel({ activeTab: 'leads' })}>Ver todos os retornos</button>}
-                  </div>
-                </div>
-
+              {/* ── PROJETOS CRÍTICOS + ÚLTIMAS ATIVIDADES ─────────────── */}
+              <div className="pg-bottom-row">
                 <div className="admin-card">
                   <div className="card-header-flex compact">
                     <h3>Projetos críticos</h3>
@@ -4652,24 +4609,77 @@ const AdminDashboard = () => {
                     {(resumo.projetosCriticos || []).length > 5 && <button type="button" className="btn btn-outline btn-sm-admin dashboard-list-action" onClick={() => navigatePanel({ activeTab: 'projetos' })}>Ver todos os projetos</button>}
                   </div>
                 </div>
+                <div className="admin-card">
+                  <div className="card-header-flex compact">
+                    <h3>Últimas atividades</h3>
+                    <span className="status-badge success">{resumo.atividadesRecentes?.length || 0}</span>
+                  </div>
+                  <div className="activity-feed">
+                    {(resumo.atividadesRecentes || []).map(atividade => (
+                      <div className="activity-feed-item" key={atividade.id}>
+                        <strong>{atividade.tipo} • {atividade.clienteNome}</strong>
+                        <span>{atividade.descricao}</span>
+                        <em>{atividade.criadoPorNome} em {dateBr(atividade.createdAt)}</em>
+                      </div>
+                    ))}
+                    {(resumo.atividadesRecentes || []).length === 0 && <p className="muted-text">Ainda não há atividades registradas.</p>}
+                  </div>
+                </div>
               </div>
 
-              <div className="admin-card">
-                <div className="card-header-flex compact">
-                  <h3>Últimas atividades da equipe</h3>
-                  <span className="status-badge success">{resumo.atividadesRecentes?.length || 0}</span>
-                </div>
-                <div className="activity-feed">
-                  {(resumo.atividadesRecentes || []).map(atividade => (
-                    <div className="activity-feed-item" key={atividade.id}>
-                      <strong>{atividade.tipo} • {atividade.clienteNome}</strong>
-                      <span>{atividade.descricao}</span>
-                      <em>{atividade.criadoPorNome} em {dateBr(atividade.createdAt)}</em>
+              {/* ── META ADS (acesso restrito) ──────────────────────────── */}
+              {(adminUser.permissions?.verTodosLeads || adminUser.role === 'ADM') && (
+                <div className="rr-leads-panel">
+                  <div className="section-heading rr-leads-heading">
+                    <div>
+                      <span className="section-kicker">Meta Ads</span>
+                      <h3>Captura via /rleads</h3>
+                      <p>Rodízio automático no servidor para os anúncios que apontam direto para o WhatsApp.</p>
                     </div>
-                  ))}
-                  {(resumo.atividadesRecentes || []).length === 0 && <p className="muted-text">Ainda não há atividades registradas.</p>}
+                    <div className="section-stats">
+                      <div><strong>{resumo.roundRobinLeads?.total || 0}</strong><span>leads totais</span></div>
+                      <div><strong>{resumo.roundRobinLeads?.last24h || 0}</strong><span>últimas 24h</span></div>
+                      <div><strong>{resumo.roundRobinLeads?.status?.ok ? 'OK' : 'Atenção'}</strong><span>distribuição</span></div>
+                    </div>
+                  </div>
+                  <div className="rr-status-card">
+                    <div>
+                      <strong>{resumo.roundRobinLeads?.status?.message || 'Aguardando primeiros acessos.'}</strong>
+                      <span>Próximo vendedor: {resumo.roundRobinLeads?.nextSeller?.phone || 'não definido'} • rota ativa em /rleads</span>
+                    </div>
+                    <span className={`status-badge ${resumo.roundRobinLeads?.status?.ok ? 'success' : 'warning'}`}>{resumo.roundRobinLeads?.enabled ? 'online' : 'offline'}</span>
+                  </div>
+                  <div className="rr-seller-grid">
+                    {(resumo.roundRobinLeads?.bySeller || []).map(seller => (
+                      <div className="rr-seller-card" key={seller.phone}>
+                        <div className="rr-seller-top"><span>Vendedor {seller.position}</span><strong>{seller.total || 0}</strong></div>
+                        <p>{seller.phone}</p>
+                        <div className="pipeline-bar orange"><span style={{ width: `${Math.min((seller.percent || 0) * 100, 100)}%` }}></span></div>
+                        <small>{percent(seller.percent || 0)} dos redirecionamentos</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="admin-card rr-recent-card">
+                    <div className="card-header-flex compact">
+                      <h3>Últimos acessos /rleads</h3>
+                      <span className="status-badge success">{resumo.roundRobinLeads?.recent?.length || 0}</span>
+                    </div>
+                    <div className="mobile-list">
+                      {(resumo.roundRobinLeads?.recent || []).slice(0, 8).map(item => (
+                        <div className="mobile-list-item rr-recent-item" key={item.id}>
+                          <div>
+                            <strong>Vendedor {item.sellerPosition} • {item.sellerPhone}</strong>
+                            <span>{item.ip || 'IP não identificado'} • {item.referer || 'Sem referer'}</span>
+                            {Object.keys(item.utmParams || {}).length > 0 && <small>{Object.entries(item.utmParams).map(([key, value]) => `${key}=${value}`).join(' • ')}</small>}
+                          </div>
+                          <em>{item.createdAt ? new Date(item.createdAt).toLocaleString('pt-BR') : 'Sem data'}</em>
+                        </div>
+                      ))}
+                      {(resumo.roundRobinLeads?.recent || []).length === 0 && <p className="muted-text">Os acessos da campanha aparecerão aqui em tempo real após usar /rleads.</p>}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -4805,6 +4815,13 @@ const AdminDashboard = () => {
                           <label className="cc-label">Observações</label>
                           <textarea className="cc-input cc-textarea" placeholder="Digite observações adicionais sobre o cliente (opcional)" value={novoCliente.observacoes} onChange={(e) => setNovoCliente(prev => ({ ...prev, observacoes: e.target.value }))} />
                         </div>
+                        <div className="cc-field">
+                          <label className="cc-label">Consultor responsável</label>
+                          <select className="cc-input" value={novoCliente.consultorNome} onChange={(e) => setNovoCliente(prev => ({ ...prev, consultorNome: e.target.value }))}>
+                            <option value="">Selecione o consultor</option>
+                            {usuarios.map(u => <option key={u.id} value={u.nome}>{u.nome}</option>)}
+                          </select>
+                        </div>
                       </div>
                       <div className="cc-footer">
                         <button type="button" className="cc-btn-cancel" onClick={() => { handlePanelBack(); setNovoCliente(emptyClientForm); }}>
@@ -4893,119 +4910,203 @@ const AdminDashboard = () => {
                     </div>
                   )}
 
-                  <div className="admin-card clients-table-card">
-                    <div className="clients-table-toolbar">
-                      <div className="clients-toolbar-left">
-                        <div className="clients-search-wrap">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
-                          <input
-                            placeholder="Buscar por nome, WhatsApp, cidade ou e-mail..."
-                            value={clientSearch}
-                            onChange={(event) => setClientSearch(event.target.value)}
-                          />
+                  <div className={`clients-split-view${selectedCliente ? ' with-ficha' : ''}`}>
+                    <div className="clients-table-section">
+                      <div className="admin-card clients-table-card">
+                        <div className="clients-table-toolbar">
+                          <div className="clients-toolbar-left">
+                            <div className="clients-search-wrap">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+                              <input
+                                placeholder="Buscar por nome, WhatsApp, cidade ou e-mail..."
+                                value={clientSearch}
+                                onChange={(event) => setClientSearch(event.target.value)}
+                              />
+                            </div>
+                            <div className="clients-filter-tabs">
+                              {[['todos','Todos'],['Em negociação','Em negociação'],['Venda concluída','Concluídas'],['Venda suspensa','Suspensas']].map(([val, label]) => (
+                                <button key={val} type="button"
+                                  className={`cft-btn ${clientEtapaFilter === val ? 'active' : ''} ${val === 'Venda suspensa' ? 'cft-suspensa' : val === 'Venda concluída' ? 'cft-concluida' : val === 'Em negociação' ? 'cft-negociacao' : ''}`}
+                                  onClick={() => setClientEtapaFilter(val)}>{label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="clients-toolbar-right">
+                            <span className="clients-count">{clientSummary.filtered.length} cliente{clientSummary.filtered.length !== 1 ? 's' : ''}</span>
+                            {hasPermission('gerenciarClientes') && (
+                              <button type="button" className="btn btn-primary" onClick={() => { rememberPanelStep(); setNovoCliente(emptyClientForm); setClientView('new'); }}>
+                                + Cadastrar
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="clients-filter-tabs">
-                          {[['todos','Todos'],['Em negociação','Em negociação'],['Venda concluída','Concluídas'],['Venda suspensa','Suspensas']].map(([val, label]) => (
-                            <button key={val} type="button"
-                              className={`cft-btn ${clientEtapaFilter === val ? 'active' : ''} ${val === 'Venda suspensa' ? 'cft-suspensa' : val === 'Venda concluída' ? 'cft-concluida' : val === 'Em negociação' ? 'cft-negociacao' : ''}`}
-                              onClick={() => setClientEtapaFilter(val)}>{label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="clients-toolbar-right">
-                        <span className="clients-count">{clientSummary.filtered.length} cliente{clientSummary.filtered.length !== 1 ? 's' : ''}</span>
-                        {hasPermission('gerenciarClientes') && (
-                          <button type="button" className="btn btn-primary" onClick={() => { rememberPanelStep(); setNovoCliente(emptyClientForm); setClientView('new'); }}>
-                            + Cadastrar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="table-container">
-                      <table className="modern-table client-table-v2">
-                        <thead>
-                          <tr>
-                            <th style={{width:'42px'}}>#</th>
-                            <th>Cliente</th>
-                            <th>WhatsApp</th>
-                            <th>Cidade / UF</th>
-                            <th>Cadastro</th>
-                            <th>Etapa</th>
-                            <th style={{width:'1%'}}>Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {clientSummary.filtered.map(c => {
-                            const whatsappHref = getPanelWhatsAppUrl(c.whatsapp, whatsappClientMessage(c));
-                            const etapa = c.etapaComercial || 'Em negociação';
-                            const existingContract = getClientContract(c);
-                            const dataFormatada = c.dataCadastro ? c.dataCadastro.slice(0,10).split('-').reverse().join('/') : '—';
-                            return (
-                              <tr key={c.id} className="client-row">
-                                <td className="col-id text-muted">{c.id}</td>
-                                <td className="col-nome">
-                                  <span className="client-name">{c.nome}</span>
-                                </td>
-                                <td className="col-wp">
-                                  {c.whatsapp ? (
-                                    <a href={whatsappHref || '#'} target="_blank" rel="noopener noreferrer" className="wp-cell-link" title="Abrir WhatsApp">
-                                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#25d366" style={{ flexShrink: 0 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
-                                      {c.whatsapp}
-                                    </a>
-                                  ) : <span className="text-muted">—</span>}
-                                </td>
-                                <td>{[c.cidade, c.estado].filter(Boolean).join(' / ') || '—'}</td>
-                                <td className="text-muted">{dataFormatada}</td>
-                                <td>
-                                  <div className="etapa-cell">
-                                    <span className={`etapa-chip ${etapa === 'Venda concluída' ? 'etapa-concluida' : etapa === 'Venda suspensa' ? 'etapa-suspensa' : 'etapa-negociacao'}`}>{etapa}</span>
-                                    <div className="etapa-change-btns">
-                                      {etapa !== 'Venda concluída' && <button type="button" className="etapa-micro-btn concluir" title="Marcar como Venda Concluída" onClick={() => updateClienteEtapa(c.id, 'Venda concluída', {})}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>}
-                                      {etapa !== 'Em negociação' && <button type="button" className="etapa-micro-btn negociar" title="Retomar Negociação" onClick={() => updateClienteEtapa(c.id, 'Em negociação', {})}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.9"/></svg></button>}
-                                      {etapa !== 'Venda suspensa' && <button type="button" className="etapa-micro-btn suspender" title="Suspender Venda (pausar negociação)" onClick={() => { setSuspensaoModal(c); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></button>}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td>
-                                  <div className="client-actions">
-                                    {hasPermission('orcamentos') && (
-                                      <button type="button" className="ca-btn ca-primary" onClick={() => openBudgetFormForClient(c)}>Orçamento</button>
-                                    )}
-                                    {hasPermission('contratos') && (
-                                      <button
-                                        type="button"
-                                        className="ca-btn ca-outline"
-                                        title={existingContract ? `${contractNumber(existingContract)} - ${existingContract.status}` : 'Gerar contrato'}
-                                        onClick={() => openClientContractModal(c)}
-                                      >
-                                        {existingContract ? 'Ver contrato' : 'Contrato'}
-                                      </button>
-                                    )}
-                                    {hasPermission('contratos') && (
-                                      <button type="button" className="ca-btn ca-outline" onClick={() => openHomologacaoModal(c)}>Procuração</button>
-                                    )}
-                                    {hasPermission('gerenciarClientes') && (
-                                      <button type="button" className="ca-btn ca-ghost" title="Editar dados do cliente" onClick={() => { rememberPanelStep(); setNovoCliente({ ...emptyClientForm, ...c, password: '' }); setClientView('new'); }}>
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                        Editar
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
+                        <div className="table-container">
+                          <table className="modern-table client-table-v2">
+                            <thead>
+                              <tr>
+                                <th style={{width:'42px'}}>#</th>
+                                <th>Cliente</th>
+                                <th>WhatsApp</th>
+                                <th>Cidade / UF</th>
+                                <th>Cadastro</th>
+                                <th>Etapa</th>
+                                <th>Consultor</th>
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                      {clientSummary.filtered.length === 0 && (
-                        <div className="empty-state-orcamento client-empty-state">
-                          <div className="icon">CL</div>
-                          <h4>Nenhum cliente encontrado</h4>
-                          <p>Ajuste a busca ou o filtro de etapa.</p>
+                            </thead>
+                            <tbody>
+                              {clientSummary.filtered.map(c => {
+                                const whatsappHref = getPanelWhatsAppUrl(c.whatsapp, whatsappClientMessage(c));
+                                const etapa = c.etapaComercial || 'Em negociação';
+                                const dataFormatada = c.dataCadastro ? c.dataCadastro.slice(0,10).split('-').reverse().join('/') : '—';
+                                return (
+                                  <tr key={c.id} className={`client-row${selectedCliente?.id === c.id ? ' selected' : ''}`}>
+                                    <td className="col-id text-muted">{c.id}</td>
+                                    <td className="col-nome">
+                                      <button type="button" className="client-name-link" onClick={() => { setSelectedCliente(c); setClientFichaTab('resumo'); }}>{c.nome}</button>
+                                    </td>
+                                    <td className="col-wp">
+                                      {c.whatsapp ? (
+                                        <a href={whatsappHref || '#'} target="_blank" rel="noopener noreferrer" className="wp-cell-link" title="Abrir WhatsApp">
+                                          <svg width="15" height="15" viewBox="0 0 24 24" fill="#25d366" style={{ flexShrink: 0 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
+                                          {c.whatsapp}
+                                        </a>
+                                      ) : <span className="text-muted">—</span>}
+                                    </td>
+                                    <td>{[c.cidade, c.estado].filter(Boolean).join(' / ') || '—'}</td>
+                                    <td className="text-muted">{dataFormatada}</td>
+                                    <td>
+                                      <div className="etapa-cell">
+                                        <span className={`etapa-chip ${etapa === 'Venda concluída' ? 'etapa-concluida' : etapa === 'Venda suspensa' ? 'etapa-suspensa' : 'etapa-negociacao'}`}>{etapa}</span>
+                                        <div className="etapa-change-btns">
+                                          {etapa !== 'Venda concluída' && <button type="button" className="etapa-micro-btn concluir" title="Marcar como Venda Concluída" onClick={() => updateClienteEtapa(c.id, 'Venda concluída', {})}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>}
+                                          {etapa !== 'Em negociação' && <button type="button" className="etapa-micro-btn negociar" title="Retomar Negociação" onClick={() => updateClienteEtapa(c.id, 'Em negociação', {})}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.9"/></svg></button>}
+                                          {etapa !== 'Venda suspensa' && <button type="button" className="etapa-micro-btn suspender" title="Suspender Venda (pausar negociação)" onClick={() => { setSuspensaoModal(c); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></button>}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="col-consultor text-muted">{c.consultorNome || '—'}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                          {clientSummary.filtered.length === 0 && (
+                            <div className="empty-state-orcamento client-empty-state">
+                              <div className="icon">CL</div>
+                              <h4>Nenhum cliente encontrado</h4>
+                              <p>Ajuste a busca ou o filtro de etapa.</p>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
+
+                    {selectedCliente && (() => {
+                      const fichaEtapa = selectedCliente.etapaComercial || 'Em negociação';
+                      const fichaContract = getClientContract(selectedCliente);
+                      return (
+                        <aside className="client-ficha-panel">
+                          <div className="ficha-header">
+                            <div className="ficha-header-top">
+                              <div className="ficha-title-wrap">
+                                <strong className="ficha-nome">{selectedCliente.nome}</strong>
+                                <span className={`etapa-chip ${fichaEtapa === 'Venda concluída' ? 'etapa-concluida' : fichaEtapa === 'Venda suspensa' ? 'etapa-suspensa' : 'etapa-negociacao'}`}>{fichaEtapa}</span>
+                              </div>
+                              <button type="button" className="ficha-close-btn" aria-label="Fechar ficha" onClick={() => setSelectedCliente(null)}>×</button>
+                            </div>
+                            <div className="ficha-meta-grid">
+                              <div className="ficha-meta-cell">
+                                <span>WhatsApp</span>
+                                <strong>{selectedCliente.whatsapp || '—'}</strong>
+                              </div>
+                              <div className="ficha-meta-cell">
+                                <span>Cidade / UF</span>
+                                <strong>{[selectedCliente.cidade, selectedCliente.estado].filter(Boolean).join(' / ') || '—'}</strong>
+                              </div>
+                              <div className="ficha-meta-cell">
+                                <span>Cadastro</span>
+                                <strong>{selectedCliente.dataCadastro ? selectedCliente.dataCadastro.slice(0,10).split('-').reverse().join('/') : '—'}</strong>
+                              </div>
+                              <div className="ficha-meta-cell">
+                                <span>Consultor</span>
+                                <strong>{selectedCliente.consultorNome || '—'}</strong>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="ficha-tabs">
+                            {[['resumo','Resumo'],['documentos','Documentos'],['historico','Histórico'],['obs','Obs.']].map(([key, label]) => (
+                              <button key={key} type="button" className={`ficha-tab-btn${clientFichaTab === key ? ' active' : ''}`} onClick={() => setClientFichaTab(key)}>{label}</button>
+                            ))}
+                          </div>
+                          <div className="ficha-tab-body">
+                            {clientFichaTab === 'resumo' && (
+                              <div className="ficha-resumo">
+                                <div className="ficha-actions-grid">
+                                  {hasPermission('orcamentos') && (
+                                    <button type="button" className="ficha-action-card" onClick={() => openBudgetFormForClient(selectedCliente)}>
+                                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M8 8h5M8 16h3"/></svg>
+                                      <span>Orçamento</span>
+                                    </button>
+                                  )}
+                                  {hasPermission('contratos') && (
+                                    <button type="button" className="ficha-action-card" onClick={() => openClientContractModal(selectedCliente)}>
+                                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                      <span>{fichaContract ? 'Ver contrato' : 'Contrato'}</span>
+                                    </button>
+                                  )}
+                                  {hasPermission('contratos') && (
+                                    <button type="button" className="ficha-action-card" onClick={() => openHomologacaoModal(selectedCliente)}>
+                                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                      <span>Procuração</span>
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="ficha-etapa-section">
+                                  <p className="ficha-section-label">Alterar etapa</p>
+                                  <div className="ficha-etapa-btns">
+                                    {fichaEtapa !== 'Venda concluída' && (
+                                      <button type="button" className="ficha-etapa-btn concluir" onClick={() => { updateClienteEtapa(selectedCliente.id, 'Venda concluída', {}); setSelectedCliente(prev => ({ ...prev, etapaComercial: 'Venda concluída' })); }}>
+                                        ✓ Marcar como concluída
+                                      </button>
+                                    )}
+                                    {fichaEtapa !== 'Em negociação' && (
+                                      <button type="button" className="ficha-etapa-btn negociar" onClick={() => { updateClienteEtapa(selectedCliente.id, 'Em negociação', {}); setSelectedCliente(prev => ({ ...prev, etapaComercial: 'Em negociação' })); }}>
+                                        ↺ Retomar negociação
+                                      </button>
+                                    )}
+                                    {fichaEtapa !== 'Venda suspensa' && (
+                                      <button type="button" className="ficha-etapa-btn suspender" onClick={() => { setSuspensaoModal(selectedCliente); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}>
+                                        ⏸ Suspender venda
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {clientFichaTab === 'documentos' && (
+                              <div className="ficha-empty-tab"><p>Nenhum documento anexado.</p></div>
+                            )}
+                            {clientFichaTab === 'historico' && (
+                              <div className="ficha-empty-tab"><p>Histórico não disponível.</p></div>
+                            )}
+                            {clientFichaTab === 'obs' && (
+                              <div className="ficha-obs">
+                                <p>{selectedCliente.observacoes || 'Sem observações registradas.'}</p>
+                              </div>
+                            )}
+                          </div>
+                          {hasPermission('gerenciarClientes') && (
+                            <div className="ficha-footer">
+                              <button type="button" className="ficha-edit-btn" onClick={() => { rememberPanelStep(); setNovoCliente({ ...emptyClientForm, ...selectedCliente, password: '' }); setClientView('new'); }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Editar dados do cliente
+                              </button>
+                            </div>
+                          )}
+                        </aside>
+                      );
+                    })()}
                   </div>
                 </>
               )}
