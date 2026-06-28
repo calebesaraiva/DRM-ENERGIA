@@ -4347,197 +4347,124 @@ const AdminDashboard = () => {
 
               {/* ── VISÃO GERAL ─────────────────────────────────────────── */}
               <div className="pg-section-label">VISÃO GERAL</div>
-              <div className="pg-visao-row">
-                <button type="button" className="pg-visao-card pg-visao-primary" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
-                  <span className="pg-visao-title">Vendido no mês</span>
-                  <strong className="pg-visao-value">{money(resumo.kpis?.valorAprovadoMes)}</strong>
-                  <span className="pg-visao-sub">contratos aprovados</span>
+              <div className="pg-vg-row">
+                <button type="button" className="pg-vg-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                  <div className="pg-vg-top"><span className="pg-vg-dot" style={{background:'#f97316'}} /><span className="pg-vg-label">VENDIDO NO MÊS</span></div>
+                  <strong className="pg-vg-value">{money(resumo.kpis?.valorAprovadoMes)}</strong>
+                  <span className="pg-vg-sub">contratos aprovados</span>
                 </button>
-                <button type="button" className="pg-visao-card" onClick={() => navigatePanel({ activeTab: 'leads' })}>
-                  <span className="pg-visao-title">Retornos 7 dias</span>
-                  <strong className="pg-visao-value">{resumo.kpis?.retornosSemana || 0}</strong>
-                  <span className="pg-visao-sub">agendados esta semana</span>
+                <button type="button" className="pg-vg-card" onClick={() => navigatePanel({ activeTab: 'leads' })}>
+                  <div className="pg-vg-top"><span className="pg-vg-dot" style={{background:'#8b5cf6'}} /><span className="pg-vg-label">RETORNOS 7 DIAS</span></div>
+                  <strong className="pg-vg-value">{resumo.kpis?.retornosSemana || 0}</strong>
+                  <span className="pg-vg-sub">sem agenda</span>
                 </button>
-                <button type="button" className="pg-visao-card" onClick={() => navigatePanel({ activeTab: 'projetos' })}>
-                  <span className="pg-visao-title">Projetos ativos</span>
-                  <strong className="pg-visao-value">{resumo.kpis?.projetosAtivos || 0}</strong>
-                  <span className="pg-visao-sub">em andamento</span>
+                <button type="button" className="pg-vg-card" onClick={() => navigatePanel({ activeTab: 'projetos' })}>
+                  <div className="pg-vg-top"><span className="pg-vg-dot" style={{background:'#3b82f6'}} /><span className="pg-vg-label">PROJETOS ATIVOS</span></div>
+                  <strong className="pg-vg-value">{resumo.kpis?.projetosAtivos || 0}</strong>
+                  <span className="pg-vg-sub">em andamento</span>
                 </button>
-                <button type="button" className="pg-visao-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
-                  <span className="pg-visao-title">Valor pendente</span>
-                  <strong className="pg-visao-value">{money(resumo.kpis?.valorPendenteContratos)}</strong>
-                  <span className="pg-visao-sub">aguardando aprovação</span>
+                <button type="button" className="pg-vg-card" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                  <div className="pg-vg-top"><span className="pg-vg-dot" style={{background:'#22c55e'}} /><span className="pg-vg-label">VALOR PENDENTE</span></div>
+                  <strong className="pg-vg-value">{money(resumo.kpis?.valorPendenteContratos)}</strong>
+                  <span className="pg-vg-sub">contratos</span>
                 </button>
               </div>
 
               {/* ── ATENDER AGORA ──────────────────────────────────────── */}
               <div className="pg-section-label">ATENDER AGORA</div>
-              <div className="dashboard-action-strip pg-atender-strip">
-                <button type="button" className="dashboard-action-card urgent" onClick={() => navigatePanel({ activeTab: 'leads' })}>
-                  <span>Leads novos</span>
-                  <strong>{resumo.kpis?.novos || 0}</strong>
-                  <small>aguardando atendimento</small>
+              <div className="pg-aa-row">
+                <button type="button" className="pg-aa-card" style={{borderLeftColor:'#f97316'}} onClick={() => navigatePanel({ activeTab: 'leads' })}>
+                  <span className="pg-aa-label">LEADS NOVOS</span>
+                  <strong className="pg-aa-number">{resumo.kpis?.novos || 0}</strong>
                 </button>
-                <button type="button" className="dashboard-action-card" onClick={() => navigatePanel({ activeTab: 'leads' })}>
-                  <span>Retornos</span>
-                  <strong>{resumo.proximosRetornos?.length || 0}</strong>
-                  <small>agendado{(resumo.proximosRetornos?.length || 0) === 1 ? '' : 's'}</small>
+                <button type="button" className="pg-aa-card" style={{borderLeftColor:'#8b5cf6'}} onClick={() => navigatePanel({ activeTab: 'leads' })}>
+                  <span className="pg-aa-label">RETORNOS</span>
+                  <strong className="pg-aa-number">{resumo.proximosRetornos?.length || 0}</strong>
                 </button>
-                <button type="button" className="dashboard-action-card warning" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
-                  <span>Contratos pend.</span>
-                  <strong>{resumo.kpis?.contratosPendentes || 0}</strong>
-                  <small>pendente{(resumo.kpis?.contratosPendentes || 0) === 1 ? '' : 's'}</small>
+                <button type="button" className="pg-aa-card" style={{borderLeftColor:'#f59e0b'}} onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                  <span className="pg-aa-label">CONTRATOS PEND.</span>
+                  <strong className="pg-aa-number">{resumo.kpis?.contratosPendentes || 0}</strong>
                 </button>
-                <button type="button" className="dashboard-action-card" onClick={() => navigatePanel({ activeTab: 'projetos' })}>
-                  <span>Projetos críticos</span>
-                  <strong>{resumo.projetosCriticos?.length || 0}</strong>
-                  <small>com atenção</small>
+                <button type="button" className="pg-aa-card" style={{borderLeftColor:'#ef4444'}} onClick={() => navigatePanel({ activeTab: 'projetos' })}>
+                  <span className="pg-aa-label">PROJETOS CRÍTICOS</span>
+                  <strong className="pg-aa-number">{resumo.projetosCriticos?.length || 0}</strong>
                 </button>
-                <button type="button" className="dashboard-action-card warning" onClick={() => navigatePanel({ activeTab: 'ordensServico' })}>
-                  <span>O.S abertas</span>
-                  <strong>{resumo.kpis?.osAbertas || 0}</strong>
-                  <small>{resumo.kpis?.osEmAtendimento || 0} em atendimento</small>
+                <button type="button" className="pg-aa-card" style={{borderLeftColor:'#ec4899'}} onClick={() => navigatePanel({ activeTab: 'ordensServico' })}>
+                  <span className="pg-aa-label">O.S ABERTAS</span>
+                  <strong className="pg-aa-number">{resumo.kpis?.osAbertas || 0}</strong>
                 </button>
               </div>
 
               {/* ── 3-COLUMN SECTION GRID ──────────────────────────────── */}
-              <div className="pg-columns-grid">
+              <div className="pg-3col-grid">
                 {/* COMERCIAL */}
-                <div className="pg-col">
-                  <div className="pg-col-header">COMERCIAL</div>
-                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'leads' })}>
-                    <span>Leads captados</span><strong>{resumo.kpis?.leads || 0}</strong>
-                  </button>
-                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'orcamentos' })}>
-                    <span>Orçamentos</span><strong>{resumo.kpis?.orcamentos || 0}</strong>
-                  </button>
-                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
-                    <span>Contratos</span><strong>{resumo.kpis?.contratos || 0}</strong>
-                  </button>
-                  <div className="pg-col-mini-section">
-                    <span className="pg-col-mini-label">Funil</span>
-                    {Object.entries(resumo.leadsPorStatus || {}).slice(0, 4).map(([status, total]) => (
-                      <div className="pg-mini-pipeline-item" key={status}>
-                        <div className="pg-mini-pipeline-top"><span>{status}</span><strong>{total}</strong></div>
-                        <div className="pipeline-bar"><span style={{ width: `${Math.min((total / Math.max(resumo.kpis?.leads || 1, 1)) * 100, 100)}%` }}></span></div>
-                      </div>
-                    ))}
+                <div className="pg-3col-section">
+                  <div className="pg-3col-head">
+                    <span className="pg-3col-title pg-orange">COMERCIAL</span>
+                    <button type="button" className="pg-ver-detalhes" onClick={() => navigatePanel({ activeTab: 'leads' })}>Ver detalhes ›</button>
+                  </div>
+                  <div className="pg-mini-grid">
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#f97316'}} onClick={() => navigatePanel({ activeTab: 'leads' })}>
+                      <span>LEADS CAPTADOS</span><strong>{resumo.kpis?.leads || 0}</strong>
+                    </button>
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#f97316'}} onClick={() => navigatePanel({ activeTab: 'orcamentos' })}>
+                      <span>ORÇAMENTOS</span><strong>{resumo.kpis?.orcamentos || 0}</strong>
+                    </button>
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#f97316'}} onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                      <span>CONTRATOS</span><strong>{resumo.kpis?.contratos || 0}</strong>
+                    </button>
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#f97316'}} onClick={() => navigatePanel({ activeTab: 'leads' })}>
+                      <span>FUNIL</span><strong>{resumo.kpis?.leads || 0}</strong>
+                    </button>
                   </div>
                 </div>
 
                 {/* OPERAÇÃO */}
-                <div className="pg-col">
-                  <div className="pg-col-header">OPERAÇÃO</div>
-                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'projetos' })}>
-                    <span>Projetos críticos</span><strong>{resumo.projetosCriticos?.length || 0}</strong>
-                  </button>
-                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'contratos' })}>
-                    <span>Homologações</span><strong>{resumo.operacao?.contratosAprovados || 0}</strong>
-                  </button>
-                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'instalacoes' })}>
-                    <span>Instalações</span><strong>{resumo.kpis?.projetosAtivos || 0}</strong>
-                  </button>
-                  <button type="button" className="pg-col-item" onClick={() => navigatePanel({ activeTab: 'ordensServico' })}>
-                    <span>Pend. técnicas</span><strong>{resumo.operacao?.ordensServicoAbertas || 0}</strong>
-                  </button>
+                <div className="pg-3col-section">
+                  <div className="pg-3col-head">
+                    <span className="pg-3col-title pg-blue">OPERAÇÃO</span>
+                    <button type="button" className="pg-ver-detalhes" onClick={() => navigatePanel({ activeTab: 'projetos' })}>Ver detalhes ›</button>
+                  </div>
+                  <div className="pg-mini-grid">
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#3b82f6'}} onClick={() => navigatePanel({ activeTab: 'projetos' })}>
+                      <span>PROJETOS CRIT.</span><strong>{resumo.projetosCriticos?.length || 0}</strong>
+                    </button>
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#3b82f6'}} onClick={() => navigatePanel({ activeTab: 'contratos' })}>
+                      <span>HOMOLOG.</span><strong>{resumo.operacao?.contratosAprovados || 0}</strong>
+                    </button>
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#3b82f6'}} onClick={() => navigatePanel({ activeTab: 'instalacoes' })}>
+                      <span>INSTALAÇÕES</span><strong>{resumo.kpis?.projetosAtivos || 0}</strong>
+                    </button>
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#3b82f6'}} onClick={() => navigatePanel({ activeTab: 'ordensServico' })}>
+                      <span>PEND. TÉCNICAS</span><strong>{resumo.operacao?.ordensServicoAbertas || 0}</strong>
+                    </button>
+                  </div>
                 </div>
 
                 {/* MARKETING + ACESSOS */}
-                <div className="pg-col">
-                  <div className="pg-col-header">MARKETING + ACESSOS</div>
-                  <div className="pg-col-item">
-                    <span>Visitas 30D</span><strong>{resumo.kpis?.visitasSite30d || 0}</strong>
+                <div className="pg-3col-section">
+                  <div className="pg-3col-head">
+                    <span className="pg-3col-title pg-green">MARKETING + ACESSOS</span>
+                    <button type="button" className="pg-ver-detalhes" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>Ver detalhes ›</button>
                   </div>
-                  <div className="pg-col-item">
-                    <span>WhatsApp</span><strong>{resumo.kpis?.clicksWhatsApp30d || 0}</strong>
+                  <div className="pg-mini-grid">
+                    <div className="pg-mini-card" style={{borderLeftColor:'#22c55e'}}>
+                      <span>VISITAS 30D</span><strong>{resumo.kpis?.visitasSite30d || 0}</strong>
+                    </div>
+                    <div className="pg-mini-card" style={{borderLeftColor:'#22c55e'}}>
+                      <span>WHATSAPP</span><strong>{resumo.kpis?.clicksWhatsApp30d || 0}</strong>
+                    </div>
+                    <div className="pg-mini-card" style={{borderLeftColor:'#22c55e'}}>
+                      <span>SIMULAR</span><strong>{resumo.kpis?.clicksSimular30d || 0}</strong>
+                    </div>
+                    <button type="button" className="pg-mini-card" style={{borderLeftColor:'#ef4444'}} onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
+                      <span>SEM E-MAIL</span><strong>{resumo.kpis?.acessosSemRecuperacao || 0}</strong>
+                    </button>
                   </div>
-                  <div className="pg-col-item">
-                    <span>Simular</span><strong>{resumo.kpis?.clicksSimular30d || 0}</strong>
-                  </div>
-                  <button type="button" className="pg-col-item pg-col-item-alert" onClick={() => navigatePanel({ activeTab: 'usuarios' })}>
-                    <span>Sem e-mail</span><strong>{resumo.kpis?.acessosSemRecuperacao || 0}</strong>
-                  </button>
                 </div>
               </div>
 
-              {Array.isArray(resumo.vendasConsultores?.porAno) && resumo.vendasConsultores.porAno.length > 0 && (
-                <div className="admin-card consultor-sales-panel">
-                  <div className="section-heading consultor-sales-heading">
-                    <div>
-                      <span className="section-kicker">Performance comercial</span>
-                      <h3>Vendas por consultor</h3>
-                      <p>Agora o contrato já guarda o consultor da venda para a gente separar faturamento e produção por pessoa.</p>
-                    </div>
-                    <div className="section-stats">
-                      <div><strong>{money(resumo.vendasConsultores?.totalMes || 0)}</strong><span>mês atual</span></div>
-                      <div><strong>{money(resumo.vendasConsultores?.totalAno || 0)}</strong><span>ano atual</span></div>
-                      <div><strong>{resumo.vendasConsultores?.porAno?.length || 0}</strong><span>consultores</span></div>
-                    </div>
-                  </div>
-
-                  <div className="consultor-sales-grid">
-                    <section className="consultor-sales-card">
-                      <div className="consultor-sales-card-header">
-                        <div>
-                          <span>Ranking mensal</span>
-                          <strong>{resumo.vendasConsultores?.referenciaMes || 'Mês atual'}</strong>
-                        </div>
-                      </div>
-                      <div className="consultor-sales-list">
-                        {(resumo.vendasConsultores?.porMes || []).map(item => {
-                          const width = resumo.vendasConsultores?.totalMes
-                            ? Math.max((Number(item.mes?.valor || 0) / Number(resumo.vendasConsultores.totalMes || 1)) * 100, item.mes?.valor ? 12 : 0)
-                            : 0;
-                          return (
-                            <div className="consultor-sales-item" key={`mes-${item.nome}`}>
-                              <div className="consultor-sales-row">
-                                <strong>{item.nome}</strong>
-                                <span>{item.mes?.quantidade || 0} venda{(item.mes?.quantidade || 0) === 1 ? '' : 's'}</span>
-                              </div>
-                              <div className="consultor-sales-bar"><span style={{ width: `${Math.min(width, 100)}%` }}></span></div>
-                              <div className="consultor-sales-row is-summary">
-                                <small>{money(item.mes?.valor || 0)}</small>
-                                <small>{resumo.vendasConsultores?.totalMes ? percent((item.mes?.valor || 0) / resumo.vendasConsultores.totalMes) : '0,0%'}</small>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-
-                    <section className="consultor-sales-card">
-                      <div className="consultor-sales-card-header">
-                        <div>
-                          <span>Ranking anual</span>
-                          <strong>{resumo.vendasConsultores?.referenciaAno || 'Ano atual'}</strong>
-                        </div>
-                      </div>
-                      <div className="consultor-sales-list">
-                        {(resumo.vendasConsultores?.porAno || []).map(item => {
-                          const width = resumo.vendasConsultores?.totalAno
-                            ? Math.max((Number(item.ano?.valor || 0) / Number(resumo.vendasConsultores.totalAno || 1)) * 100, item.ano?.valor ? 12 : 0)
-                            : 0;
-                          return (
-                            <div className="consultor-sales-item" key={`ano-${item.nome}`}>
-                              <div className="consultor-sales-row">
-                                <strong>{item.nome}</strong>
-                                <span>{item.ano?.quantidade || 0} venda{(item.ano?.quantidade || 0) === 1 ? '' : 's'}</span>
-                              </div>
-                              <div className="consultor-sales-bar annual"><span style={{ width: `${Math.min(width, 100)}%` }}></span></div>
-                              <div className="consultor-sales-row is-summary">
-                                <small>{money(item.ano?.valor || 0)}</small>
-                                <small>{resumo.vendasConsultores?.totalAno ? percent((item.ano?.valor || 0) / resumo.vendasConsultores.totalAno) : '0,0%'}</small>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  </div>
-                </div>
-              )}
-
-              {/* ── PERFORMANCE POR CONSULTOR (existente) ──────────────── */}
+              {/* ── PERFORMANCE POR CONSULTOR ──────────────────────────── */}
               {Array.isArray(resumo.vendasConsultores?.porAno) && resumo.vendasConsultores.porAno.length > 0 && (
                 <div className="admin-card consultor-sales-panel">
                   <div className="section-heading consultor-sales-heading">
