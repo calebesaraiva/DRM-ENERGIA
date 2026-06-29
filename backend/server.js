@@ -3354,8 +3354,15 @@ const buildContratoPdf = async (contrato) => {
     };
 
     const renderClauses = () => {
-      clauses.split('\n').map(line => line.trim()).filter(Boolean).forEach(line => {
+      const lines = clauses.split('\n').map(line => line.trim()).filter(Boolean);
+      lines.forEach((line, index) => {
         if (/^CL[ÁA]USULA|^D[ÉE]CIMA|^DAS |^DO |^DA /i.test(line) && line.length < 110) {
+          const nextLine = lines[index + 1] || '';
+          doc.font('Helvetica').fontSize(8.8);
+          const nextParagraphHeight = nextLine
+            ? Math.min(72, doc.heightOfString(sanitize(nextLine), { width: pageWidth, lineGap: 3 }) + 12)
+            : 0;
+          ensureSpace(38 + nextParagraphHeight);
           sectionTitle(line);
         } else {
           paragraph(line);
