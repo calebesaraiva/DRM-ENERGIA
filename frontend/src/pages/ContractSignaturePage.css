@@ -321,6 +321,12 @@
   font-size: 1rem;
 }
 
+.signature-identity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .signature-modal-card {
   padding: 0;
   border: 0;
@@ -636,6 +642,7 @@
   }
 
   .signature-meta-grid,
+  .signature-identity-grid,
   .signature-mode-picker,
   .signature-pad-foot {
     grid-template-columns: 1fr;

@@ -22,6 +22,7 @@ function ContractSignaturePage() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [signerName, setSignerName] = useState('');
+  const [signerBirthDate, setSignerBirthDate] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [hasSignatureStroke, setHasSignatureStroke] = useState(false);
   const [signatureMode, setSignatureMode] = useState('typed');
@@ -62,6 +63,7 @@ function ContractSignaturePage() {
       if (!response.ok) throw new Error(data?.message || 'Não foi possível carregar o contrato.');
       setContract(data);
       setSignerName(data?.clienteNome || '');
+      setSignerBirthDate(data?.assinatura?.cliente?.birthDate || data?.clienteDataNascimento || '');
       setStatus('');
       setAcceptedTerms(false);
       setSignedResult(null);
@@ -174,6 +176,10 @@ function ContractSignaturePage() {
       setStatus('Confirme o aceite do contrato para concluir a assinatura.');
       return;
     }
+    if (!signerBirthDate) {
+      setStatus('Informe sua data de nascimento para concluir a assinatura.');
+      return;
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (!hasSignatureStroke) {
@@ -187,6 +193,7 @@ function ContractSignaturePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           signerName,
+          signerBirthDate,
           acceptedTerms,
           signatureDataUrl: canvas.toDataURL('image/png'),
           signatureMode,
@@ -265,6 +272,24 @@ function ContractSignaturePage() {
           disabled={signatureCompleted}
         />
       </label>
+
+      <div className="signature-identity-grid">
+        <label>
+          CPF/CNPJ
+          <input value={contract?.clienteCpfCnpj || 'Não informado'} disabled />
+        </label>
+        <label>
+          Data de nascimento
+          <input
+            type="date"
+            value={signerBirthDate}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(event) => setSignerBirthDate(event.target.value)}
+            disabled={signatureCompleted}
+            required
+          />
+        </label>
+      </div>
 
       <div className="signature-meta-grid">
         <div className="signature-meta-card">

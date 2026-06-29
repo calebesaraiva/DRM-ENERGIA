@@ -2780,6 +2780,10 @@ const formatCurrency = (value) => Number(value || 0).toLocaleString('pt-BR', {
 });
 
 const formatDateBr = (value = new Date()) => new Date(value).toLocaleDateString('pt-BR');
+const formatDateOnlyBr = (value) => {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : formatDateBr(value);
+};
 
 const getContractTemplate = async () => {
   const saved = await getSetting('contractTemplate', null);
@@ -3473,18 +3477,30 @@ const buildContratoPdf = async (contrato) => {
         { width: 205, height: 9, align: 'center', lineBreak: false }
       );
       doc.text(
-        `Nascimento ${formatDateBr(assinatura.drm.birthDate || DRM_SIGNATORY.nascimento)}`,
+        `Nascimento ${formatDateOnlyBr(assinatura.drm.birthDate || DRM_SIGNATORY.nascimento)}`,
         doc.page.margins.left,
         signatureY + 53,
         { width: 205, height: 9, align: 'center', lineBreak: false }
       );
     }
     if (assinatura?.cliente?.signedAt) {
-      doc.font('Helvetica').fontSize(7).fillColor(muted).text(
-        `Assinado digitalmente por ${assinatura.cliente.signedByName || parsed.clienteNome} em ${formatDateBr(assinatura.cliente.signedAt)}`,
+      doc.font('Helvetica').fontSize(6.5).fillColor(muted).text(
+        `Assinado eletronicamente em ${formatDateBr(assinatura.cliente.signedAt)}`,
         doc.page.margins.left + pageWidth - 205,
         signatureY + 31,
-        { width: 205, align: 'center' }
+        { width: 205, height: 9, align: 'center', lineBreak: false }
+      );
+      doc.text(
+        `CPF ${assinatura.cliente.cpfCnpj || contractVariables.cliente.cpfCnpj}`,
+        doc.page.margins.left + pageWidth - 205,
+        signatureY + 42,
+        { width: 205, height: 9, align: 'center', lineBreak: false }
+      );
+      doc.text(
+        `Nascimento ${assinatura.cliente.birthDate ? formatDateOnlyBr(assinatura.cliente.birthDate) : 'Não informado'}`,
+        doc.page.margins.left + pageWidth - 205,
+        signatureY + 53,
+        { width: 205, height: 9, align: 'center', lineBreak: false }
       );
     }
     doc.y = signatureY + 72;
@@ -7989,6 +8005,8 @@ app.get('/api/assinatura/contrato/:token', async (req, res) => {
     id: parsed.id,
     numero: `CT-${String(parsed.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(parsed.id || '').padStart(4, '0')}`,
     clienteNome: parsed.clienteNome,
+    clienteCpfCnpj: parsed.dados?.cliente?.cpfCnpj || parsed.dados?.manual?.cpfCnpj || '',
+    clienteDataNascimento: parsed.dados?.cliente?.dataNascimento || parsed.dados?.cliente?.nascimento || parsed.dados?.manual?.dataNascimento || '',
     clienteCidade: parsed.clienteCidade,
     clienteTelefone: parsed.clienteTelefone,
     clienteEmail: parsed.clienteEmail,
@@ -8022,6 +8040,13 @@ app.post('/api/assinatura/contrato/:token/cliente', async (req, res) => {
 
   const signerName = String(req.body?.signerName || '').trim();
   if (!signerName) return res.status(400).json({ message: 'Informe seu nome para concluir a assinatura.' });
+  const signerBirthDate = String(req.body?.signerBirthDate || '').trim();
+  const birthDate = /^\d{4}-\d{2}-\d{2}$/.test(signerBirthDate)
+    ? new Date(`${signerBirthDate}T12:00:00.000Z`)
+    : null;
+  if (!birthDate || Number.isNaN(birthDate.getTime()) || birthDate.getUTCFullYear() < 1900 || birthDate.getTime() > Date.now()) {
+    return res.status(400).json({ message: 'Informe uma data de nascimento válida.' });
+  }
   if (!req.body?.acceptedTerms) {
     return res.status(400).json({ message: 'Confirme a leitura e o aceite do contrato antes de assinar.' });
   }
@@ -8034,11 +8059,14 @@ app.post('/api/assinatura/contrato/:token/cliente', async (req, res) => {
 
   const parsed = parseContrato(contrato);
   const documentHash = buildSignatureDocumentHash(parsed);
+  const clienteCpfCnpj = parsed.dados?.cliente?.cpfCnpj || parsed.dados?.manual?.cpfCnpj || '';
   const assinatura = {
     ...(parsed.dados?.assinatura || {}),
     cliente: {
       signedAt: new Date().toISOString(),
       signedByName: signerName,
+      cpfCnpj: clienteCpfCnpj,
+      birthDate: signerBirthDate,
       dataUrl: signatureCheck.dataUrl,
       signatureMode: req.body?.signatureMode === 'typed' ? 'typed' : 'drawn',
       ip: getRequestIp(req),
