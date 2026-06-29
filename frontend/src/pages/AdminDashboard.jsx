@@ -909,6 +909,19 @@ const AdminDashboard = () => {
   const INST_PER_PAGE = 10;
   const INST_STATUS_FLOW = ['Aguardando envio','Em transporte','Entrega agendada','Equipamento entregue','Materiais com pendência','Aguardando instalação','Instalação agendada','Reagendada','Em instalação','Aguardando conferência técnica','Concluída','Cancelada'];
   // ── End Instalações redesign state ─────────────────────────────────────────
+  // ── Esteira Sistemas FV state ───────────────────────────────────────────────
+  const [sistemasFv, setSistemasFv] = useState([]);
+  const [sfvFilter, setSfvFilter] = useState('todos');
+  const [sfvSearch, setSfvSearch] = useState('');
+  const [sfvConsultorFilter, setSfvConsultorFilter] = useState('');
+  const [sfvCidadeFilter, setSfvCidadeFilter] = useState('');
+  const [sfvView, setSfvView] = useState('kanban');
+  const [sfvSelected, setSfvSelected] = useState(null);
+  const [sfvHistorico, setSfvHistorico] = useState([]);
+  const [sfvUpdateOpen, setSfvUpdateOpen] = useState(false);
+  const [sfvUpdateForm, setSfvUpdateForm] = useState({ etapaAtual: '', status: '', proximaAcao: '', prazoAtual: '', responsavelAtual: '', observacoes: '' });
+  const [sfvFichaTab, setSfvFichaTab] = useState('resumo');
+  // ── End Esteira Sistemas FV state ───────────────────────────────────────────
   const [pendenciaForm, setPendenciaForm] = useState(emptyPendenciaForm);
   const [envioHomologacaoForm, setEnvioHomologacaoForm] = useState(emptyEnvioHomologacaoForm);
   const [novoCliente, setNovoCliente] = useState(emptyClientForm);
@@ -1256,6 +1269,7 @@ const AdminDashboard = () => {
       tabs: [
         { id: 'homologacao', label: 'Homologação', permission: 'equipeTecnica' },
         { id: 'projetos', label: 'Instalações', permission: 'equipeTecnica' },
+        { id: 'esteiraSistemasFV', label: 'Esteira de Sistemas FV', permission: 'equipeTecnica' },
         { id: 'ordensServico', label: 'O.S e suporte', permission: 'ordensServico' },
       ],
     },
@@ -1745,6 +1759,44 @@ const AdminDashboard = () => {
   }, [projetos, instAgendaTab]);
   // ── End Instalações redesign useMemos ──────────────────────────────────────
 
+  // ── Esteira Sistemas FV useMemos ────────────────────────────────────────────
+  const SFV_ETAPAS = ['Venda concluída', 'Documentos', 'Homologação', 'Entrega', 'Instalação', 'Ligação', 'Concluído'];
+  const sfvStatusColor = { 'No prazo': '#22c55e', 'Atenção': '#f97316', 'Atrasado': '#ef4444', 'Concessionária': '#3b82f6', 'Pausado': '#94a3b8' };
+  const sfvEtapaColor = { 'Venda concluída': '#f97316', 'Documentos': '#8b5cf6', 'Homologação': '#3b82f6', 'Entrega': '#f59e0b', 'Instalação': '#10b981', 'Ligação': '#06b6d4', 'Concluído': '#22c55e' };
+
+  const filteredSistemasFv = useMemo(() => {
+    let items = sistemasFv;
+    if (sfvFilter === 'vendas') items = items.filter(s => s.etapaAtual === 'Venda concluída');
+    else if (sfvFilter === 'homologacao') items = items.filter(s => s.etapaAtual === 'Homologação');
+    else if (sfvFilter === 'entrega') items = items.filter(s => s.etapaAtual === 'Entrega');
+    else if (sfvFilter === 'instalacao') items = items.filter(s => s.etapaAtual === 'Instalação');
+    else if (sfvFilter === 'ligacao') items = items.filter(s => s.etapaAtual === 'Ligação');
+    else if (sfvFilter === 'concluido') items = items.filter(s => s.etapaAtual === 'Concluído');
+    else if (sfvFilter === 'atrasados') items = items.filter(s => ['Atrasado', 'Atenção'].includes(s.status));
+    if (sfvSearch) {
+      const q = sfvSearch.toLowerCase();
+      items = items.filter(s => (s.clienteNome || '').toLowerCase().includes(q) || (s.cidade || '').toLowerCase().includes(q) || (s.consultorNome || '').toLowerCase().includes(q));
+    }
+    if (sfvConsultorFilter) items = items.filter(s => s.consultorNome === sfvConsultorFilter);
+    if (sfvCidadeFilter) items = items.filter(s => s.cidade === sfvCidadeFilter);
+    return items;
+  }, [sistemasFv, sfvFilter, sfvSearch, sfvConsultorFilter, sfvCidadeFilter]);
+
+  const sfvResumo = useMemo(() => {
+    const porEtapa = {};
+    for (const e of SFV_ETAPAS) porEtapa[e] = 0;
+    let atrasados = 0;
+    for (const s of sistemasFv) {
+      porEtapa[s.etapaAtual] = (porEtapa[s.etapaAtual] || 0) + 1;
+      if (['Atrasado', 'Atenção'].includes(s.status)) atrasados++;
+    }
+    return { porEtapa, atrasados };
+  }, [sistemasFv]);
+
+  const sfvConsultores = useMemo(() => [...new Set(sistemasFv.map(s => s.consultorNome).filter(Boolean))].sort(), [sistemasFv]);
+  const sfvCidades = useMemo(() => [...new Set(sistemasFv.map(s => s.cidade).filter(Boolean))].sort(), [sistemasFv]);
+  // ── End Esteira Sistemas FV useMemos ────────────────────────────────────────
+
   const osSummary = useMemo(() => {
     const overdueStatuses = new Set(['Aberta', 'Em análise', 'Aguardando triagem', 'Aguardando agendamento', 'Agendada', 'Em atendimento', 'Aguardando material', 'Retorno necessário', 'Com pendência', 'Planejada', 'Equipe a caminho']);
     const now = new Date();
@@ -1914,6 +1966,7 @@ const AdminDashboard = () => {
         )));
         setProjectPhotos(Object.fromEntries(photos));
       }));
+      calls.push(request('/api/admin/sistemas-fv').then(setSistemasFv).catch(() => {}));
     }
     if (user.role === 'ADM' || user.permissions?.ordensServico) {
       calls.push(request('/api/admin/ordens-servico').then(setOrdensServico));
@@ -9022,6 +9075,401 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'esteiraSistemasFV' && (
+            <div className="admin-section sfv-section">
+              {/* Header */}
+              <div className="sfv-header">
+                <div>
+                  <h3 className="sfv-title">Esteira de Sistemas FV</h3>
+                  <p className="sfv-subtitle">Acompanhe cada sistema fotovoltaico da venda até a ligação pela concessionária.</p>
+                </div>
+                <div className="sfv-header-actions">
+                  <button
+                    type="button"
+                    className={`sfv-view-btn${sfvView === 'kanban' ? ' active' : ''}`}
+                    onClick={() => setSfvView('kanban')}
+                  >Kanban</button>
+                  <button
+                    type="button"
+                    className={`sfv-view-btn${sfvView === 'tabela' ? ' active' : ''}`}
+                    onClick={() => setSfvView('tabela')}
+                  >Tabela</button>
+                </div>
+              </div>
+
+              {/* Stats cards */}
+              <div className="sfv-stats-row">
+                {[
+                  { label: 'Vendas fechadas', key: 'Venda concluída', color: '#f97316' },
+                  { label: 'Em homologação', key: 'Homologação', color: '#3b82f6' },
+                  { label: 'Entrega agendada', key: 'Entrega', color: '#f59e0b' },
+                  { label: 'Instalação agendada', key: 'Instalação', color: '#10b981' },
+                  { label: 'Aguardando ligação', key: 'Ligação', color: '#06b6d4' },
+                  { label: 'Sistemas ligados', key: 'Concluído', color: '#22c55e' },
+                  { label: 'Atrasados/atenção', key: '__atrasados__', color: '#ef4444' },
+                ].map(({ label, key, color }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`sfv-stat-card${(sfvFilter === (key === '__atrasados__' ? 'atrasados' : key === 'Venda concluída' ? 'vendas' : key.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,''))) ? ' active' : ''}`}
+                    style={{ borderTopColor: color }}
+                    onClick={() => setSfvFilter(key === '__atrasados__' ? 'atrasados' : key === 'Venda concluída' ? 'vendas' : key === 'Homologação' ? 'homologacao' : key === 'Entrega' ? 'entrega' : key === 'Instalação' ? 'instalacao' : key === 'Ligação' ? 'ligacao' : key === 'Concluído' ? 'concluido' : 'todos')}
+                  >
+                    <strong className="sfv-stat-num" style={{ color }}>
+                      {key === '__atrasados__' ? sfvResumo.atrasados : (sfvResumo.porEtapa[key] || 0)}
+                    </strong>
+                    <span className="sfv-stat-label">{label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Filter tabs */}
+              <div className="sfv-filter-tabs">
+                {[
+                  { id: 'todos', label: 'Todos' },
+                  { id: 'vendas', label: 'Vendas' },
+                  { id: 'homologacao', label: 'Homologação' },
+                  { id: 'entrega', label: 'Entrega' },
+                  { id: 'instalacao', label: 'Instalação' },
+                  { id: 'ligacao', label: 'Ligação' },
+                  { id: 'concluido', label: 'Concluído' },
+                  { id: 'atrasados', label: 'Atrasados' },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`sfv-ftab${sfvFilter === tab.id ? ' active' : ''}`}
+                    onClick={() => setSfvFilter(tab.id)}
+                  >{tab.label}</button>
+                ))}
+              </div>
+
+              {/* Filter bar */}
+              <div className="sfv-filter-bar">
+                <input
+                  type="text"
+                  className="sfv-search"
+                  placeholder="Pesquisar cliente, cidade ou consultor..."
+                  value={sfvSearch}
+                  onChange={e => setSfvSearch(e.target.value)}
+                />
+                <select className="sfv-select" value={sfvConsultorFilter} onChange={e => setSfvConsultorFilter(e.target.value)}>
+                  <option value="">Consultor</option>
+                  {sfvConsultores.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select className="sfv-select" value={sfvCidadeFilter} onChange={e => setSfvCidadeFilter(e.target.value)}>
+                  <option value="">Cidade</option>
+                  {sfvCidades.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <button type="button" className="btn btn-outline sfv-clear-btn" onClick={() => { setSfvSearch(''); setSfvConsultorFilter(''); setSfvCidadeFilter(''); setSfvFilter('todos'); }}>
+                  Limpar filtros
+                </button>
+                <span className="sfv-count">{filteredSistemasFv.length} sistema{filteredSistemasFv.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Main content + right panel */}
+              <div className="sfv-body-layout">
+                <div className="sfv-main">
+                  {/* KANBAN VIEW */}
+                  {sfvView === 'kanban' && (
+                    <div className="sfv-kanban">
+                      {SFV_ETAPAS.map(etapa => {
+                        const cards = filteredSistemasFv.filter(s => s.etapaAtual === etapa);
+                        const col = sfvEtapaColor[etapa] || '#94a3b8';
+                        return (
+                          <div key={etapa} className="sfv-kanban-col">
+                            <div className="sfv-col-head" style={{ borderTopColor: col }}>
+                              <span className="sfv-col-title">{etapa}</span>
+                              <span className="sfv-col-count" style={{ background: col }}>{cards.length}</span>
+                            </div>
+                            <div className="sfv-col-cards">
+                              {cards.length === 0 && (
+                                <div className="sfv-col-empty">Nenhum sistema</div>
+                              )}
+                              {cards.map(s => {
+                                const isOverdue = s.prazoAtual && new Date(s.prazoAtual) < new Date();
+                                return (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    className={`sfv-card${sfvSelected?.id === s.id ? ' selected' : ''}`}
+                                    onClick={() => { setSfvSelected(s); setSfvFichaTab('resumo'); setSfvHistorico([]); request(`/api/admin/sistemas-fv/${s.id}/historico`).then(setSfvHistorico).catch(() => {}); }}
+                                  >
+                                    <div className="sfv-card-name">{s.clienteNome}</div>
+                                    <div className="sfv-card-meta">
+                                      {s.cidade && <span>{s.cidade}{s.estado ? ` - ${s.estado}` : ''}</span>}
+                                      {s.potenciaKwp && <span>{Number(s.potenciaKwp).toFixed(1)} kWp</span>}
+                                    </div>
+                                    {s.consultorNome && <div className="sfv-card-consultor">{s.consultorNome}</div>}
+                                    <div className="sfv-card-footer">
+                                      {s.prazoAtual && (
+                                        <span className={`sfv-card-prazo${isOverdue ? ' overdue' : ''}`}>
+                                          {new Date(s.prazoAtual).toLocaleDateString('pt-BR')}
+                                        </span>
+                                      )}
+                                      <span className="sfv-status-badge" style={{ background: sfvStatusColor[s.status] || '#94a3b8' }}>
+                                        {s.status}
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* TABLE VIEW */}
+                  {sfvView === 'tabela' && (
+                    <div className="sfv-table-wrap">
+                      <table className="sfv-table">
+                        <thead>
+                          <tr>
+                            <th>Cliente</th>
+                            <th>Cidade/UF</th>
+                            <th>Consultor</th>
+                            <th>Potência</th>
+                            <th>Etapa atual</th>
+                            <th>Responsável</th>
+                            <th>Próxima ação</th>
+                            <th>Prazo</th>
+                            <th>Status</th>
+                            <th>Última atualização</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredSistemasFv.length === 0 && (
+                            <tr><td colSpan={10} className="sfv-tbl-empty">Nenhum sistema encontrado</td></tr>
+                          )}
+                          {filteredSistemasFv.map(s => {
+                            const isOverdue = s.prazoAtual && new Date(s.prazoAtual) < new Date();
+                            return (
+                              <tr
+                                key={s.id}
+                                className={sfvSelected?.id === s.id ? 'sfv-tbl-selected' : ''}
+                                onClick={() => { setSfvSelected(s); setSfvFichaTab('resumo'); setSfvHistorico([]); request(`/api/admin/sistemas-fv/${s.id}/historico`).then(setSfvHistorico).catch(() => {}); }}
+                              >
+                                <td className="sfv-tbl-name">{s.clienteNome}</td>
+                                <td>{[s.cidade, s.estado].filter(Boolean).join('/')  || '—'}</td>
+                                <td>{s.consultorNome || '—'}</td>
+                                <td>{s.potenciaKwp ? `${Number(s.potenciaKwp).toFixed(1)} kWp` : '—'}</td>
+                                <td>
+                                  <span className="sfv-etapa-badge" style={{ background: sfvEtapaColor[s.etapaAtual] || '#94a3b8' }}>
+                                    {s.etapaAtual}
+                                  </span>
+                                </td>
+                                <td>{s.responsavelAtual || '—'}</td>
+                                <td className="sfv-tbl-acao">{s.proximaAcao || '—'}</td>
+                                <td style={isOverdue ? { color: '#ef4444', fontWeight: 700 } : {}}>
+                                  {s.prazoAtual ? new Date(s.prazoAtual).toLocaleDateString('pt-BR') : '—'}
+                                </td>
+                                <td>
+                                  <span className="sfv-status-badge" style={{ background: sfvStatusColor[s.status] || '#94a3b8' }}>
+                                    {s.status}
+                                  </span>
+                                </td>
+                                <td>{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString('pt-BR') : '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* RIGHT PANEL — ficha rápida */}
+                {sfvSelected && (
+                  <aside className="sfv-ficha">
+                    <div className="sfv-ficha-head">
+                      <div>
+                        <div className="sfv-ficha-nome">{sfvSelected.clienteNome}</div>
+                        <span className="sfv-status-badge" style={{ background: sfvStatusColor[sfvSelected.status] || '#94a3b8' }}>
+                          {sfvSelected.status}
+                        </span>
+                      </div>
+                      <button type="button" className="sfv-ficha-close" onClick={() => setSfvSelected(null)}>✕</button>
+                    </div>
+
+                    <div className="sfv-ficha-meta">
+                      <div className="sfv-ficha-meta-item">
+                        <span>Cidade</span>
+                        <strong>{[sfvSelected.cidade, sfvSelected.estado].filter(Boolean).join(' - ') || '—'}</strong>
+                      </div>
+                      <div className="sfv-ficha-meta-item">
+                        <span>Telefone</span>
+                        <strong>{sfvSelected.clienteTelefone || '—'}</strong>
+                      </div>
+                      <div className="sfv-ficha-meta-item">
+                        <span>Potência</span>
+                        <strong>{sfvSelected.potenciaKwp ? `${Number(sfvSelected.potenciaKwp).toFixed(1)} kWp` : '—'}</strong>
+                      </div>
+                      <div className="sfv-ficha-meta-item">
+                        <span>Valor vendido</span>
+                        <strong>{sfvSelected.valorVenda ? `R$ ${Number(sfvSelected.valorVenda).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</strong>
+                      </div>
+                      <div className="sfv-ficha-meta-item">
+                        <span>Consultor</span>
+                        <strong>{sfvSelected.consultorNome || '—'}</strong>
+                      </div>
+                      <div className="sfv-ficha-meta-item">
+                        <span>Responsável</span>
+                        <strong>{sfvSelected.responsavelAtual || '—'}</strong>
+                      </div>
+                    </div>
+
+                    {/* Etapa progress */}
+                    <div className="sfv-etapa-progress">
+                      <div className="sfv-etapa-label">Etapa atual</div>
+                      <div className="sfv-etapa-badge-lg" style={{ background: sfvEtapaColor[sfvSelected.etapaAtual] || '#94a3b8' }}>
+                        {sfvSelected.etapaAtual}
+                      </div>
+                      <div className="sfv-etapa-steps">
+                        {SFV_ETAPAS.map((etapa, idx) => {
+                          const currentIdx = SFV_ETAPAS.indexOf(sfvSelected.etapaAtual);
+                          const done = idx < currentIdx;
+                          const active = idx === currentIdx;
+                          return (
+                            <div key={etapa} className={`sfv-step${done ? ' done' : active ? ' active' : ''}`}>
+                              <div className="sfv-step-dot" style={active || done ? { background: sfvEtapaColor[etapa] } : {}} />
+                              <span className="sfv-step-label">{etapa}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Prazo e próxima ação */}
+                    <div className="sfv-ficha-info">
+                      <div className="sfv-ficha-info-row">
+                        <span>Prazo</span>
+                        <strong style={sfvSelected.prazoAtual && new Date(sfvSelected.prazoAtual) < new Date() ? { color: '#ef4444' } : {}}>
+                          {sfvSelected.prazoAtual ? new Date(sfvSelected.prazoAtual).toLocaleDateString('pt-BR') : '—'}
+                        </strong>
+                      </div>
+                      {sfvSelected.proximaAcao && (
+                        <div className="sfv-ficha-info-row">
+                          <span>Próxima ação</span>
+                          <strong>{sfvSelected.proximaAcao}</strong>
+                        </div>
+                      )}
+                      {sfvSelected.observacoes && (
+                        <div className="sfv-ficha-obs">
+                          <span>Observações</span>
+                          <p>{sfvSelected.observacoes}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Histórico */}
+                    {sfvHistorico.length > 0 && (
+                      <div className="sfv-historico">
+                        <div className="sfv-historico-title">Histórico</div>
+                        {sfvHistorico.map(h => (
+                          <div key={h.id} className="sfv-hist-item">
+                            <div className="sfv-hist-etapa">{h.etapa}</div>
+                            <div className="sfv-hist-meta">
+                              <span>{h.criadoPorNome || '—'}</span>
+                              <span>{h.createdAt ? new Date(h.createdAt).toLocaleDateString('pt-BR') : ''}</span>
+                            </div>
+                            {h.observacoes && <div className="sfv-hist-obs">{h.observacoes}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Update button */}
+                    <button
+                      type="button"
+                      className="btn btn-primary sfv-update-btn"
+                      onClick={() => {
+                        setSfvUpdateForm({
+                          etapaAtual: sfvSelected.etapaAtual || '',
+                          status: sfvSelected.status || 'No prazo',
+                          proximaAcao: sfvSelected.proximaAcao || '',
+                          prazoAtual: sfvSelected.prazoAtual || '',
+                          responsavelAtual: sfvSelected.responsavelAtual || '',
+                          observacoes: '',
+                        });
+                        setSfvUpdateOpen(true);
+                      }}
+                    >
+                      Atualizar etapa
+                    </button>
+                  </aside>
+                )}
+              </div>
+
+              {/* Atualizar etapa modal */}
+              {sfvUpdateOpen && sfvSelected && (
+                <div className="sfv-modal-overlay" onClick={() => setSfvUpdateOpen(false)}>
+                  <div className="sfv-modal" onClick={e => e.stopPropagation()}>
+                    <div className="sfv-modal-head">
+                      <h4>Atualizar etapa — {sfvSelected.clienteNome}</h4>
+                      <button type="button" className="sfv-ficha-close" onClick={() => setSfvUpdateOpen(false)}>✕</button>
+                    </div>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        try {
+                          const updated = await request(`/api/admin/sistemas-fv/${sfvSelected.id}`, {
+                            method: 'PUT',
+                            body: JSON.stringify(sfvUpdateForm),
+                          });
+                          setSistemasFv(prev => prev.map(s => s.id === updated.id ? updated : s));
+                          setSfvSelected(updated);
+                          const hist = await request(`/api/admin/sistemas-fv/${updated.id}/historico`).catch(() => []);
+                          setSfvHistorico(hist);
+                          setSfvUpdateOpen(false);
+                          showToast('Etapa atualizada com sucesso.', 'success');
+                        } catch (err) {
+                          showToast(err.message || 'Erro ao atualizar.', 'error');
+                        }
+                      }}
+                    >
+                      <div className="sfv-modal-form">
+                        <label>
+                          Etapa atual
+                          <select value={sfvUpdateForm.etapaAtual} onChange={e => setSfvUpdateForm(prev => ({ ...prev, etapaAtual: e.target.value }))}>
+                            {SFV_ETAPAS.map(et => <option key={et} value={et}>{et}</option>)}
+                          </select>
+                        </label>
+                        <label>
+                          Status
+                          <select value={sfvUpdateForm.status} onChange={e => setSfvUpdateForm(prev => ({ ...prev, status: e.target.value }))}>
+                            {['No prazo', 'Atenção', 'Atrasado', 'Concessionária', 'Pausado'].map(st => <option key={st} value={st}>{st}</option>)}
+                          </select>
+                        </label>
+                        <label>
+                          Prazo
+                          <input type="date" value={sfvUpdateForm.prazoAtual} onChange={e => setSfvUpdateForm(prev => ({ ...prev, prazoAtual: e.target.value }))} />
+                        </label>
+                        <label>
+                          Responsável
+                          <input type="text" value={sfvUpdateForm.responsavelAtual} onChange={e => setSfvUpdateForm(prev => ({ ...prev, responsavelAtual: e.target.value }))} placeholder="Nome do responsável" />
+                        </label>
+                        <label className="sfv-span2">
+                          Próxima ação
+                          <input type="text" value={sfvUpdateForm.proximaAcao} onChange={e => setSfvUpdateForm(prev => ({ ...prev, proximaAcao: e.target.value }))} placeholder="O que deve ser feito agora?" />
+                        </label>
+                        <label className="sfv-span2">
+                          Observações (registro no histórico)
+                          <textarea value={sfvUpdateForm.observacoes} onChange={e => setSfvUpdateForm(prev => ({ ...prev, observacoes: e.target.value }))} placeholder="Detalhe o que aconteceu..." rows={3} />
+                        </label>
+                      </div>
+                      <div className="sfv-modal-actions">
+                        <button type="button" className="btn btn-outline" onClick={() => setSfvUpdateOpen(false)}>Cancelar</button>
+                        <button type="submit" className="btn btn-primary">Salvar atualização</button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>

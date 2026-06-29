@@ -2229,6 +2229,71 @@ const ensureProjetosForApprovedContracts = async () => {
   }
 };
 
+const createSistemaFvFromContrato = async (contrato) => {
+  if (!contrato || contrato.status !== 'Aprovado') return null;
+  const existing = await db.get('SELECT id FROM sistemas_fv WHERE contratoId = ?', contrato.id);
+  if (existing) return existing;
+
+  const now = new Date();
+  const prazo = new Date(now);
+  prazo.setDate(prazo.getDate() + 30);
+
+  const dados = parseJsonField(contrato.dados, {});
+  const potenciaKwp = contrato.potenciaKwp
+    || dados?.manual?.potenciaKwp
+    || dados?.dimensionamento?.potencia_real_instalada_kwp
+    || null;
+  const estado = dados?.manual?.estado || dados?.cliente?.estado || '';
+
+  const result = await db.run(
+    `INSERT INTO sistemas_fv
+      (clienteId, clienteNome, clienteTelefone, consultorId, consultorNome, cidade, estado, potenciaKwp, valorVenda, contratoId, etapaAtual, status, prazoAtual, responsavelAtual, observacoes, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    contrato.clienteId || null,
+    contrato.clienteNome,
+    contrato.clienteTelefone || null,
+    contrato.consultorId || contrato.assignedUserId || null,
+    contrato.consultorNome || contrato.assignedUserName || null,
+    contrato.clienteCidade || '',
+    estado,
+    potenciaKwp ? Number(potenciaKwp) : null,
+    Number(contrato.valorProjeto) || null,
+    contrato.id,
+    'Documentos',
+    'No prazo',
+    prazo.toISOString().split('T')[0],
+    contrato.consultorNome || contrato.assignedUserName || 'Equipe DRM',
+    'Criado automaticamente após aprovação do contrato.',
+    now.toISOString(),
+    now.toISOString()
+  );
+
+  await db.run(
+    `INSERT INTO sistemas_fv_historico
+      (sistemaId, etapa, status, responsavel, proximaAcao, prazo, observacoes, criadoPorId, criadoPorNome, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    result.lastID,
+    'Documentos',
+    'No prazo',
+    contrato.consultorNome || contrato.assignedUserName || 'Equipe DRM',
+    'Receber documentação do cliente',
+    prazo.toISOString().split('T')[0],
+    'Venda concluída. Aguardando recebimento de documentos.',
+    contrato.criadoPorId || null,
+    contrato.criadoPorNome || null,
+    now.toISOString()
+  );
+
+  return await db.get('SELECT * FROM sistemas_fv WHERE id = ?', result.lastID);
+};
+
+const ensureSistemasFvForApprovedContracts = async () => {
+  const contratosAprovados = await db.all('SELECT * FROM contratos WHERE status = ?', 'Aprovado');
+  for (const contrato of contratosAprovados) {
+    await createSistemaFvFromContrato(contrato);
+  }
+};
+
 const calcularSimulacaoSolar = (body) => {
   const { contaEnergia } = body;
 
@@ -4475,6 +4540,43 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       FOREIGN KEY (marca_id) REFERENCES marcas_inversor(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS sistemas_fv (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clienteId INTEGER,
+      clienteNome TEXT NOT NULL,
+      clienteTelefone TEXT,
+      consultorId INTEGER,
+      consultorNome TEXT,
+      cidade TEXT,
+      estado TEXT,
+      potenciaKwp REAL,
+      valorVenda REAL,
+      contratoId INTEGER,
+      etapaAtual TEXT DEFAULT 'Documentos',
+      status TEXT DEFAULT 'No prazo',
+      prazoAtual TEXT,
+      proximaAcao TEXT,
+      responsavelAtual TEXT,
+      observacoes TEXT,
+      createdAt TEXT,
+      updatedAt TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS sistemas_fv_historico (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sistemaId INTEGER NOT NULL,
+      etapa TEXT,
+      status TEXT,
+      responsavel TEXT,
+      proximaAcao TEXT,
+      prazo TEXT,
+      observacoes TEXT,
+      criadoPorId INTEGER,
+      criadoPorNome TEXT,
+      createdAt TEXT,
+      FOREIGN KEY (sistemaId) REFERENCES sistemas_fv(id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_lead_redirect_logs_createdAt ON lead_redirect_logs(createdAt);
     CREATE INDEX IF NOT EXISTS idx_lead_redirect_logs_sellerPhone ON lead_redirect_logs(sellerPhone);
     CREATE INDEX IF NOT EXISTS idx_whatsapp_conversations_assigned ON whatsapp_conversations(assignedUserId);
@@ -4864,6 +4966,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
 
   await normalizeLeadDistribution();
   await ensureProjetosForApprovedContracts();
+  await ensureSistemasFvForApprovedContracts();
 
   // Popula o portfólio com dados de exemplo se estiver vazio
   const portfolioCount = await db.get('SELECT COUNT(*) as count FROM portfolio');
@@ -7859,6 +7962,7 @@ app.put('/api/admin/contratos/:id/revisao', authRequired, requirePermission('con
     );
     updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id));
     await createProjetoFromContrato(updated);
+    await createSistemaFvFromContrato(updated);
   }
   io.emit('contrato_atualizado', updated);
   res.json(updated);
@@ -9214,6 +9318,140 @@ app.put('/api/admin/tabelas-precos/:id', authRequired, requirePermission('precos
   );
   const updated = await db.get('SELECT * FROM tabelas_precos_sistemas WHERE id = ?', req.params.id);
   res.json({ ...updated, active: Boolean(updated.active) });
+});
+
+// --- ESTEIRA DE SISTEMAS FV ---
+
+const SFV_ETAPAS = ['Venda concluída', 'Documentos', 'Homologação', 'Entrega', 'Instalação', 'Ligação', 'Concluído'];
+const SFV_STATUS = ['No prazo', 'Atenção', 'Atrasado', 'Concessionária', 'Pausado'];
+
+app.get('/api/admin/sistemas-fv/resumo', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  try {
+    const rows = await db.all('SELECT etapaAtual, status, COUNT(*) as count FROM sistemas_fv GROUP BY etapaAtual, status');
+    const porEtapa = {};
+    for (const etapa of SFV_ETAPAS) porEtapa[etapa] = 0;
+    let atrasados = 0;
+    for (const row of rows) {
+      porEtapa[row.etapaAtual] = (porEtapa[row.etapaAtual] || 0) + row.count;
+      if (row.status === 'Atrasado' || row.status === 'Atenção') atrasados += row.count;
+    }
+    res.json({ porEtapa, atrasados, total: rows.reduce((s, r) => s + r.count, 0) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/sistemas-fv', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  try {
+    const { etapa, status, consultor, cidade, search } = req.query;
+    let sql = 'SELECT * FROM sistemas_fv WHERE 1=1';
+    const params = [];
+    if (etapa) { sql += ' AND etapaAtual = ?'; params.push(etapa); }
+    if (status) { sql += ' AND status = ?'; params.push(status); }
+    if (consultor) { sql += ' AND consultorNome = ?'; params.push(consultor); }
+    if (cidade) { sql += ' AND cidade = ?'; params.push(cidade); }
+    if (search) {
+      sql += ' AND (clienteNome LIKE ? OR cidade LIKE ? OR consultorNome LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    sql += ' ORDER BY updatedAt DESC';
+    const rows = await db.all(sql, ...params);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/sistemas-fv', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  try {
+    const { clienteId, clienteNome, clienteTelefone, consultorId, consultorNome, cidade, estado, potenciaKwp, valorVenda, contratoId, etapaAtual, status, prazoAtual, proximaAcao, responsavelAtual, observacoes } = req.body;
+    if (!clienteNome) return res.status(400).json({ error: 'clienteNome obrigatório' });
+    const now = new Date().toISOString();
+    const result = await db.run(
+      `INSERT INTO sistemas_fv (clienteId, clienteNome, clienteTelefone, consultorId, consultorNome, cidade, estado, potenciaKwp, valorVenda, contratoId, etapaAtual, status, prazoAtual, proximaAcao, responsavelAtual, observacoes, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      clienteId || null, clienteNome, clienteTelefone || null, consultorId || null, consultorNome || null,
+      cidade || null, estado || null, potenciaKwp ? Number(potenciaKwp) : null, valorVenda ? Number(valorVenda) : null,
+      contratoId || null, etapaAtual || 'Documentos', status || 'No prazo',
+      prazoAtual || null, proximaAcao || null, responsavelAtual || req.user.nome || null, observacoes || null, now, now
+    );
+    await db.run(
+      `INSERT INTO sistemas_fv_historico (sistemaId, etapa, status, responsavel, proximaAcao, prazo, observacoes, criadoPorId, criadoPorNome, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      result.lastID, etapaAtual || 'Documentos', status || 'No prazo',
+      responsavelAtual || req.user.nome, proximaAcao || null, prazoAtual || null,
+      'Sistema criado manualmente.', req.user.id, req.user.nome, now
+    );
+    const sistema = await db.get('SELECT * FROM sistemas_fv WHERE id = ?', result.lastID);
+    res.status(201).json(sistema);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/admin/sistemas-fv/:id', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  try {
+    const sistema = await db.get('SELECT * FROM sistemas_fv WHERE id = ?', req.params.id);
+    if (!sistema) return res.status(404).json({ error: 'Sistema não encontrado' });
+
+    const { etapaAtual, status, prazoAtual, proximaAcao, responsavelAtual, observacoes, potenciaKwp, valorVenda, cidade, estado, consultorNome, consultorId } = req.body;
+    const now = new Date().toISOString();
+
+    await db.run(
+      `UPDATE sistemas_fv SET
+        etapaAtual = COALESCE(?, etapaAtual),
+        status = COALESCE(?, status),
+        prazoAtual = COALESCE(?, prazoAtual),
+        proximaAcao = COALESCE(?, proximaAcao),
+        responsavelAtual = COALESCE(?, responsavelAtual),
+        observacoes = COALESCE(?, observacoes),
+        potenciaKwp = COALESCE(?, potenciaKwp),
+        valorVenda = COALESCE(?, valorVenda),
+        cidade = COALESCE(?, cidade),
+        estado = COALESCE(?, estado),
+        consultorNome = COALESCE(?, consultorNome),
+        consultorId = COALESCE(?, consultorId),
+        updatedAt = ?
+       WHERE id = ?`,
+      etapaAtual || null, status || null, prazoAtual || null, proximaAcao || null,
+      responsavelAtual || null, observacoes || null,
+      potenciaKwp != null ? Number(potenciaKwp) : null,
+      valorVenda != null ? Number(valorVenda) : null,
+      cidade || null, estado || null, consultorNome || null,
+      consultorId || null, now, req.params.id
+    );
+
+    const etapaChanged = etapaAtual && etapaAtual !== sistema.etapaAtual;
+    const statusChanged = status && status !== sistema.status;
+    if (etapaChanged || statusChanged || proximaAcao || observacoes) {
+      await db.run(
+        `INSERT INTO sistemas_fv_historico (sistemaId, etapa, status, responsavel, proximaAcao, prazo, observacoes, criadoPorId, criadoPorNome, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        req.params.id,
+        etapaAtual || sistema.etapaAtual,
+        status || sistema.status,
+        responsavelAtual || req.user.nome,
+        proximaAcao || null,
+        prazoAtual || sistema.prazoAtual || null,
+        observacoes || null,
+        req.user.id, req.user.nome, now
+      );
+    }
+
+    const updated = await db.get('SELECT * FROM sistemas_fv WHERE id = ?', req.params.id);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/sistemas-fv/:id/historico', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM sistemas_fv_historico WHERE sistemaId = ? ORDER BY createdAt DESC', req.params.id);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- WEBSOCKETS (Chat em Tempo Real) ---
