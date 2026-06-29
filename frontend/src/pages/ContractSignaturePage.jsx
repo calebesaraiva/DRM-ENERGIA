@@ -24,6 +24,7 @@ function ContractSignaturePage() {
   const [signerName, setSignerName] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [hasSignatureStroke, setHasSignatureStroke] = useState(false);
+  const [signatureMode, setSignatureMode] = useState('typed');
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
   const [signedResult, setSignedResult] = useState(null);
   const canvasRef = useRef(null);
@@ -135,6 +136,35 @@ function ContractSignaturePage() {
     resizeCanvas();
   };
 
+  const useTypedSignature = () => {
+    const name = signerName.trim();
+    if (!name) {
+      setStatus('Confira seu nome completo antes de gerar a assinatura.');
+      return;
+    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    resizeCanvas();
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(280, Math.floor(rect.width || 640));
+    const height = Math.max(180, Math.floor(rect.height || 240));
+    const ctx = canvas.getContext('2d');
+    const fontSize = Math.max(28, Math.min(54, Math.floor(width / Math.max(name.length * 0.58, 10))));
+    ctx.fillStyle = '#111827';
+    ctx.font = `italic ${fontSize}px "Segoe Script", "Brush Script MT", cursive`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, width / 2, height / 2, width - 36);
+    setHasSignatureStroke(true);
+    setStatus('Assinatura pronta. Confirme o aceite e toque em “Assinar contrato”.');
+  };
+
+  const changeSignatureMode = (mode) => {
+    setSignatureMode(mode);
+    setStatus('');
+    window.setTimeout(resizeCanvas, 0);
+  };
+
   const submitSignature = async () => {
     if (!signerName.trim()) {
       setStatus('Informe seu nome para concluir a assinatura.');
@@ -159,6 +189,7 @@ function ContractSignaturePage() {
           signerName,
           acceptedTerms,
           signatureDataUrl: canvas.toDataURL('image/png'),
+          signatureMode,
         }),
       });
       const data = await response.json().catch(() => null);
@@ -242,13 +273,34 @@ function ContractSignaturePage() {
         </div>
         <div className="signature-meta-card">
           <span>Método</span>
-          <strong>Desenho + evidências</strong>
+          <strong>{signatureMode === 'typed' ? 'Nome confirmado + evidências' : 'Desenho + evidências'}</strong>
         </div>
       </div>
 
+      {!signatureCompleted && (
+        <div className="signature-mode-picker" role="group" aria-label="Forma de assinatura">
+          <button
+            type="button"
+            className={signatureMode === 'typed' ? 'active' : ''}
+            onClick={() => changeSignatureMode('typed')}
+          >
+            <strong>Assinar com meu nome</strong>
+            <span>Mais fácil, basta confirmar</span>
+          </button>
+          <button
+            type="button"
+            className={signatureMode === 'drawn' ? 'active' : ''}
+            onClick={() => changeSignatureMode('drawn')}
+          >
+            <strong>Desenhar assinatura</strong>
+            <span>Use o dedo ou o mouse</span>
+          </button>
+        </div>
+      )}
+
       <div className="signature-pad">
         <div className="signature-pad-head">
-          <strong>Desenhe sua assinatura</strong>
+          <strong>{signatureMode === 'typed' ? 'Confirme sua assinatura' : 'Desenhe sua assinatura'}</strong>
           {!signatureCompleted && <button type="button" onClick={clearCanvas}>Limpar</button>}
         </div>
         {signatureCompleted ? (
@@ -270,8 +322,19 @@ function ContractSignaturePage() {
               onTouchEnd={stopDrawing}
             />
             <div className="signature-pad-foot">
-              <span>Use o dedo no celular ou o mouse no computador.</span>
-              <span>Evite abreviar demais a assinatura.</span>
+              {signatureMode === 'typed' ? (
+                <>
+                  <span>Não precisa escrever na tela.</span>
+                  <button type="button" className="make-typed-signature" onClick={useTypedSignature}>
+                    Usar meu nome como assinatura
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span>Use o dedo no celular ou o mouse no computador.</span>
+                  <span>Evite abreviar demais a assinatura.</span>
+                </>
+              )}
             </div>
           </>
         )}

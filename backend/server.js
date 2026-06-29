@@ -3417,7 +3417,7 @@ const buildContratoPdf = async (contrato) => {
     sectionTitle('Cláusulas contratuais');
     renderClauses();
 
-    ensureSpace(225);
+    ensureSpace(245);
     sectionTitle('Assinaturas');
     doc.font('Helvetica').fontSize(9).fillColor(dark).text(`${parsed.clienteCidade || 'Imperatriz'}, ${new Date().toLocaleDateString('pt-BR')}.`, { align: 'center' });
     doc.moveDown(7);
@@ -3434,11 +3434,11 @@ const buildContratoPdf = async (contrato) => {
       }
     } else if (assinatura?.drm?.signedAt) {
       const autoDrmName = assinatura?.drm?.signedByName || DRM_SIGNATORY.nome;
-      doc.font('Helvetica-Oblique').fontSize(17).fillColor(orange).text(
+      doc.font('Helvetica-Oblique').fontSize(12.5).fillColor(orange).text(
         autoDrmName,
-        doc.page.margins.left + 18,
-        signatureY - 34,
-        { width: 170, align: 'center' }
+        doc.page.margins.left + 5,
+        signatureY - 27,
+        { width: 195, height: 17, align: 'center', ellipsis: true, lineBreak: false }
       );
     }
     if (clientSignatureBuffer) {
@@ -3453,17 +3453,23 @@ const buildContratoPdf = async (contrato) => {
     doc.font('Helvetica').fontSize(8).fillColor(muted).text('CONTRATADA', doc.page.margins.left, signatureY + 20, { width: 205, align: 'center' });
     doc.text('CONTRATANTE', doc.page.margins.left + pageWidth - 205, signatureY + 20, { width: 205, align: 'center' });
     if (assinatura?.drm?.signedAt) {
-      doc.font('Helvetica').fontSize(7).fillColor(muted).text(
-        `Assinado digitalmente por ${assinatura.drm.signedByName || template.empresa.nome} em ${formatDateBr(assinatura.drm.signedAt)}`,
+      doc.font('Helvetica').fontSize(6.5).fillColor(muted).text(
+        `Assinado eletronicamente em ${formatDateBr(assinatura.drm.signedAt)}`,
         doc.page.margins.left,
         signatureY + 31,
-        { width: 205, align: 'center' }
+        { width: 205, height: 9, align: 'center', lineBreak: false }
       );
       doc.text(
-        `CPF ${assinatura.drm.cpf || DRM_SIGNATORY.cpf} - Nascimento ${formatDateBr(assinatura.drm.birthDate || DRM_SIGNATORY.nascimento)}`,
+        `CPF ${assinatura.drm.cpf || DRM_SIGNATORY.cpf}`,
         doc.page.margins.left,
-        signatureY + 41,
-        { width: 205, align: 'center' }
+        signatureY + 42,
+        { width: 205, height: 9, align: 'center', lineBreak: false }
+      );
+      doc.text(
+        `Nascimento ${formatDateBr(assinatura.drm.birthDate || DRM_SIGNATORY.nascimento)}`,
+        doc.page.margins.left,
+        signatureY + 53,
+        { width: 205, height: 9, align: 'center', lineBreak: false }
       );
     }
     if (assinatura?.cliente?.signedAt) {
@@ -3474,11 +3480,13 @@ const buildContratoPdf = async (contrato) => {
         { width: 205, align: 'center' }
       );
     }
-    doc.y = signatureY + 60;
+    doc.y = signatureY + 72;
 
     const signatureEvidence = buildSignatureEvidenceSummary(parsed);
     const evidenceRows = [
-      ['Método', signatureEvidence.method],
+      ['Método', assinatura?.cliente?.signatureMode === 'typed'
+        ? 'Assinatura eletrônica por nome confirmado com trilha de evidências'
+        : signatureEvidence.method],
       ['Hash SHA-256 do contrato', signatureEvidence.documentHash],
       ['Link/token', signatureEvidence.linkToken || 'Não gerado'],
       ['Solicitado em', signatureEvidence.requestedAt ? formatDateBr(signatureEvidence.requestedAt) : 'Não informado'],
@@ -8025,6 +8033,7 @@ app.post('/api/assinatura/contrato/:token/cliente', async (req, res) => {
       signedAt: new Date().toISOString(),
       signedByName: signerName,
       dataUrl: signatureCheck.dataUrl,
+      signatureMode: req.body?.signatureMode === 'typed' ? 'typed' : 'drawn',
       ip: getRequestIp(req),
       userAgent: String(req.headers['user-agent'] || ''),
       referer: String(req.headers.referer || ''),
