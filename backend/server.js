@@ -3797,6 +3797,7 @@ const buildOrcamentoPdf = async (orcamento) => {
 
     const clienteRows = [
       ['NOME', orcamento.clienteNome || '-'],
+      ...(orcamento.clienteCpfCnpj ? [['CPF/CNPJ', orcamento.clienteCpfCnpj]] : []),
       ['CIDADE', orcamento.clienteCidade || '-'],
     ];
     clienteRows.forEach(([label, value]) => {
@@ -4046,6 +4047,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       clienteId INTEGER,
       clienteNome TEXT,
+      clienteCpfCnpj TEXT,
       clienteTelefone TEXT,
       clienteEmail TEXT,
       clienteCidade TEXT,
@@ -4617,6 +4619,9 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   }
   if (!existingOrcamentoColumns.includes('clienteTelefone')) {
     await db.exec('ALTER TABLE orcamentos ADD COLUMN clienteTelefone TEXT');
+  }
+  if (!existingOrcamentoColumns.includes('clienteCpfCnpj')) {
+    await db.exec('ALTER TABLE orcamentos ADD COLUMN clienteCpfCnpj TEXT');
   }
   if (!existingOrcamentoColumns.includes('clienteEmail')) {
     await db.exec('ALTER TABLE orcamentos ADD COLUMN clienteEmail TEXT');
@@ -7036,6 +7041,7 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
   const {
     clienteId,
     clienteNome,
+    clienteCpfCnpj,
     clienteTelefone,
     clienteEmail,
     clienteCidade,
@@ -7055,10 +7061,15 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
   }
 
   const snapshotClienteNome = String(cliente?.nome || clienteNome || '').trim();
+  const snapshotClienteCpfCnpj = String(cliente?.cpfCnpj || clienteCpfCnpj || '').trim();
+  const snapshotCpfCnpjDigits = snapshotClienteCpfCnpj.replace(/\D/g, '');
   const snapshotClienteCidade = String(cliente?.cidade || clienteCidade || '').trim();
   const snapshotClienteTelefone = String(cliente?.whatsapp || clienteTelefone || '').trim();
   const snapshotClienteEmail = String(cliente?.email || clienteEmail || '').trim();
   if (!snapshotClienteNome) return res.status(400).json({ message: 'Informe o nome do cliente para salvar o orçamento.' });
+  if (snapshotCpfCnpjDigits && ![11, 14].includes(snapshotCpfCnpjDigits.length)) {
+    return res.status(400).json({ message: 'Informe um CPF ou CNPJ completo, ou deixe o campo vazio.' });
+  }
   if (!snapshotClienteCidade) return res.status(400).json({ message: 'Informe a cidade do cliente para salvar o orçamento.' });
 
   const potenciaPlacaW = Number(dimensionamento.potencia_placa_w || dimensionamento.potenciaPlacaW || 0);
@@ -7105,10 +7116,11 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
 
   const result = await db.run(
     `INSERT INTO orcamentos
-      (clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, status, data, tipo, dimensionamento, financeiro, assignedUserId, assignedUserName)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (clienteId, clienteNome, clienteCpfCnpj, clienteTelefone, clienteEmail, clienteCidade, status, data, tipo, dimensionamento, financeiro, assignedUserId, assignedUserName)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     cliente?.id || null,
     snapshotClienteNome,
+    snapshotClienteCpfCnpj || null,
     snapshotClienteTelefone || null,
     snapshotClienteEmail || null,
     snapshotClienteCidade,
@@ -7125,6 +7137,7 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
     id: result.lastID,
     clienteId: cliente?.id || null,
     clienteNome: snapshotClienteNome,
+    clienteCpfCnpj: snapshotClienteCpfCnpj || null,
     clienteTelefone: snapshotClienteTelefone || null,
     clienteEmail: snapshotClienteEmail || null,
     clienteCidade: snapshotClienteCidade,
@@ -7676,6 +7689,7 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     cliente: cliente ? publicClient(cliente) : {
       id: orcamento.clienteId || null,
       nome: orcamento.clienteNome,
+      cpfCnpj: orcamento.clienteCpfCnpj || '',
       whatsapp: orcamento.clienteTelefone,
       email: orcamento.clienteEmail,
       cidade: orcamento.clienteCidade,

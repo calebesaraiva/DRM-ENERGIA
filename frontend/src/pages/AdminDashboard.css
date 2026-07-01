@@ -16162,6 +16162,15 @@
   gap: 1rem;
 }
 
+.orc-rapido-row-client {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.orc-optional-label {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
 /* Row 2 — placa (wide) + quantity */
 .orc-rapido-row-placa {
   display: grid;
@@ -16458,7 +16467,8 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .orc-rapido-row-4 {
+  .orc-rapido-row-4,
+  .orc-rapido-row-client {
     grid-template-columns: repeat(2, 1fr);
   }
   .orc-rapido-row-inversor {
@@ -16478,6 +16488,7 @@
     padding: 1.25rem;
   }
   .orc-rapido-row-4,
+  .orc-rapido-row-client,
   .orc-rapido-row-placa,
   .orc-rapido-row-inversor {
     grid-template-columns: 1fr;

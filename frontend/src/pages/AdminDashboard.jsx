@@ -456,6 +456,16 @@ const maskCpf = (v) => {
   return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
 };
 
+const maskCpfCnpj = (value) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 11) return maskCpf(digits);
+  return digits
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2');
+};
+
 const maskWhatsapp = (v) => {
   const d = v.replace(/\D/g, '').slice(0, 11);
   if (d.length <= 2) return d.length ? `(${d}` : '';
@@ -777,6 +787,7 @@ const emptyBudgetForm = {
   modo: 'cliente',
   clienteId: '',
   clienteNome: '',
+  clienteCpfCnpj: '',
   clienteCidade: '',
   clienteTelefone: '',
   clienteEmail: '',
@@ -3357,6 +3368,7 @@ const AdminDashboard = () => {
       modo: cliente?.id ? 'cliente' : 'rapido',
       clienteId: cliente?.id ? String(cliente.id) : '',
       clienteNome: cliente?.nome || '',
+      clienteCpfCnpj: cliente?.cpfCnpj || '',
       clienteCidade: cliente?.cidade || '',
       clienteTelefone: cliente?.whatsapp || '',
       clienteEmail: cliente?.email || '',
@@ -3395,6 +3407,8 @@ const AdminDashboard = () => {
 
     const errors = {};
     if (!budgetForm.clienteNome?.trim()) errors.clienteNome = true;
+    const cpfCnpjDigits = String(budgetForm.clienteCpfCnpj || '').replace(/\D/g, '');
+    if (cpfCnpjDigits && ![11, 14].includes(cpfCnpjDigits.length)) errors.clienteCpfCnpj = true;
     if (!budgetForm.clienteCidade?.trim()) errors.clienteCidade = true;
     if (!budgetForm.geracaoKwh || Number(budgetForm.geracaoKwh) <= 0) errors.geracaoKwh = true;
     if (!budgetForm.valorSistema || Number(budgetForm.valorSistema) <= 0) errors.valorSistema = true;
@@ -3416,6 +3430,7 @@ const AdminDashboard = () => {
         body: JSON.stringify({
           clienteId: budgetForm.clienteId,
           clienteNome: budgetForm.clienteNome,
+          clienteCpfCnpj: budgetForm.clienteCpfCnpj,
           clienteCidade: budgetForm.clienteCidade,
           clienteTelefone: budgetForm.clienteTelefone,
           clienteEmail: budgetForm.clienteEmail,
@@ -5813,7 +5828,7 @@ const AdminDashboard = () => {
                 <div className="orc-rapido-body">
 
                   {/* Row 1 — 4 columns */}
-                  <div className="orc-rapido-row-4">
+                  <div className="orc-rapido-row-4 orc-rapido-row-client">
                     <div className={`orc-rapido-field${budgetFieldErrors.clienteNome ? ' field-error' : ''}`}>
                       <label>1. Nome do cliente</label>
                       <input
@@ -5823,8 +5838,21 @@ const AdminDashboard = () => {
                         placeholder="Ex: João da Silva"
                       />
                     </div>
+                    <div className={`orc-rapido-field${budgetFieldErrors.clienteCpfCnpj ? ' field-error' : ''}`}>
+                      <label>2. CPF/CNPJ <span className="orc-optional-label">(opcional)</span></label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={budgetForm.clienteCpfCnpj}
+                        onChange={e => {
+                          setBudgetForm(prev => ({ ...prev, clienteCpfCnpj: maskCpfCnpj(e.target.value) }));
+                          setBudgetFieldErrors(prev => ({ ...prev, clienteCpfCnpj: false }));
+                        }}
+                        placeholder="CPF ou CNPJ"
+                      />
+                    </div>
                     <div className={`orc-rapido-field${budgetFieldErrors.clienteCidade ? ' field-error' : ''}`}>
-                      <label>2. Cidade</label>
+                      <label>3. Cidade</label>
                       <input
                         type="text"
                         value={budgetForm.clienteCidade}
@@ -5833,7 +5861,7 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <div className={`orc-rapido-field${budgetFieldErrors.geracaoKwh ? ' field-error' : ''}`}>
-                      <label>3. Geração do sistema (kWh)</label>
+                      <label>4. Geração do sistema (kWh)</label>
                       <input
                         type="number"
                         min="0"
@@ -5844,7 +5872,7 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <div className={`orc-rapido-field${budgetFieldErrors.valorSistema ? ' field-error' : ''}`}>
-                      <label>4. Valor do projeto</label>
+                      <label>5. Valor do projeto</label>
                       <div className="orc-rapido-currency-wrap">
                         <span className="orc-rapido-currency-prefix">R$</span>
                         <CurrencyInput
@@ -5859,7 +5887,7 @@ const AdminDashboard = () => {
                   {/* Row 2 — placa */}
                   <div className="orc-rapido-row-placa">
                     <div className={`orc-rapido-field${budgetFieldErrors.placaModelo ? ' field-error' : ''}`}>
-                      <label>5. Modelo da placa</label>
+                      <label>6. Modelo da placa</label>
                       <select
                         value={budgetForm.placaModelo}
                         onChange={e => {
@@ -5880,7 +5908,7 @@ const AdminDashboard = () => {
                       </select>
                     </div>
                     <div className={`orc-rapido-field${budgetFieldErrors.numeroPaineis ? ' field-error' : ''}`}>
-                      <label>6. Quantidade de placas</label>
+                      <label>7. Quantidade de placas</label>
                       <input
                         type="number"
                         min="1"
@@ -5894,7 +5922,7 @@ const AdminDashboard = () => {
                   {/* Row 3 — inversor */}
                   <div className="orc-rapido-row-inversor">
                     <div className={`orc-rapido-field${budgetFieldErrors.inversorMarca ? ' field-error' : ''}`}>
-                      <label>7. Marca do inversor</label>
+                      <label>8. Marca do inversor</label>
                       <select
                         value={budgetForm.inversorMarca}
                         onChange={e => {
@@ -5915,7 +5943,7 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className={`orc-rapido-field${budgetFieldErrors.inversorModelo ? ' field-error' : ''}`}>
-                      <label>8. Modelo do inversor</label>
+                      <label>9. Modelo do inversor</label>
                       <div className="orc-rapido-locked-wrap">
                         <select
                           value={budgetForm.inversorModelo}
@@ -5936,7 +5964,7 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className={`orc-rapido-field${budgetFieldErrors.quantidadeInversores ? ' field-error' : ''}`}>
-                      <label>9. Quantidade de inversores</label>
+                      <label>10. Quantidade de inversores</label>
                       <input
                         type="number"
                         min="1"
@@ -6145,7 +6173,10 @@ const AdminDashboard = () => {
                           <div className="quick-budget-card" key={orc.id}>
                             <div>
                               <span className="quick-budget-badge">Rápido</span>
-                              <strong>{orc.clienteNome}</strong>
+                              <strong>
+                                {orc.clienteNome}
+                                {orc.clienteCpfCnpj ? ` • ${orc.clienteCpfCnpj}` : ''}
+                              </strong>
                               <p>{orc.clienteCidade || 'Cidade não informada'} • {orc.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</p>
                             </div>
                             <div className="quick-budget-card-actions">
