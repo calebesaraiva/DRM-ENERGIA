@@ -963,6 +963,13 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
 };
 
 const disconnectWhatsAppQrSession = async () => {
+  const disconnectedPhone = normalizeWhatsAppPhone(whatsappRuntime.phone);
+  if (disconnectedPhone && db) {
+    await db.run(
+      "UPDATE whatsapp_conversations SET accountPhone = ? WHERE COALESCE(accountPhone, '') = ''",
+      disconnectedPhone
+    );
+  }
   try {
     if (whatsappRuntime.socket) {
       await whatsappRuntime.socket.logout().catch(() => {});
@@ -1036,9 +1043,11 @@ const upsertWhatsAppConversation = async ({
   assignedUserId = null,
   assignedUserName = '',
   status = 'Aguardando atendimento',
+  accountPhone = whatsappRuntime.phone,
 } = {}) => {
   const phone = normalizeWhatsAppPhone(telefone);
   if (!phone) return null;
+  const normalizedAccountPhone = normalizeWhatsAppPhone(accountPhone);
 
   const phoneVariants = whatsAppPhoneVariants(phone);
   const placeholders = phoneVariants.map(() => '?').join(', ');
@@ -1048,16 +1057,21 @@ const upsertWhatsAppConversation = async ({
   );
   const now = new Date().toISOString();
   if (conversation) {
+    const accountChanged = Boolean(
+      normalizedAccountPhone
+      && conversation.accountPhone
+      && normalizeWhatsAppPhone(conversation.accountPhone) !== normalizedAccountPhone
+    );
     const nextLeadId = conversation.leadId || leadId || null;
     // 'Arquivada' = "não é lead": permanece oculta mesmo que o contato mande
     // novas mensagens. Apenas 'Finalizada' (atendimento concluído) pode reabrir.
-    const shouldReopen = conversation.status === 'Finalizada' && status === 'Aguardando atendimento';
+    const shouldReopen = accountChanged || (conversation.status === 'Finalizada' && status === 'Aguardando atendimento');
     const nextOwnerId = shouldReopen ? (assignedUserId || null) : (conversation.assignedUserId || assignedUserId || null);
     const nextOwnerName = shouldReopen ? (assignedUserName || null) : (conversation.assignedUserName || assignedUserName || null);
-    const nextStatus = shouldReopen ? 'Aguardando atendimento' : (conversation.status || status);
+    const nextStatus = shouldReopen ? status : (conversation.status || status);
     await db.run(
       `UPDATE whatsapp_conversations
-       SET leadId = ?, clienteNome = ?, remoteJid = COALESCE(NULLIF(?, ''), remoteJid), assignedUserId = ?, assignedUserName = ?, status = ?, updatedAt = ?
+       SET leadId = ?, clienteNome = ?, remoteJid = COALESCE(NULLIF(?, ''), remoteJid), assignedUserId = ?, assignedUserName = ?, status = ?, accountPhone = COALESCE(NULLIF(?, ''), accountPhone), updatedAt = ?
        WHERE id = ?`,
       nextLeadId,
       conversation.clienteNome || nome || phone,
@@ -1065,6 +1079,7 @@ const upsertWhatsAppConversation = async ({
       nextOwnerId,
       nextOwnerName,
       nextStatus,
+      normalizedAccountPhone,
       now,
       conversation.id
     );
@@ -1073,8 +1088,8 @@ const upsertWhatsAppConversation = async ({
 
   const result = await db.run(
     `INSERT INTO whatsapp_conversations
-      (leadId, clienteNome, clienteTelefone, remoteJid, assignedUserId, assignedUserName, status, lastMessage, lastMessageAt, unreadCount, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, 0, ?, ?)`,
+      (leadId, clienteNome, clienteTelefone, remoteJid, assignedUserId, assignedUserName, status, accountPhone, lastMessage, lastMessageAt, unreadCount, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, 0, ?, ?)`,
     leadId,
     nome || phone,
     phone,
@@ -1082,6 +1097,7 @@ const upsertWhatsAppConversation = async ({
     assignedUserId,
     assignedUserName,
     status,
+    normalizedAccountPhone,
     now,
     now,
     now
@@ -4331,6 +4347,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       assignedUserId INTEGER,
       assignedUserName TEXT,
       status TEXT DEFAULT 'Aberta',
+      accountPhone TEXT,
       lastMessage TEXT,
       lastMessageAt TEXT,
       unreadCount INTEGER DEFAULT 0,
@@ -4689,6 +4706,9 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   const existingWhatsappConversationColumns = whatsappConversationColumns.map(column => column.name);
   if (!existingWhatsappConversationColumns.includes('remoteJid')) {
     await db.exec('ALTER TABLE whatsapp_conversations ADD COLUMN remoteJid TEXT');
+  }
+  if (!existingWhatsappConversationColumns.includes('accountPhone')) {
+    await db.exec('ALTER TABLE whatsapp_conversations ADD COLUMN accountPhone TEXT');
   }
   const whatsappMessageColumns = await db.all('PRAGMA table_info(whatsapp_messages)');
   const existingWhatsappMessageColumns = whatsappMessageColumns.map(column => column.name);
@@ -6571,8 +6591,10 @@ app.post('/api/admin/whatsapp/disconnect', authRequired, requirePermission('what
 });
 
 app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('whatsapp'), async (req, res) => {
+  const currentAccountPhone = normalizeWhatsAppPhone(whatsappRuntime.phone);
   const visibleWhere = `
     status != 'Arquivada'
+    AND COALESCE(accountPhone, '') = ?
     AND COALESCE(remoteJid, '') LIKE '%@s.whatsapp.net'
     AND COALESCE(remoteJid, '') NOT LIKE '%@g.us'
     AND COALESCE(remoteJid, '') != 'status@broadcast'
@@ -6587,12 +6609,13 @@ app.get('/api/admin/whatsapp/conversations', authRequired, requirePermission('wh
       SELECT * FROM whatsapp_conversations
       WHERE ${visibleWhere}
       ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC
-    `)
+    `, currentAccountPhone)
     : await db.all(
       `SELECT * FROM whatsapp_conversations
        WHERE ${visibleWhere}
          AND assignedUserId = ?
        ORDER BY COALESCE(lastMessageAt, updatedAt, createdAt) DESC, id DESC`,
+      currentAccountPhone,
       req.user.id
     );
 
