@@ -6060,8 +6060,8 @@ app.put('/api/admin/clientes/:id/etapa-comercial', authRequired, requirePermissi
     dataPrevisaoRetorno || null,
     ultimoContatoComercial || null,
     proximaAcaoComercial || null,
-    req.user.id,
-    req.user.nome || req.user.username,
+    cliente.consultorId || null,
+    cliente.consultorNome || null,
     JSON.stringify(novoHistorico),
     req.params.id
   );
@@ -7099,8 +7099,8 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
     : 0;
   const geracaoMensal = Number(dimensionamento.geracao_estimada_kwh || geracaoCalculada || 0);
   const data = new Date().toISOString().split('T')[0];
-  const ownerId = req.user.id || null;
-  const ownerName = req.user.nome || req.user.username || null;
+  const ownerId = cliente?.consultorId || req.user.id || null;
+  const ownerName = cliente?.consultorNome || req.user.nome || req.user.username || null;
 
   const normalizedDimensionamento = {
     ...dimensionamento,
@@ -7699,8 +7699,17 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     Object.entries(manual || {}).filter(([, value]) => value !== '' && typeof value !== 'undefined' && value !== null)
   );
   const manualFinal = mergeManualWithEquipamento({ ...manualFromOrcamento, ...manualOverrides }, equipamento);
-  const consultorId = cliente?.consultorId ?? orcamento.assignedUserId ?? req.user.id ?? null;
-  const consultorNome = String(cliente?.consultorNome || orcamento.assignedUserName || req.user.nome || '').trim() || 'Sem consultor';
+  const requestedConsultantId = Number(manualFinal.consultorId || cliente?.consultorId || orcamento.assignedUserId || 0);
+  const selectedConsultant = requestedConsultantId
+    ? await db.get('SELECT id, nome FROM usuarios WHERE id = ? AND active = 1', requestedConsultantId)
+    : null;
+  if (!selectedConsultant) {
+    return res.status(400).json({ message: 'Selecione um consultor ativo como responsável pela venda.' });
+  }
+  const consultorId = selectedConsultant.id;
+  const consultorNome = selectedConsultant.nome;
+  manualFinal.consultorId = consultorId;
+  manualFinal.consultorNome = consultorNome;
   const now = new Date().toISOString();
   const dados = {
     cliente: cliente ? publicClient(cliente) : {
@@ -7784,8 +7793,17 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
     ? await db.get('SELECT * FROM equipamentos WHERE id = ?', equipamentoId)
     : await db.get('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id DESC LIMIT 1');
   const manualFinal = mergeManualWithEquipamento(manual, equipamento);
-  const consultorId = cliente.consultorId ?? req.user.id ?? null;
-  const consultorNome = String(cliente.consultorNome || req.user.nome || '').trim() || 'Sem consultor';
+  const requestedConsultantId = Number(manualFinal.consultorId || cliente.consultorId || 0);
+  const selectedConsultant = requestedConsultantId
+    ? await db.get('SELECT id, nome FROM usuarios WHERE id = ? AND active = 1', requestedConsultantId)
+    : null;
+  if (!selectedConsultant) {
+    return res.status(400).json({ message: 'Selecione um consultor ativo como responsável pela venda.' });
+  }
+  const consultorId = selectedConsultant.id;
+  const consultorNome = selectedConsultant.nome;
+  manualFinal.consultorId = consultorId;
+  manualFinal.consultorNome = consultorNome;
 
   const potenciaKwp = Number(manualFinal.potenciaKwp || 0);
   const potenciaPlacaW = Number(equipamento?.potenciaPlacaW || 0);
@@ -7904,6 +7922,23 @@ app.put('/api/admin/contratos/:id', authRequired, requirePermission('contratos')
       data.valorProjeto,
       JSON.stringify(data.dados),
       JSON.stringify(data.equipamentoDados),
+      req.params.id
+    );
+
+    const contractClientId = parseContrato(contrato).dados?.cliente?.id;
+    if (contractClientId) {
+      await db.run(
+        'UPDATE clientes SET consultorId = ?, consultorNome = ? WHERE id = ?',
+        data.consultorId,
+        data.consultorNome,
+        contractClientId
+      );
+    }
+    await db.run(
+      'UPDATE sistemas_fv SET consultorId = ?, consultorNome = ?, updatedAt = ? WHERE contratoId = ?',
+      data.consultorId,
+      data.consultorNome,
+      new Date().toISOString(),
       req.params.id
     );
 

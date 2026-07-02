@@ -655,6 +655,7 @@ const emptyClientForm = {
   cidadeInstalacao: '',
   estadoInstalacao: '',
   observacoes: '',
+  consultorId: '',
   consultorNome: '',
 };
 
@@ -3554,6 +3555,8 @@ const AdminDashboard = () => {
       painel: orcamento.dimensionamento?.placa_modelo || '',
       inversor: orcamento.dimensionamento?.inversor_modelo || '',
       quantidadeInversores: getDimensioningInverterQuantity(orcamento.dimensionamento),
+      consultorId: orcamento.consultorId || orcamento.assignedUserId || '',
+      consultorNome: orcamento.consultorNome || orcamento.assignedUserName || '',
       quantidadeCabo: orcamento.dimensionamento?.quantidade_cabo_cc || '',
       valorSistema: orcamento.financeiro?.preco_final_cliente_rs || '',
       valorEntrada: orcamento.financeiro?.entrada_rs ?? '',
@@ -3635,7 +3638,12 @@ const AdminDashboard = () => {
         clienteData: cliente,
       },
       equipamentoId: equipamento?.id || '',
-      manual: applyEquipamentoToManual({ ...emptyContractManual, formaPagamentoTipo: 'avista' }, equipamento),
+      manual: applyEquipamentoToManual({
+        ...emptyContractManual,
+        formaPagamentoTipo: 'avista',
+        consultorId: cliente.consultorId || '',
+        consultorNome: cliente.consultorNome || '',
+      }, equipamento),
     });
   };
 
@@ -3754,6 +3762,10 @@ const AdminDashboard = () => {
     event.preventDefault();
     const { orcamento, equipamentoId, manual } = contractModal;
     if (!orcamento) return;
+    if (!manual.consultorId) {
+      showToast('Selecione o consultor responsável pela venda.', 'warning');
+      return;
+    }
 
     const isClientContract = orcamento.source === 'cliente';
     const contrato = await request(isClientContract ? '/api/admin/contratos-direto' : '/api/admin/contratos', {
@@ -4826,9 +4838,22 @@ const AdminDashboard = () => {
                         </div>
                         <div className="cc-field">
                           <label className="cc-label">Consultor responsável</label>
-                          <select className="cc-input" value={novoCliente.consultorNome} onChange={(e) => setNovoCliente(prev => ({ ...prev, consultorNome: e.target.value }))}>
+                          <select
+                            className="cc-input"
+                            value={novoCliente.consultorId}
+                            onChange={(e) => {
+                              const consultant = usuarios.find(user => String(user.id) === e.target.value);
+                              setNovoCliente(prev => ({
+                                ...prev,
+                                consultorId: e.target.value,
+                                consultorNome: consultant?.nome || '',
+                              }));
+                            }}
+                          >
                             <option value="">Selecione o consultor</option>
-                            {usuarios.map(u => <option key={u.id} value={u.nome}>{u.nome}</option>)}
+                            {usuarios.filter(user => user.active && user.role !== 'CLIENTE').map(user => (
+                              <option key={user.id} value={user.id}>{user.nome}</option>
+                            ))}
                           </select>
                         </div>
                       </div>
@@ -10613,6 +10638,29 @@ const AdminDashboard = () => {
             </div>
 
             <div className="contract-modal-grid">
+              <label className="span-2">
+                Consultor responsável pela venda *
+                <select
+                  value={contractModal.manual.consultorId || ''}
+                  onChange={(event) => {
+                    const consultant = usuarios.find(user => String(user.id) === event.target.value);
+                    setContractModal(prev => ({
+                      ...prev,
+                      manual: {
+                        ...prev.manual,
+                        consultorId: event.target.value,
+                        consultorNome: consultant?.nome || '',
+                      },
+                    }));
+                  }}
+                  required
+                >
+                  <option value="">Selecione o consultor</option>
+                  {usuarios.filter(user => user.active && user.role !== 'CLIENTE').map(user => (
+                    <option key={user.id} value={user.id}>{user.nome}</option>
+                  ))}
+                </select>
+              </label>
               <label>
                 Geração em kWh
                 <input value={contractModal.manual.geracaoKwh} onChange={(event) => updateContractManual('geracaoKwh', event.target.value)} placeholder="Ex: 660" required />
