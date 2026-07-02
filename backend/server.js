@@ -781,7 +781,6 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     let lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
     const rescuedUnknownLidLead = !allowNewLead
       && !previousConversation
-      && !lead
       && !savedWhatsAppContact
       && !knownBusinessPhone;
     const effectiveAllowNewLead = !savedWhatsAppContact
@@ -818,6 +817,23 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
         owner.nome
       );
       lead = await db.get('SELECT * FROM leads WHERE id = ?', result.lastID);
+      createdLeadNow = true;
+      io.emit('novo_lead', lead);
+    } else if (lead && effectiveAllowNewLead && !previousConversation) {
+      owner = await getNextLeadOwner();
+      await db.run(
+        `UPDATE leads
+         SET nome = ?, origem = 'WhatsApp QR', status = 'Novo', dataCadastro = ?,
+             assignedUserId = ?, assignedUserName = ?,
+             observacoes = 'Novo contato recebido pelo WhatsApp conectado via QR Code.'
+         WHERE id = ?`,
+        message.pushName || lead.nome || phone,
+        new Date().toISOString().split('T')[0],
+        owner.id,
+        owner.nome,
+        lead.id
+      );
+      lead = await db.get('SELECT * FROM leads WHERE id = ?', lead.id);
       createdLeadNow = true;
       io.emit('novo_lead', lead);
     } else if (lead?.assignedUserId) {
