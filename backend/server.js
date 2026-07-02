@@ -1318,7 +1318,21 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
     const jid = (options.remoteJid || options.exactPhone)
       ? rawJid
       : await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
+    if (options.prepareSession !== false) {
+      try {
+        await whatsappRuntime.socket.getUSyncDevices?.([jid], false, false);
+        await whatsappRuntime.socket.assertSessions?.([jid], true);
+      } catch (error) {
+        console.warn(`[WhatsApp] Falha ao preparar sessão de envio para ${jid}:`, error?.message || error);
+      }
+    }
     const result = await whatsappRuntime.socket.sendMessage(jid, { text });
+    console.log('[WhatsApp] Mensagem enviada via QR:', JSON.stringify({
+      to: normalizeWhatsAppPhone(to),
+      jid,
+      id: result?.key?.id || '',
+      status: result?.status,
+    }));
     return {
       configured: true,
       mode: 'qrcode',
