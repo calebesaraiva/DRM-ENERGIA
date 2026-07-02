@@ -741,10 +741,15 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     const phoneVariants = whatsAppPhoneVariants(phone);
     const savedWhatsAppContact = isSavedWhatsAppContact(phoneVariants);
     const knownBusinessPhone = await isKnownBusinessPhone(phoneVariants);
+    const currentAccountPhone = normalizeWhatsAppPhone(whatsappRuntime.phone);
     const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
     const previousConversation = await db.get(
-      `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
-      ...phoneVariants
+      `SELECT * FROM whatsapp_conversations
+       WHERE clienteTelefone IN (${conversationPlaceholders})
+         AND COALESCE(accountPhone, '') = ?
+       ORDER BY updatedAt DESC LIMIT 1`,
+      ...phoneVariants,
+      currentAccountPhone
     );
     const leadPlaceholders = phoneVariants.map(() => '?').join(', ');
     let lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
@@ -1119,12 +1124,14 @@ const createWhatsAppMessage = async ({
   senderId = null,
   senderName = '',
   rawPayload = null,
+  accountPhone = whatsappRuntime.phone,
 } = {}) => {
   const now = new Date().toISOString();
+  const normalizedAccountPhone = normalizeWhatsAppPhone(accountPhone);
   const result = await db.run(
     `INSERT INTO whatsapp_messages
-      (conversationId, direction, messageType, text, mediaUrl, mimeType, fileName, fileSize, providerMessageId, status, senderId, senderName, createdAt, rawPayload)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (conversationId, direction, messageType, text, mediaUrl, mimeType, fileName, fileSize, providerMessageId, status, senderId, senderName, accountPhone, createdAt, rawPayload)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     conversationId,
     direction,
     messageType,
@@ -1137,6 +1144,7 @@ const createWhatsAppMessage = async ({
     status,
     senderId,
     senderName,
+    normalizedAccountPhone,
     now,
     rawPayload ? JSON.stringify(rawPayload) : null
   );
@@ -4370,6 +4378,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       status TEXT,
       senderId INTEGER,
       senderName TEXT,
+      accountPhone TEXT,
       createdAt TEXT,
       rawPayload TEXT,
       FOREIGN KEY (conversationId) REFERENCES whatsapp_conversations(id)
@@ -4717,6 +4726,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     ['mimeType', 'TEXT'],
     ['fileName', 'TEXT'],
     ['fileSize', 'INTEGER'],
+    ['accountPhone', 'TEXT'],
   ];
   for (const [column, definition] of whatsappMediaColumns) {
     if (!existingWhatsappMessageColumns.includes(column)) {
@@ -6829,7 +6839,13 @@ app.get('/api/admin/whatsapp/conversations/:id/messages', authRequired, requireP
   }
 
   await db.run('UPDATE whatsapp_conversations SET unreadCount = 0 WHERE id = ?', conversation.id);
-  const messages = await db.all('SELECT * FROM whatsapp_messages WHERE conversationId = ? ORDER BY createdAt ASC, id ASC', conversation.id);
+  const messages = await db.all(
+    `SELECT * FROM whatsapp_messages
+     WHERE conversationId = ? AND COALESCE(accountPhone, '') = ?
+     ORDER BY createdAt ASC, id ASC`,
+    conversation.id,
+    normalizeWhatsAppPhone(whatsappRuntime.phone)
+  );
   res.json(messages);
 });
 
@@ -6998,10 +7014,15 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
           const phoneVariants = whatsAppPhoneVariants(phone);
           const savedWhatsAppContact = isSavedWhatsAppContact(phoneVariants);
           const knownBusinessPhone = await isKnownBusinessPhone(phoneVariants);
+          const currentAccountPhone = normalizeWhatsAppPhone(whatsappRuntime.phone);
           const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
           const previousConversation = await db.get(
-            `SELECT * FROM whatsapp_conversations WHERE clienteTelefone IN (${conversationPlaceholders}) ORDER BY updatedAt DESC LIMIT 1`,
-            ...phoneVariants
+            `SELECT * FROM whatsapp_conversations
+             WHERE clienteTelefone IN (${conversationPlaceholders})
+               AND COALESCE(accountPhone, '') = ?
+             ORDER BY updatedAt DESC LIMIT 1`,
+            ...phoneVariants,
+            currentAccountPhone
           );
           const leadPlaceholders = phoneVariants.map(() => '?').join(', ');
           let lead = await db.get(`SELECT * FROM leads WHERE telefone IN (${leadPlaceholders})`, ...phoneVariants);
