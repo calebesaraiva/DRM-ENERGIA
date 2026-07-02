@@ -534,7 +534,7 @@ const mapBaileysMessageStatus = (status) => {
   return 'enviada';
 };
 
-const getConsultantDisplayName = (user = {}) => String(user.nome || user.username || 'Consultor DRM').trim();
+const getConsultantDisplayName = (user = {}) => String(user?.nome || user?.username || 'Consultor DRM').trim();
 
 const formatWhatsAppPanelMessage = (text, consultantName) => [
   '*DRM ENERGIA SOLAR*',
