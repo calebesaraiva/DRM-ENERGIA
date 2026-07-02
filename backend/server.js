@@ -536,6 +536,11 @@ const mapBaileysMessageStatus = (status) => {
 
 const getConsultantDisplayName = (user = {}) => String(user?.nome || user?.username || 'Consultor DRM').trim();
 
+const withTimeout = (promise, ms, label = 'operação') => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} excedeu ${ms}ms`)), ms)),
+]);
+
 const formatWhatsAppPanelMessage = (text, consultantName) => [
   '*DRM ENERGIA SOLAR*',
   `Consultor: ${consultantName}`,
@@ -1320,8 +1325,8 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
       : await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
     if (options.prepareSession !== false) {
       try {
-        await whatsappRuntime.socket.getUSyncDevices?.([jid], false, false);
-        await whatsappRuntime.socket.assertSessions?.([jid], true);
+        await withTimeout(whatsappRuntime.socket.getUSyncDevices?.([jid], false, false) || Promise.resolve(), 2500, 'getUSyncDevices');
+        await withTimeout(whatsappRuntime.socket.assertSessions?.([jid], true) || Promise.resolve(), 2500, 'assertSessions');
       } catch (error) {
         console.warn(`[WhatsApp] Falha ao preparar sessão de envio para ${jid}:`, error?.message || error);
       }
