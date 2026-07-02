@@ -2515,6 +2515,14 @@ const firstFilled = (...values) => (
   values.find(value => value !== '' && typeof value !== 'undefined' && value !== null) ?? ''
 );
 
+const getDimensioningInverterQuantity = (dimensionamento = {}) => {
+  const primary = Number(dimensionamento.quantidade_inversores || 1);
+  const additional = Array.isArray(dimensionamento.inversores_adicionais)
+    ? dimensionamento.inversores_adicionais.reduce((total, item) => total + Number(item?.quantidade || 0), 0)
+    : 0;
+  return Math.max(1, primary + additional);
+};
+
 const mergeManualWithEquipamento = (manual = {}, equipamento = {}) => ({
   ...manual,
   geracaoKwh: firstFilled(manual.geracaoKwh, equipamento?.geracaoKwh),
@@ -2524,6 +2532,7 @@ const mergeManualWithEquipamento = (manual = {}, equipamento = {}) => ({
   quantidadeCabo: firstFilled(manual.quantidadeCabo, equipamento?.quantidadeCabo),
   painel: firstFilled(manual.painel, equipamento?.placaModelo),
   inversor: firstFilled(manual.inversor, equipamento?.inversorModelo),
+  quantidadeInversores: firstFilled(manual.quantidadeInversores, equipamento?.quantidadeInversores, 1),
   valorSistema: firstFilled(manual.valorSistema, equipamento?.valorSistema),
   valorEntrada: firstFilled(manual.valorEntrada, equipamento?.valorEntrada),
   valorSaldo: firstFilled(manual.valorSaldo, equipamento?.valorSaldo),
@@ -2567,6 +2576,7 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
     numeroPaineis: body.numeroPaineis ?? manual.numeroPaineis ?? '',
     painel: body.placaModelo ?? manual.painel ?? '',
     inversor: body.inversorModelo ?? manual.inversor ?? '',
+    quantidadeInversores: body.quantidadeInversores ?? manual.quantidadeInversores ?? getDimensioningInverterQuantity(dimensionamento),
     quantidadeCabo: body.quantidadeCabo ?? manual.quantidadeCabo ?? '',
     prazoExecucao: body.prazoExecucao ?? manual.prazoExecucao ?? '',
     formaPagamento: body.formaPagamento ?? manual.formaPagamento ?? '',
@@ -2591,6 +2601,7 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
     numero_paineis_necessarios: numberOrNull(body.numeroPaineis) ?? dimensionamento.numero_paineis_necessarios ?? 0,
     placa_modelo: body.placaModelo ?? dimensionamento.placa_modelo ?? '',
     inversor_modelo: body.inversorModelo ?? dimensionamento.inversor_modelo ?? '',
+    quantidade_inversores: numberOrNull(body.quantidadeInversores) ?? dimensionamento.quantidade_inversores ?? 1,
     quantidade_cabo_cc: body.quantidadeCabo ?? dimensionamento.quantidade_cabo_cc ?? '',
   };
 
@@ -2605,6 +2616,7 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
     numeroPaineis: numberOrNull(body.numeroPaineis) ?? equipamentoDados.numeroPaineis ?? null,
     placaModelo: String(body.placaModelo ?? equipamentoDados.placaModelo ?? '').trim(),
     inversorModelo: String(body.inversorModelo ?? equipamentoDados.inversorModelo ?? '').trim(),
+    quantidadeInversores: numberOrNull(body.quantidadeInversores) ?? equipamentoDados.quantidadeInversores ?? getDimensioningInverterQuantity(dimensionamento),
     quantidadeCabo: String(body.quantidadeCabo ?? equipamentoDados.quantidadeCabo ?? '').trim(),
     prazoExecucao: numberOrNull(body.prazoExecucao) ?? equipamentoDados.prazoExecucao ?? null,
     formaPagamento: String(body.formaPagamento ?? equipamentoDados.formaPagamento ?? '').trim(),
@@ -2908,6 +2920,7 @@ const buildContratoHtml = async (contrato) => {
       geracao: manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0,
       geracaoAnual: manual.geracaoAnualKwh || (Number(manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0) * 12),
       quantidadeCabo: manual.quantidadeCabo || 'Não informado',
+      quantidadeInversores: manual.quantidadeInversores || getDimensioningInverterQuantity(dimensionamento),
     },
     equipamento: {
       nome: parsed.equipamentoNome || equipamento.nome || 'Não informado',
@@ -2937,6 +2950,7 @@ const buildContratoHtml = async (contrato) => {
     ['Potência em KWp', `${variables.projeto.potencia} kWp`],
     ['Painel', variables.equipamento.placaModelo],
     ['Inversor', variables.equipamento.inversorModelo],
+    ['Quantidade de inversores', variables.projeto.quantidadeInversores],
     ['Quantidade de painéis', variables.projeto.paineis],
     ['Quantidade de cabo', variables.projeto.quantidadeCabo],
     ['Valor do sistema', variables.contrato.valor],
@@ -2944,7 +2958,7 @@ const buildContratoHtml = async (contrato) => {
   ];
   const materialRows = [
     ['MÓDULO FOTOVOLTAICO', variables.equipamento.placaModelo, variables.projeto.paineis],
-    ['INVERSOR FOTOVOLTAICO', variables.equipamento.inversorModelo, 1],
+    ['INVERSOR FOTOVOLTAICO', variables.equipamento.inversorModelo, variables.projeto.quantidadeInversores],
     ['CABO SOLAR', variables.projeto.quantidadeCabo, 'Incluso'],
     ['CONECTOR MC4 MACHO/FÊMEA', 'Conectores para ligação do sistema', 'Incluso'],
     ['ESTRUTURA DE FIXAÇÃO', 'Estrutura metálica compatível com o telhado', 'Incluso'],
@@ -3272,6 +3286,7 @@ const buildContratoPdf = async (contrato) => {
       geracaoAnual: manual.geracaoAnualKwh || dimensionamento.geracao_anual_kwh || dimensionamento.geracao_anual_estimada_kwh || (Number(manual.geracaoKwh || dimensionamento.geracao_estimada_kwh || 0) * 12),
       paineis: manual.numeroPaineis || dimensionamento.numero_paineis_necessarios || 0,
       quantidadeCabo: manual.quantidadeCabo || equipamento.quantidadeCabo || 'Não informado',
+      quantidadeInversores: manual.quantidadeInversores || equipamento.quantidadeInversores || getDimensioningInverterQuantity(dimensionamento),
     },
     equipamento: {
       nome: parsed.equipamentoNome || equipamento.nome || 'Não informado',
@@ -3299,6 +3314,7 @@ const buildContratoPdf = async (contrato) => {
     ['Quantidade de painéis', contractVariables.projeto.paineis || 'Não informado'],
     ['Modelo dos painéis', contractVariables.equipamento.placaModelo],
     ['Modelo do inversor', contractVariables.equipamento.inversorModelo],
+    ['Quantidade de inversores', contractVariables.projeto.quantidadeInversores],
     ['Quantidade de cabo', contractVariables.projeto.quantidadeCabo],
   ];
   const commercialRows = [
@@ -7670,6 +7686,7 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     numeroPaineis: dimensionamento.numero_paineis_necessarios || '',
     painel: dimensionamento.placa_modelo || '',
     inversor: dimensionamento.inversor_modelo || '',
+    quantidadeInversores: getDimensioningInverterQuantity(dimensionamento),
     quantidadeCabo: dimensionamento.quantidade_cabo_cc || '',
     valorSistema: financeiro.preco_final_cliente_rs || '',
     valorEntrada: financeiro.entrada_rs ?? '',
@@ -7733,6 +7750,7 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
       ...(equipamento || {}),
       placaModelo: manualFinal.painel || equipamento?.placaModelo || '',
       inversorModelo: manualFinal.inversor || equipamento?.inversorModelo || '',
+      quantidadeInversores: Number(manualFinal.quantidadeInversores || 1),
     }),
     consultorId,
     consultorNome,
@@ -7788,6 +7806,7 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
     dimensionamento: {
       potencia_real_instalada_kwp: potenciaKwp,
       numero_paineis_necessarios: numeroPaineis,
+      quantidade_inversores: Number(manualFinal.quantidadeInversores || 1),
       potencia_painel_utilizado_w: potenciaPlacaW || null,
       geracao_estimada_kwh: geracaoMensal,
       geracao_anual_estimada_kwh: Number(manualFinal.geracaoAnualKwh || 0) || (geracaoMensal * 12),
@@ -7837,6 +7856,7 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
       ...(equipamento || {}),
       placaModelo: manualFinal.painel || equipamento?.placaModelo || '',
       inversorModelo: manualFinal.inversor || equipamento?.inversorModelo || '',
+      quantidadeInversores: Number(manualFinal.quantidadeInversores || 1),
     }),
     consultorId,
     consultorNome,

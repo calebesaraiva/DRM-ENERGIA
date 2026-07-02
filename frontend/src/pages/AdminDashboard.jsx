@@ -519,6 +519,7 @@ const emptyContractManual = {
   numeroPaineis: '',
   painel: '',
   inversor: '',
+  quantidadeInversores: '1',
   quantidadeCabo: '',
   valorSistema: '',
   valorEntrada: '',
@@ -544,6 +545,9 @@ const contractToReviewForm = (contrato = {}) => ({
   numeroPaineis: contrato.dados?.manual?.numeroPaineis ?? contrato.equipamentoDados?.numeroPaineis ?? contrato.dados?.dimensionamento?.numero_paineis_necessarios ?? '',
   placaModelo: contrato.equipamentoDados?.placaModelo || contrato.dados?.manual?.painel || '',
   inversorModelo: contrato.equipamentoDados?.inversorModelo || contrato.dados?.manual?.inversor || '',
+  quantidadeInversores: contrato.dados?.manual?.quantidadeInversores
+    ?? contrato.equipamentoDados?.quantidadeInversores
+    ?? getDimensioningInverterQuantity(contrato.dados?.dimensionamento),
   quantidadeCabo: contrato.dados?.manual?.quantidadeCabo || contrato.equipamentoDados?.quantidadeCabo || '',
   prazoExecucao: contrato.dados?.manual?.prazoExecucao ?? contrato.equipamentoDados?.prazoExecucao ?? '',
   formaPagamentoTipo: contrato.dados?.manual?.formaPagamentoTipo || contrato.equipamentoDados?.formaPagamentoTipo || '',
@@ -602,6 +606,14 @@ const firstFilled = (...values) => (
   values.find(value => value !== '' && typeof value !== 'undefined' && value !== null) ?? ''
 );
 
+function getDimensioningInverterQuantity(dimensionamento = {}) {
+  const primary = Number(dimensionamento?.quantidade_inversores || 1);
+  const additional = Array.isArray(dimensionamento?.inversores_adicionais)
+    ? dimensionamento.inversores_adicionais.reduce((total, item) => total + Number(item?.quantidade || 0), 0)
+    : 0;
+  return Math.max(1, primary + additional);
+}
+
 const applyEquipamentoToManual = (manual = {}, equipamento = {}) => ({
   ...manual,
   geracaoKwh: firstFilled(manual.geracaoKwh, equipamento?.geracaoKwh),
@@ -611,6 +623,7 @@ const applyEquipamentoToManual = (manual = {}, equipamento = {}) => ({
   quantidadeCabo: firstFilled(manual.quantidadeCabo, equipamento?.quantidadeCabo),
   painel: firstFilled(manual.painel, equipamento?.placaModelo),
   inversor: firstFilled(manual.inversor, equipamento?.inversorModelo),
+  quantidadeInversores: firstFilled(manual.quantidadeInversores, equipamento?.quantidadeInversores, 1),
   valorSistema: firstFilled(manual.valorSistema, equipamento?.valorSistema),
   valorEntrada: firstFilled(manual.valorEntrada, equipamento?.valorEntrada),
   valorSaldo: firstFilled(manual.valorSaldo, equipamento?.valorSaldo),
@@ -3540,6 +3553,7 @@ const AdminDashboard = () => {
       numeroPaineis: orcamento.dimensionamento?.numero_paineis_necessarios || '',
       painel: orcamento.dimensionamento?.placa_modelo || '',
       inversor: orcamento.dimensionamento?.inversor_modelo || '',
+      quantidadeInversores: getDimensioningInverterQuantity(orcamento.dimensionamento),
       quantidadeCabo: orcamento.dimensionamento?.quantidade_cabo_cc || '',
       valorSistema: orcamento.financeiro?.preco_final_cliente_rs || '',
       valorEntrada: orcamento.financeiro?.entrada_rs ?? '',
@@ -6729,6 +6743,7 @@ const AdminDashboard = () => {
                           {renderContractReviewField('Placas', 'numeroPaineis', { type: 'number', inputMode: 'numeric' })}
                           {renderContractReviewField('Modelo placa', 'placaModelo')}
                           {renderContractReviewField('Inversor', 'inversorModelo')}
+                          {renderContractReviewField('Quantidade de inversores', 'quantidadeInversores', { type: 'number', inputMode: 'numeric' })}
                           {renderContractReviewField('Cabo', 'quantidadeCabo')}
                           {renderContractReviewField('Prazo dias', 'prazoExecucao', { type: 'number', inputMode: 'numeric' })}
                           {renderContractReviewField('Tipo pagamento', 'formaPagamentoTipo', {
@@ -10644,6 +10659,10 @@ const AdminDashboard = () => {
               <label className="span-2">
                 Inversor
                 <input value={contractModal.manual.inversor} onChange={(event) => updateContractManual('inversor', event.target.value)} placeholder="Modelo do inversor" required />
+              </label>
+              <label>
+                Quantidade de inversores
+                <input type="number" min="1" step="1" value={contractModal.manual.quantidadeInversores} onChange={(event) => updateContractManual('quantidadeInversores', event.target.value)} placeholder="1" required />
               </label>
               <label>
                 Valor do sistema
