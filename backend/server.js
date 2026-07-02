@@ -568,6 +568,19 @@ const buildWhatsAppNewLeadNotice = ({ nome = '', telefone = '', mensagem = '', t
   'Abra o painel > WhatsApp e inicie o atendimento.',
 ].filter(Boolean).join('\n');
 
+const buildWhatsAppMasterLeadNotice = ({ nome = '', telefone = '', mensagem = '', consultantName = '' } = {}) => [
+  '*DRM ENERGIA SOLAR*',
+  '',
+  'Novo lead distribuído pelo rodízio.',
+  '',
+  `Cliente: ${nome || 'Sem nome'}`,
+  `WhatsApp: ${formatLeadPhoneForNotice(telefone) || 'Sem telefone'}`,
+  `Direcionado para: ${consultantName || 'Consultor não identificado'}`,
+  mensagem ? `Mensagem: ${String(mensagem).slice(0, 280)}` : '',
+  '',
+  'Acompanhe o atendimento pelo painel > WhatsApp.',
+].filter(Boolean).join('\n');
+
 const buildWhatsAppLink = (phone, text) => {
   const normalizedPhone = normalizeWhatsAppPhone(phone) || DEFAULT_WHATSAPP_PHONE;
   const encoded = encodeURIComponent(text || 'Ola, vim do site e quero uma proposta de energia solar.');
@@ -1420,12 +1433,12 @@ const getNewLeadNotificationRecipients = async (conversation = {}, options = {})
 };
 
 const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', test = false } = {}) => {
-  const notice = buildWhatsAppNewLeadNotice({
+  const leadDetails = {
     nome: conversation?.clienteNome,
     telefone: conversation?.clienteTelefone,
     mensagem: text,
     teste: test,
-  });
+  };
   const recipients = await getNewLeadNotificationRecipients(conversation, {
     assignedUsername: conversation?.assignedUsername,
     fallbackToRoundRobin: test,
@@ -1434,7 +1447,15 @@ const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', 
     throw new Error('Nenhum destinatário válido para o aviso de lead novo.');
   }
   const results = await Promise.allSettled(
-    recipients.map(item => sendWhatsAppTextMessage(item.phone, notice))
+    recipients.map(item => {
+      const notice = item.role === 'master'
+        ? buildWhatsAppMasterLeadNotice({
+            ...leadDetails,
+            consultantName: conversation?.assignedUserName,
+          })
+        : buildWhatsAppNewLeadNotice(leadDetails);
+      return sendWhatsAppTextMessage(item.phone, notice);
+    })
   );
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
