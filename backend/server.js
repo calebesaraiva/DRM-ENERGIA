@@ -1331,7 +1331,7 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
         console.warn(`[WhatsApp] Falha ao preparar sessão de envio para ${jid}:`, error?.message || error);
       }
     }
-    const result = await whatsappRuntime.socket.sendMessage(jid, { text });
+    const result = await whatsappRuntime.socket.sendMessage(jid, { text }, { useUserDevicesCache: false });
     console.log('[WhatsApp] Mensagem enviada via QR:', JSON.stringify({
       to: normalizeWhatsAppPhone(to),
       jid,
