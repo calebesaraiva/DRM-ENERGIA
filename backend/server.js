@@ -7548,7 +7548,8 @@ app.get('/api/admin/contratos', authRequired, requirePermission('contratos'), as
   const contratos = can(req.user, 'verTodosLeads')
     ? await db.all('SELECT * FROM contratos ORDER BY id DESC')
     : await db.all(
-      'SELECT * FROM contratos WHERE assignedUserId = ? OR criadoPorId = ? ORDER BY id DESC',
+      'SELECT * FROM contratos WHERE consultorId = ? OR assignedUserId = ? OR criadoPorId = ? ORDER BY id DESC',
+      req.user.id,
       req.user.id,
       req.user.id
     );
