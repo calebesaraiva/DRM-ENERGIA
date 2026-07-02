@@ -29,7 +29,7 @@ const {
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
-const DEFAULT_WHATSAPP_PHONE = '559985127056';
+const DEFAULT_WHATSAPP_PHONE = process.env.WHATSAPP_DEIVSON || '559991675608';
 const WHATSAPP_AUTH_DIR = path.join(__dirname, 'whatsapp-session');
 const WHATSAPP_MEDIA_DIR = path.join(__dirname, 'uploads', 'whatsapp');
 const WHATSAPP_MEDIA_ARCHIVE_REMOTE = process.env.WHATSAPP_MEDIA_ARCHIVE_REMOTE || 'gdrive:DRM-Solar-Backups/media/whatsapp';
@@ -254,7 +254,7 @@ const INTERNAL_USERS = [
     nome: 'Rene Jr',
     username: 'renejr',
     email: 'renejr@drm.local',
-    whatsapp: process.env.WHATSAPP_RENEJR || '5599985127056',
+    whatsapp: process.env.WHATSAPP_RENEJR || '559985127056',
     role: 'EQUIPE_TECNICA_COMERCIAL',
     temporaryPassword: 'ReneJr@DRM#2026',
     permissions: {
@@ -274,7 +274,7 @@ const INTERNAL_USERS = [
     nome: 'Gleyson',
     username: 'gleyson',
     email: 'gleyson@drm.local',
-    whatsapp: process.env.WHATSAPP_GLEYSON || '5599984632324',
+    whatsapp: process.env.WHATSAPP_GLEYSON || '559984632324',
     role: 'CONSULTOR',
     temporaryPassword: 'Gleyson@DRM#2026',
     permissions: {
@@ -289,7 +289,7 @@ const INTERNAL_USERS = [
     nome: 'Carlito Lopes',
     username: 'carlito',
     email: 'carlito@drm.local',
-    whatsapp: process.env.WHATSAPP_CARLITO || '5599992276744',
+    whatsapp: process.env.WHATSAPP_CARLITO || '559992276744',
     role: 'CONSULTOR',
     temporaryPassword: 'Carlito@DRM#2026',
     permissions: {
@@ -4990,10 +4990,28 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   await db.run(
     `UPDATE usuarios
         SET whatsapp = ?
+      WHERE lower(username) = 'renejr'
+        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
+    '559985127056',
+    '5599985127056'
+  );
+
+  await db.run(
+    `UPDATE usuarios
+        SET whatsapp = ?
+      WHERE lower(username) = 'gleyson'
+        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
+    '559984632324',
+    '5599984632324'
+  );
+
+  await db.run(
+    `UPDATE usuarios
+        SET whatsapp = ?
       WHERE lower(username) = 'carlito'
         AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
-    '5599992276744',
-    '559992276744'
+    '559992276744',
+    '5599992276744'
   );
 
   await db.run(
