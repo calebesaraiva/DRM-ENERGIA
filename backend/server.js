@@ -1400,26 +1400,50 @@ const getInternalWhatsAppDeliveryPhones = (phone) => {
   return [...phones];
 };
 
-const sendInternalWhatsAppTextMessage = async (to, text, options = {}) => {
+const getInternalWhatsAppDeliveryTargets = async (phone, options = {}) => {
   const phones = options.includeVariants === false
-    ? [normalizeWhatsAppPhone(to)].filter(Boolean)
-    : getInternalWhatsAppDeliveryPhones(to);
-  if (!phones.length) {
+    ? [normalizeWhatsAppPhone(phone)].filter(Boolean)
+    : getInternalWhatsAppDeliveryPhones(phone);
+  if (!phones.length) return [];
+
+  const lidTargets = [];
+  const lidMapping = whatsappRuntime.socket?.signalRepository?.lidMapping;
+  if (lidMapping && options.includeLid !== false) {
+    for (const itemPhone of phones) {
+      try {
+        const pnJid = normalizeWhatsAppRemoteJid(itemPhone);
+        const lidJid = await lidMapping.getLIDForPN(pnJid);
+        if (lidJid && !lidTargets.some(item => item.remoteJid === lidJid)) {
+          lidTargets.push({ phone: itemPhone, remoteJid: lidJid, label: 'lid' });
+        }
+      } catch (error) {
+        console.warn(`[WhatsApp] Não foi possível resolver LID interno para ${itemPhone}:`, error?.message || error);
+      }
+    }
+  }
+
+  if (lidTargets.length) return lidTargets;
+  return phones.map(itemPhone => ({ phone: itemPhone, remoteJid: normalizeWhatsAppRemoteJid(itemPhone), label: 'phone' }));
+};
+
+const sendInternalWhatsAppTextMessage = async (to, text, options = {}) => {
+  const targets = await getInternalWhatsAppDeliveryTargets(to, options);
+  if (!targets.length) {
     throw new Error('Contato do WhatsApp inválido para envio interno.');
   }
 
   const attempts = [];
   let firstSuccess = null;
-  for (const phone of phones) {
+  for (const target of targets) {
     try {
-      const result = await sendWhatsAppTextMessage(phone, text, {
-        exactPhone: true,
+      const result = await sendWhatsAppTextMessage(target.phone, text, {
+        remoteJid: target.remoteJid,
         prepareSessionTimeoutMs: options.prepareSessionTimeoutMs || 12000,
       });
-      attempts.push({ phone, ok: true, status: result?.status || '' });
+      attempts.push({ phone: target.phone, remoteJid: target.remoteJid, label: target.label, ok: true, status: result?.status || '' });
       if (!firstSuccess) firstSuccess = result;
     } catch (error) {
-      attempts.push({ phone, ok: false, error: error?.message || 'Falha ao enviar.' });
+      attempts.push({ phone: target.phone, remoteJid: target.remoteJid, label: target.label, ok: false, error: error?.message || 'Falha ao enviar.' });
     }
   }
 
