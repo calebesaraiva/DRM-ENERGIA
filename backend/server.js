@@ -477,7 +477,9 @@ const isSavedWhatsAppContact = (phoneVariants = []) => {
   for (const variant of phoneVariants) {
     const phone = normalizeWhatsAppPhone(variant);
     const contact = phone ? whatsappKnownContacts.get(phone) : null;
-    if (contact && (contact.name || contact.notify || contact.verifiedName || contact.short || contact.phoneNumber || contact.lid || contact.id)) return true;
+    // Baileys also fills notify/verifiedName/id/lid for unsaved numbers.
+    // Only `name` represents a name explicitly saved in the connected agenda.
+    if (contact && String(contact.name || '').trim()) return true;
   }
   return false;
 };
@@ -490,18 +492,30 @@ const isPlausibleContactPhone = (phone) => {
   return digits.length >= 10 && digits.length <= 13;
 };
 
-const getIncomingContactAddress = (key = {}) => {
+const getIncomingContactAddress = async (key = {}) => {
   const primaryJid = String(key.remoteJid || '');
   if (isBlockedWhatsAppJid(primaryJid)) {
     return { phone: '', remoteJid: '', allowNewLead: false };
   }
-  const phoneJid = [
+  let phoneJid = [
     primaryJid,
     key.remoteJidAlt,
     key.participantAlt,
     key.senderPn,
     key.participant,
   ].map(value => String(value || '')).find(jid => jid.endsWith('@s.whatsapp.net') && isPlausibleContactPhone(getPhoneFromWhatsAppJid(jid)));
+
+  if (!phoneJid && primaryJid.endsWith('@lid')) {
+    try {
+      const mappedPhoneJid = await whatsappRuntime.socket?.signalRepository?.lidMapping?.getPNForLID(primaryJid);
+      if (mappedPhoneJid?.endsWith('@s.whatsapp.net') && isPlausibleContactPhone(getPhoneFromWhatsAppJid(mappedPhoneJid))) {
+        phoneJid = mappedPhoneJid;
+      }
+    } catch (error) {
+      console.warn('[WhatsApp] Não foi possível resolver LID:', error.message || error);
+    }
+  }
+
   if (!phoneJid) return { phone: '', remoteJid: primaryJid, allowNewLead: false };
   return {
     phone: getPhoneFromWhatsAppJid(phoneJid),
@@ -720,8 +734,14 @@ const saveIncomingWhatsAppMedia = async (message, mediaInfo) => {
 
 const handleIncomingWhatsAppWebMessage = async (message) => {
   try {
-    const { phone, remoteJid, allowNewLead } = getIncomingContactAddress(message.key || {});
+    const { phone, remoteJid, allowNewLead } = await getIncomingContactAddress(message.key || {});
     if (message.key?.fromMe || !isSupportedIncomingWhatsAppJid(message.key?.remoteJid || remoteJid) || !phone) {
+      if (!message.key?.fromMe) {
+        console.info('[WhatsApp] Mensagem ignorada sem telefone individual resolvido.', {
+          jid: String(message.key?.remoteJid || ''),
+          alt: String(message.key?.remoteJidAlt || message.key?.participantAlt || ''),
+        });
+      }
       return;
     }
 
@@ -764,7 +784,15 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     // Grupo nunca entra aqui porque é bloqueado antes. Além disso, contatos
     // salvos e números já conhecidos no sistema não podem disparar lead novo
     // nem consumir o rodízio dos consultores.
-    if (!effectiveAllowNewLead && !previousConversation) return;
+    if (!effectiveAllowNewLead && !previousConversation) {
+      console.info('[WhatsApp] Mensagem individual não entrou no rodízio.', {
+        phone: formatLeadPhoneForNotice(phone),
+        savedContact: savedWhatsAppContact,
+        knownBusinessPhone,
+        allowNewLead,
+      });
+      return;
+    }
 
     let owner = previousConversation?.assignedUserId
       ? { id: previousConversation.assignedUserId, nome: previousConversation.assignedUserName }
