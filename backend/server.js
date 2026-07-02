@@ -1325,9 +1325,10 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
       ? rawJid
       : await resolveWhatsAppJid(activeSocket, rawJid);
     if (options.prepareSession !== false) {
+      const sessionTimeoutMs = Number(options.prepareSessionTimeoutMs || 8000);
       try {
-        await withTimeout(activeSocket.getUSyncDevices?.([jid], false, false) || Promise.resolve(), 2500, 'getUSyncDevices');
-        await withTimeout(activeSocket.assertSessions?.([jid], true) || Promise.resolve(), 2500, 'assertSessions');
+        await withTimeout(activeSocket.getUSyncDevices?.([jid], false, false) || Promise.resolve(), sessionTimeoutMs, 'getUSyncDevices');
+        await withTimeout(activeSocket.assertSessions?.([jid], true) || Promise.resolve(), sessionTimeoutMs, 'assertSessions');
       } catch (error) {
         console.warn(`[WhatsApp] Falha ao preparar sessão de envio para ${jid}:`, error?.message || error);
       }
@@ -1498,7 +1499,7 @@ const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', 
             consultantName: conversation?.assignedUserName,
           })
         : buildWhatsAppNewLeadNotice(leadDetails);
-      return sendWhatsAppTextMessage(item.phone, notice, { exactPhone: true });
+      return sendWhatsAppTextMessage(item.phone, notice, { exactPhone: true, prepareSessionTimeoutMs: 12000 });
     })
   );
   results.forEach((result, index) => {
@@ -1555,7 +1556,7 @@ const notifyConsultantAboutTransfer = async ({ consultant, conversation, transfe
     clienteNome: conversation?.clienteNome,
     telefone: conversation?.clienteTelefone,
     transferredBy,
-  }), { exactPhone: true });
+  }), { exactPhone: true, prepareSessionTimeoutMs: 12000 });
   return { sent: true, result };
 };
 
@@ -1619,7 +1620,7 @@ const notifyAssignedConsultantAboutReply = async ({ conversation, text = '' }) =
   const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
   if (consultantPhone && consultantPhone !== businessPhone) {
     try {
-      await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload), { exactPhone: true });
+      await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload), { exactPhone: true, prepareSessionTimeoutMs: 12000 });
     } catch (error) {
       console.error(`Erro ao avisar consultor ${consultant.username} por WhatsApp:`, error?.message || error);
     }
@@ -6659,7 +6660,7 @@ app.post('/api/admin/whatsapp/test-consultant-alert', authRequired, requirePermi
     const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
     if (consultantPhone && consultantPhone !== businessPhone) {
       try {
-        const r = await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload), { exactPhone: true });
+        const r = await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload), { exactPhone: true, prepareSessionTimeoutMs: 12000 });
         item.whatsapp = 'enviado para ' + consultantPhone + ' | baileysStatus=' + (r?.payload?.status ?? '?') + ' | id=' + (r?.providerMessageId || '-');
       } catch (error) {
         item.whatsapp = 'erro: ' + (error?.message || 'falha');
