@@ -759,7 +759,13 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     if (!text) return;
 
     const phoneVariants = whatsAppPhoneVariants(phone);
-    const savedWhatsAppContact = isSavedWhatsAppContact(phoneVariants);
+    const contactIdentityVariants = [
+      ...phoneVariants,
+      message.key?.remoteJid,
+      message.key?.remoteJidAlt,
+      message.key?.participantAlt,
+    ];
+    const savedWhatsAppContact = isSavedWhatsAppContact(contactIdentityVariants);
     const knownBusinessPhone = await isKnownBusinessPhone(phoneVariants);
     const currentAccountPhone = normalizeWhatsAppPhone(whatsappRuntime.phone);
     const conversationPlaceholders = phoneVariants.map(() => '?').join(', ');
