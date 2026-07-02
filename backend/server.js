@@ -254,7 +254,7 @@ const INTERNAL_USERS = [
     nome: 'Rene Jr',
     username: 'renejr',
     email: 'renejr@drm.local',
-    whatsapp: process.env.WHATSAPP_RENEJR || '559985127056',
+    whatsapp: process.env.WHATSAPP_RENEJR || '5599985127056',
     role: 'EQUIPE_TECNICA_COMERCIAL',
     temporaryPassword: 'ReneJr@DRM#2026',
     permissions: {
@@ -274,7 +274,7 @@ const INTERNAL_USERS = [
     nome: 'Gleyson',
     username: 'gleyson',
     email: 'gleyson@drm.local',
-    whatsapp: process.env.WHATSAPP_GLEYSON || '559984632324',
+    whatsapp: process.env.WHATSAPP_GLEYSON || '5599984632324',
     role: 'CONSULTOR',
     temporaryPassword: 'Gleyson@DRM#2026',
     permissions: {
@@ -289,7 +289,7 @@ const INTERNAL_USERS = [
     nome: 'Carlito Lopes',
     username: 'carlito',
     email: 'carlito@drm.local',
-    whatsapp: process.env.WHATSAPP_CARLITO || '559992276744',
+    whatsapp: process.env.WHATSAPP_CARLITO || '5599992276744',
     role: 'CONSULTOR',
     temporaryPassword: 'Carlito@DRM#2026',
     permissions: {
@@ -1475,7 +1475,7 @@ const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', 
             consultantName: conversation?.assignedUserName,
           })
         : buildWhatsAppNewLeadNotice(leadDetails);
-      return sendWhatsAppTextMessage(item.phone, notice);
+      return sendWhatsAppTextMessage(item.phone, notice, { exactPhone: true });
     })
   );
   results.forEach((result, index) => {
@@ -1532,7 +1532,7 @@ const notifyConsultantAboutTransfer = async ({ consultant, conversation, transfe
     clienteNome: conversation?.clienteNome,
     telefone: conversation?.clienteTelefone,
     transferredBy,
-  }));
+  }), { exactPhone: true });
   return { sent: true, result };
 };
 
@@ -1596,7 +1596,7 @@ const notifyAssignedConsultantAboutReply = async ({ conversation, text = '' }) =
   const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
   if (consultantPhone && consultantPhone !== businessPhone) {
     try {
-      await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload));
+      await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload), { exactPhone: true });
     } catch (error) {
       console.error(`Erro ao avisar consultor ${consultant.username} por WhatsApp:`, error?.message || error);
     }
@@ -4990,33 +4990,6 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   await db.run(
     `UPDATE usuarios
         SET whatsapp = ?
-      WHERE lower(username) = 'renejr'
-        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
-    '559985127056',
-    '5599985127056'
-  );
-
-  await db.run(
-    `UPDATE usuarios
-        SET whatsapp = ?
-      WHERE lower(username) = 'gleyson'
-        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
-    '559984632324',
-    '5599984632324'
-  );
-
-  await db.run(
-    `UPDATE usuarios
-        SET whatsapp = ?
-      WHERE lower(username) = 'carlito'
-        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
-    '559992276744',
-    '5599992276744'
-  );
-
-  await db.run(
-    `UPDATE usuarios
-        SET whatsapp = ?
       WHERE lower(username) = 'deivson'
         AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(whatsapp, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?`,
     '559991675608',
@@ -6663,7 +6636,7 @@ app.post('/api/admin/whatsapp/test-consultant-alert', authRequired, requirePermi
     const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
     if (consultantPhone && consultantPhone !== businessPhone) {
       try {
-        const r = await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload));
+        const r = await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload), { exactPhone: true });
         item.whatsapp = 'enviado para ' + consultantPhone + ' | baileysStatus=' + (r?.payload?.status ?? '?') + ' | id=' + (r?.providerMessageId || '-');
       } catch (error) {
         item.whatsapp = 'erro: ' + (error?.message || 'falha');
