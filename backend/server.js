@@ -1475,7 +1475,7 @@ const notifyConsultantsAboutNewWhatsAppLead = async ({ conversation, text = '', 
             consultantName: conversation?.assignedUserName,
           })
         : buildWhatsAppNewLeadNotice(leadDetails);
-      return sendWhatsAppTextMessage(item.phone, notice);
+      return sendWhatsAppTextMessage(item.phone, notice, { exactPhone: true });
     })
   );
   results.forEach((result, index) => {
@@ -1532,7 +1532,7 @@ const notifyConsultantAboutTransfer = async ({ consultant, conversation, transfe
     clienteNome: conversation?.clienteNome,
     telefone: conversation?.clienteTelefone,
     transferredBy,
-  }));
+  }), { exactPhone: true });
   return { sent: true, result };
 };
 
@@ -1596,7 +1596,7 @@ const notifyAssignedConsultantAboutReply = async ({ conversation, text = '' }) =
   const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
   if (consultantPhone && consultantPhone !== businessPhone) {
     try {
-      await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload));
+      await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload), { exactPhone: true });
     } catch (error) {
       console.error(`Erro ao avisar consultor ${consultant.username} por WhatsApp:`, error?.message || error);
     }
@@ -6645,7 +6645,7 @@ app.post('/api/admin/whatsapp/test-consultant-alert', authRequired, requirePermi
     const businessPhone = normalizeWhatsAppPhone(whatsappRuntime.phone || DEFAULT_WHATSAPP_PHONE);
     if (consultantPhone && consultantPhone !== businessPhone) {
       try {
-        const r = await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload));
+        const r = await sendWhatsAppTextMessage(consultantPhone, buildConsultantReplyNotice(payload), { exactPhone: true });
         item.whatsapp = 'enviado para ' + consultantPhone + ' | baileysStatus=' + (r?.payload?.status ?? '?') + ' | id=' + (r?.providerMessageId || '-');
       } catch (error) {
         item.whatsapp = 'erro: ' + (error?.message || 'falha');
