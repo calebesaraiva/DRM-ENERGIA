@@ -549,6 +549,14 @@ const buildWhatsAppClaimNotice = (consultantName) => [
   `Olá! Meu nome é ${consultantName} e a partir de agora vou cuidar do seu atendimento. 😊`,
 ].join('\n');
 
+const buildWhatsAppAssignedConsultantNotice = (customerName, consultantName) => [
+  '*DRM ENERGIA SOLAR*',
+  '',
+  `Olá${customerName ? `, ${customerName}` : ''}! Recebemos sua mensagem.`,
+  `Seu atendimento foi direcionado para o consultor ${consultantName || 'da nossa equipe'}.`,
+  'Ele entrará em contato para continuar seu atendimento.',
+].join('\n');
+
 const buildWhatsAppCloseNotice = (consultantName) => [
   '*DRM ENERGIA SOLAR*',
   '',
@@ -885,6 +893,19 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
     io.emit('whatsapp_message_created', { message: savedMessage, conversation: updatedConversation });
     io.emit('whatsapp_conversation_updated', updatedConversation);
     if (shouldNotifyNewLead && updatedConversation?.status === 'Aguardando atendimento') {
+      try {
+        await sendAndStoreWhatsAppMessage({
+          conversation: updatedConversation,
+          text: buildWhatsAppAssignedConsultantNotice(
+            updatedConversation.clienteNome,
+            updatedConversation.assignedUserName
+          ),
+          user: null,
+          system: true,
+        });
+      } catch (error) {
+        console.error('Erro ao confirmar direcionamento para o cliente:', error);
+      }
       try {
         const notificationResults = await notifyConsultantsAboutNewWhatsAppLead({ conversation: updatedConversation, text });
         console.log('[WhatsApp] Aviso de lead novo enviado:', JSON.stringify({
