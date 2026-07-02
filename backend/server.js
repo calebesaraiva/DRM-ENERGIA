@@ -1315,23 +1315,27 @@ const sendWhatsAppTextMessage = async (to, text, options = {}) => {
     }
   }
 
-  if (whatsappRuntime.connected && whatsappRuntime.socket) {
+  const activeSocket = whatsappRuntime.connected ? whatsappRuntime.socket : null;
+  if (activeSocket) {
     const rawJid = normalizeWhatsAppRemoteJid(options.remoteJid || to);
     if (!rawJid) {
       throw new Error('Contato do WhatsApp inválido para envio.');
     }
     const jid = (options.remoteJid || options.exactPhone)
       ? rawJid
-      : await resolveWhatsAppJid(whatsappRuntime.socket, rawJid);
+      : await resolveWhatsAppJid(activeSocket, rawJid);
     if (options.prepareSession !== false) {
       try {
-        await withTimeout(whatsappRuntime.socket.getUSyncDevices?.([jid], false, false) || Promise.resolve(), 2500, 'getUSyncDevices');
-        await withTimeout(whatsappRuntime.socket.assertSessions?.([jid], true) || Promise.resolve(), 2500, 'assertSessions');
+        await withTimeout(activeSocket.getUSyncDevices?.([jid], false, false) || Promise.resolve(), 2500, 'getUSyncDevices');
+        await withTimeout(activeSocket.assertSessions?.([jid], true) || Promise.resolve(), 2500, 'assertSessions');
       } catch (error) {
         console.warn(`[WhatsApp] Falha ao preparar sessão de envio para ${jid}:`, error?.message || error);
       }
     }
-    const result = await whatsappRuntime.socket.sendMessage(jid, { text }, { useUserDevicesCache: false });
+    if (!whatsappRuntime.connected || whatsappRuntime.socket !== activeSocket) {
+      throw new Error('WhatsApp desconectou durante a preparação do envio. Tente novamente após reconectar.');
+    }
+    const result = await activeSocket.sendMessage(jid, { text }, { useUserDevicesCache: false });
     console.log('[WhatsApp] Mensagem enviada via QR:', JSON.stringify({
       to: normalizeWhatsAppPhone(to),
       jid,
