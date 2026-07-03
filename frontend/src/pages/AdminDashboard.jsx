@@ -830,9 +830,16 @@ const emptyBudgetForm = {
 
 const budgetDraftStorageKey = 'drmAdminBudgetDraft';
 const budgetDraftOpenStorageKey = 'drmAdminBudgetDraftOpen';
+const normalizeBudgetForm = (form = {}) => ({
+  ...emptyBudgetForm,
+  ...(form && typeof form === 'object' ? form : {}),
+  inversoresAdicionais: Array.isArray(form?.inversoresAdicionais)
+    ? form.inversoresAdicionais
+    : [],
+});
 const getInitialBudgetForm = () => {
   try {
-    return JSON.parse(localStorage.getItem(budgetDraftStorageKey) || 'null') || emptyBudgetForm;
+    return normalizeBudgetForm(JSON.parse(localStorage.getItem(budgetDraftStorageKey) || 'null') || emptyBudgetForm);
   } catch {
     return emptyBudgetForm;
   }
@@ -1559,6 +1566,9 @@ const AdminDashboard = () => {
     () => clientes.find(cliente => String(cliente.id) === String(budgetForm.clienteId)) || null,
     [budgetForm.clienteId, clientes]
   );
+  const budgetInversoresAdicionais = Array.isArray(budgetForm.inversoresAdicionais)
+    ? budgetForm.inversoresAdicionais
+    : [];
 
   const budgetCalculations = useMemo(() => {
     const potenciaPlacaW = Number(String(budgetForm.potenciaPlacaW || '0').replace(',', '.')) || 0;
@@ -3460,7 +3470,7 @@ const AdminDashboard = () => {
             inversor_marca: budgetForm.inversorMarca,
             inversor_modelo: budgetForm.inversorModelo,
             quantidade_inversores: budgetForm.quantidadeInversores,
-            inversores_adicionais: budgetForm.inversoresAdicionais.filter(i => i.marca && i.modelo),
+            inversores_adicionais: budgetInversoresAdicionais.filter(i => i.marca && i.modelo),
             quantidade_cabo_cc: budgetForm.quantidadeCaboCc,
             irradiacao_solar: budgetForm.irradiacaoSolar,
             perda_percentual: budgetForm.perdaPercentual,
@@ -6015,14 +6025,14 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* Inversores adicionais */}
-                  {budgetForm.inversoresAdicionais.map((inv, idx) => (
+                  {budgetInversoresAdicionais.map((inv, idx) => (
                     <div key={idx} className="orc-rapido-row-inversor orc-rapido-inv-extra">
                       <div className="orc-rapido-field">
                         <label>Marca (inv. {idx + 2})</label>
                         <select
                           value={inv.marca}
                           onChange={e => {
-                            const newInvs = budgetForm.inversoresAdicionais.map((it, i) => i === idx ? { ...it, marca: e.target.value, modelo: '' } : it);
+                            const newInvs = budgetInversoresAdicionais.map((it, i) => i === idx ? { ...it, marca: e.target.value, modelo: '' } : it);
                             setBudgetForm(prev => ({ ...prev, inversoresAdicionais: newInvs }));
                           }}
                         >
@@ -6039,7 +6049,7 @@ const AdminDashboard = () => {
                           value={inv.modelo}
                           disabled={!inv.marca}
                           onChange={e => {
-                            const newInvs = budgetForm.inversoresAdicionais.map((it, i) => i === idx ? { ...it, modelo: e.target.value } : it);
+                            const newInvs = budgetInversoresAdicionais.map((it, i) => i === idx ? { ...it, modelo: e.target.value } : it);
                             setBudgetForm(prev => ({ ...prev, inversoresAdicionais: newInvs }));
                           }}
                         >
@@ -6054,7 +6064,7 @@ const AdminDashboard = () => {
                           min="1"
                           value={inv.quantidade}
                           onChange={e => {
-                            const newInvs = budgetForm.inversoresAdicionais.map((it, i) => i === idx ? { ...it, quantidade: e.target.value } : it);
+                            const newInvs = budgetInversoresAdicionais.map((it, i) => i === idx ? { ...it, quantidade: e.target.value } : it);
                             setBudgetForm(prev => ({ ...prev, inversoresAdicionais: newInvs }));
                           }}
                         />
@@ -6063,7 +6073,7 @@ const AdminDashboard = () => {
                         type="button"
                         className="orc-rapido-inv-remove"
                         title="Remover este inversor"
-                        onClick={() => setBudgetForm(prev => ({ ...prev, inversoresAdicionais: prev.inversoresAdicionais.filter((_, i) => i !== idx) }))}
+                        onClick={() => setBudgetForm(prev => ({ ...prev, inversoresAdicionais: (Array.isArray(prev.inversoresAdicionais) ? prev.inversoresAdicionais : []).filter((_, i) => i !== idx) }))}
                       >
                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                       </button>
@@ -6075,7 +6085,7 @@ const AdminDashboard = () => {
                     <button
                       type="button"
                       className="orc-rapido-add-inv-btn"
-                      onClick={() => setBudgetForm(prev => ({ ...prev, inversoresAdicionais: [...prev.inversoresAdicionais, { marca: '', modelo: '', quantidade: '1' }] }))}
+                      onClick={() => setBudgetForm(prev => ({ ...prev, inversoresAdicionais: [...(Array.isArray(prev.inversoresAdicionais) ? prev.inversoresAdicionais : []), { marca: '', modelo: '', quantidade: '1' }] }))}
                     >
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       Adicionar outro inversor
