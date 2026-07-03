@@ -15948,6 +15948,91 @@
   gap: 16px;
 }
 
+.orc-hibrido-form {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.orc-hibrido-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.orc-hibrido-form-head h4,
+.orc-hibrido-form-head p {
+  margin: 0;
+}
+
+.orc-hibrido-form-head p {
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.orc-hibrido-form-head span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.orc-hibrido-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.orc-hibrido-form-grid label {
+  display: grid;
+  gap: 7px;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.orc-hibrido-form-grid label.span-2 {
+  grid-column: span 2;
+}
+
+.orc-hibrido-form-grid input,
+.orc-hibrido-form-grid select,
+.orc-hibrido-form-grid textarea {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #dbe5f0;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 600;
+}
+
+.orc-hibrido-form-grid textarea {
+  min-height: 88px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.orc-hibrido-form-grid .field-error input,
+.orc-hibrido-form-grid .field-error select,
+.orc-hibrido-form-grid .field-error textarea {
+  border-color: #fb7185;
+  box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.14);
+}
+
+.orc-hibrido-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #eef2f7;
+  padding-top: 16px;
+}
+
 .orc-hibrido-card {
   padding: 18px;
 }
@@ -16210,6 +16295,20 @@
 
   .orc-hibrido-grid {
     grid-template-columns: 1fr;
+  }
+
+  .orc-hibrido-form-head,
+  .orc-hibrido-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .orc-hibrido-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .orc-hibrido-form-grid label.span-2 {
+    grid-column: auto;
   }
 
   .orc-hibrido-action-buttons,

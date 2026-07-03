@@ -813,6 +813,9 @@ const emptyBudgetForm = {
   inversorMarca: '',
   inversorModelo: '',
   quantidadeInversores: '1',
+  hibridoMarcaId: '',
+  hibridoModeloId: '',
+  bateriaId: '',
   inversoresAdicionais: [],
   quantidadeCaboCc: '',
   areaPorPainelM2: '2.6',
@@ -1558,9 +1561,38 @@ const AdminDashboard = () => {
 
   const quickBudgets = useMemo(
     () => orcamentos
-      .filter(o => String(o.tipo || '').toLowerCase() === 'rapido' || !o.clienteId)
+      .filter(o => ['rapido', 'hibrido'].includes(String(o.tipo || '').toLowerCase()) || !o.clienteId)
       .sort((a, b) => Number(b.id || 0) - Number(a.id || 0)),
     [orcamentos]
+  );
+
+  const selectedHybridMarca = useMemo(
+    () => marcasHibrido.find(marca => String(marca.id) === String(budgetForm.hibridoMarcaId)) || null,
+    [budgetForm.hibridoMarcaId, marcasHibrido]
+  );
+
+  const hybridModelsForBudget = useMemo(
+    () => selectedHybridMarca
+      ? modelosHibrido.filter(modelo => modelo.marca_id === selectedHybridMarca.id && modelo.status !== 'inativo')
+      : [],
+    [modelosHibrido, selectedHybridMarca]
+  );
+
+  const selectedHybridModelo = useMemo(
+    () => modelosHibrido.find(modelo => String(modelo.id) === String(budgetForm.hibridoModeloId)) || null,
+    [budgetForm.hibridoModeloId, modelosHibrido]
+  );
+
+  const hybridBateriasForBudget = useMemo(
+    () => selectedHybridModelo
+      ? bateriasHibrido.filter(bateria => bateria.modelo_hibrido_id === selectedHybridModelo.id && bateria.status !== 'inativo')
+      : [],
+    [bateriasHibrido, selectedHybridModelo]
+  );
+
+  const selectedHybridBateria = useMemo(
+    () => bateriasHibrido.find(bateria => String(bateria.id) === String(budgetForm.bateriaId)) || null,
+    [budgetForm.bateriaId, bateriasHibrido]
   );
 
   const budgetClient = useMemo(
@@ -3500,6 +3532,100 @@ const AdminDashboard = () => {
       setBudgetStatus('Orçamento criado com sucesso.');
       setIsBudgetFormOpen(false);
       setBudgetMode(orcamento.clienteId ? 'completo' : 'rapido');
+      if (!orcamento.clienteId) setSelectedOrcClient(null);
+      request('/api/admin/resumo').then(setResumo).catch(() => {});
+    } catch (err) {
+      setBudgetStatus(err.message);
+    }
+  };
+
+  const createHybridBudget = async (event) => {
+    event.preventDefault();
+
+    const errors = {};
+    if (!budgetForm.clienteNome?.trim()) errors.clienteNome = true;
+    const cpfCnpjDigits = String(budgetForm.clienteCpfCnpj || '').replace(/\D/g, '');
+    if (cpfCnpjDigits && ![11, 14].includes(cpfCnpjDigits.length)) errors.clienteCpfCnpj = true;
+    if (!budgetForm.clienteCidade?.trim()) errors.clienteCidade = true;
+    if (!budgetForm.geracaoKwh || Number(budgetForm.geracaoKwh) <= 0) errors.geracaoKwh = true;
+    if (!budgetForm.valorSistema || Number(budgetForm.valorSistema) <= 0) errors.valorSistema = true;
+    if (!budgetForm.placaModelo) errors.placaModelo = true;
+    if (!budgetForm.numeroPaineis || Number(budgetForm.numeroPaineis) < 1) errors.numeroPaineis = true;
+    if (!budgetForm.hibridoMarcaId) errors.hibridoMarcaId = true;
+    if (!budgetForm.hibridoModeloId) errors.hibridoModeloId = true;
+    if (!budgetForm.bateriaId) errors.bateriaId = true;
+    if (Object.keys(errors).length > 0) {
+      setBudgetFieldErrors(errors);
+      setBudgetStatus('Preencha os dados do cliente, sistema híbrido e valor.');
+      return;
+    }
+
+    const hybridLabel = [
+      selectedHybridMarca?.nome_marca,
+      selectedHybridModelo?.nome_modelo,
+    ].filter(Boolean).join(' ');
+    const bateriaLabel = selectedHybridBateria
+      ? `${selectedHybridBateria.nome_bateria}${selectedHybridBateria.capacidade_kwh ? ` ${selectedHybridBateria.capacidade_kwh} kWh` : ''}`
+      : '';
+
+    setBudgetFieldErrors({});
+    setBudgetStatus('Salvando orçamento híbrido...');
+    try {
+      const orcamento = await request('/api/admin/orcamentos', {
+        method: 'POST',
+        body: JSON.stringify({
+          clienteId: budgetForm.clienteId,
+          clienteNome: budgetForm.clienteNome,
+          clienteCpfCnpj: budgetForm.clienteCpfCnpj,
+          clienteCidade: budgetForm.clienteCidade,
+          clienteTelefone: budgetForm.clienteTelefone,
+          clienteEmail: budgetForm.clienteEmail,
+          tipo: 'hibrido',
+          status: 'Novo orçamento',
+          dimensionamento: {
+            potencia_placa_w: budgetForm.potenciaPlacaW,
+            placa_modelo: budgetForm.placaModelo,
+            numero_paineis_necessarios: budgetForm.numeroPaineis,
+            potencia_real_instalada_kwp: budgetCalculations.potenciaKwp,
+            area_ocupada_m2: budgetCalculations.areaOcupadaM2,
+            potencia_inversor_kw: budgetForm.potenciaInversorKw,
+            inversor_marca: selectedHybridMarca?.nome_marca || '',
+            inversor_modelo: hybridLabel || selectedHybridModelo?.nome_modelo || '',
+            quantidade_inversores: budgetForm.quantidadeInversores || '1',
+            inversor_hibrido: true,
+            inversor_hibrido_marca_id: budgetForm.hibridoMarcaId,
+            inversor_hibrido_modelo_id: budgetForm.hibridoModeloId,
+            bateria_id: budgetForm.bateriaId,
+            bateria_modelo: bateriaLabel,
+            bateria_capacidade_kwh: selectedHybridBateria?.capacidade_kwh || '',
+            quantidade_cabo_cc: budgetForm.quantidadeCaboCc,
+            irradiacao_solar: budgetForm.irradiacaoSolar,
+            perda_percentual: budgetForm.perdaPercentual,
+            geracao_estimada_kwh: Number(budgetForm.geracaoKwh) || budgetCalculations.geracaoKwh,
+            geracao_anual_kwh: (Number(budgetForm.geracaoKwh) || budgetCalculations.geracaoKwh) * 12,
+            cidade_base: budgetForm.clienteCidade,
+            observacoes: [
+              budgetForm.observacoes,
+              bateriaLabel ? `Bateria: ${bateriaLabel}` : '',
+              'Orçamento híbrido com armazenamento de energia.',
+            ].filter(Boolean).join('\n'),
+            modelo_orcamento: 'Solaris Híbrido',
+          },
+          financeiro: {
+            preco_final_cliente_rs: budgetForm.valorSistema,
+            entrada_rs: budgetForm.valorEntrada,
+            saldo_rs: budgetForm.valorSaldo,
+            forma_pagamento: budgetForm.formaPagamentoTipo,
+            forma_pagamento_tipo: budgetForm.formaPagamentoTipo,
+            condicoes_pagamento: budgetForm.condicoesPagamento,
+          },
+        }),
+      });
+      setOrcamentos(prev => [orcamento, ...prev.filter(item => item.id !== orcamento.id)]);
+      setSelectedOrcamento(orcamento);
+      setBudgetStatus('Orçamento híbrido criado com sucesso.');
+      setBudgetMode('completo');
+      setIsBudgetFormOpen(false);
       if (!orcamento.clienteId) setSelectedOrcClient(null);
       request('/api/admin/resumo').then(setResumo).catch(() => {});
     } catch (err) {
@@ -6486,6 +6612,189 @@ const AdminDashboard = () => {
                   Gerenciar inversores híbridos
                 </button>
               </div>
+
+              <form className="admin-card orc-hibrido-form" onSubmit={createHybridBudget} noValidate>
+                <div className="orc-hibrido-form-head">
+                  <div>
+                    <h4>Criar orçamento híbrido</h4>
+                    <p>Informe os dados essenciais para gerar a proposta com inversor híbrido e bateria.</p>
+                  </div>
+                  <span>Híbrido + bateria</span>
+                </div>
+
+                <div className="orc-hibrido-form-grid">
+                  <label className={budgetFieldErrors.clienteNome ? 'field-error' : ''}>
+                    Nome do cliente
+                    <input
+                      value={budgetForm.clienteNome}
+                      onChange={e => { setBudgetForm(prev => ({ ...prev, clienteNome: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, clienteNome: false })); }}
+                      placeholder="Ex: João da Silva"
+                    />
+                  </label>
+                  <label className={budgetFieldErrors.clienteCpfCnpj ? 'field-error' : ''}>
+                    CPF/CNPJ opcional
+                    <input
+                      value={budgetForm.clienteCpfCnpj}
+                      onChange={e => { setBudgetForm(prev => ({ ...prev, clienteCpfCnpj: maskCpfCnpj(e.target.value) })); setBudgetFieldErrors(prev => ({ ...prev, clienteCpfCnpj: false })); }}
+                      placeholder="CPF ou CNPJ"
+                    />
+                  </label>
+                  <label className={budgetFieldErrors.clienteCidade ? 'field-error' : ''}>
+                    Cidade
+                    <input
+                      value={budgetForm.clienteCidade}
+                      onChange={e => { setBudgetForm(prev => ({ ...prev, clienteCidade: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, clienteCidade: false })); }}
+                      placeholder="Ex: Imperatriz"
+                    />
+                  </label>
+                  <label className={budgetFieldErrors.valorSistema ? 'field-error' : ''}>
+                    Valor do projeto
+                    <CurrencyInput
+                      value={budgetForm.valorSistema}
+                      onValueChange={value => { setBudgetForm(prev => ({ ...prev, valorSistema: value })); setBudgetFieldErrors(prev => ({ ...prev, valorSistema: false })); }}
+                      placeholder="Ex: 42.900,00"
+                    />
+                  </label>
+                  <label className={budgetFieldErrors.placaModelo ? 'field-error' : ''}>
+                    Modelo da placa
+                    <select
+                      value={budgetForm.placaModelo}
+                      onChange={e => {
+                        const model = e.target.value;
+                        const placa = placas.find(p => p.modelo === model);
+                        setBudgetForm(prev => ({
+                          ...prev,
+                          placaModelo: model,
+                          potenciaPlacaW: placa?.potencia_w ? String(placa.potencia_w) : prev.potenciaPlacaW,
+                        }));
+                        setBudgetFieldErrors(prev => ({ ...prev, placaModelo: false }));
+                      }}
+                    >
+                      <option value="">Selecione o modelo</option>
+                      {placaModelsFromEquip.map(model => <option key={model} value={model}>{model}</option>)}
+                    </select>
+                  </label>
+                  <label className={budgetFieldErrors.numeroPaineis ? 'field-error' : ''}>
+                    Quantidade de placas
+                    <input
+                      type="number"
+                      min="1"
+                      value={budgetForm.numeroPaineis}
+                      onChange={e => { setBudgetForm(prev => ({ ...prev, numeroPaineis: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, numeroPaineis: false })); }}
+                      placeholder="Ex: 14"
+                    />
+                  </label>
+                  <label className={budgetFieldErrors.geracaoKwh ? 'field-error' : ''}>
+                    Geração mensal kWh
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={budgetForm.geracaoKwh}
+                      onChange={e => { setBudgetForm(prev => ({ ...prev, geracaoKwh: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, geracaoKwh: false })); }}
+                      placeholder="Ex: 780"
+                    />
+                  </label>
+                  <label>
+                    Cabo CC
+                    <input
+                      value={budgetForm.quantidadeCaboCc}
+                      onChange={e => setBudgetForm(prev => ({ ...prev, quantidadeCaboCc: e.target.value }))}
+                      placeholder="Ex: 50"
+                    />
+                  </label>
+                  <label className={budgetFieldErrors.hibridoMarcaId ? 'field-error' : ''}>
+                    Marca do inversor híbrido
+                    <select
+                      value={budgetForm.hibridoMarcaId}
+                      onChange={e => {
+                        setBudgetForm(prev => ({ ...prev, hibridoMarcaId: e.target.value, hibridoModeloId: '', bateriaId: '' }));
+                        setBudgetFieldErrors(prev => ({ ...prev, hibridoMarcaId: false, hibridoModeloId: false, bateriaId: false }));
+                      }}
+                    >
+                      <option value="">Selecione a marca</option>
+                      {marcasHibrido.filter(marca => marca.status !== 'inativo').map(marca => (
+                        <option key={marca.id} value={marca.id}>{marca.nome_marca}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={budgetFieldErrors.hibridoModeloId ? 'field-error' : ''}>
+                    Modelo do inversor híbrido
+                    <select
+                      value={budgetForm.hibridoModeloId}
+                      disabled={!budgetForm.hibridoMarcaId}
+                      onChange={e => {
+                        setBudgetForm(prev => ({ ...prev, hibridoModeloId: e.target.value, bateriaId: '' }));
+                        setBudgetFieldErrors(prev => ({ ...prev, hibridoModeloId: false, bateriaId: false }));
+                      }}
+                    >
+                      <option value="">{budgetForm.hibridoMarcaId ? 'Selecione o modelo' : 'Selecione a marca primeiro'}</option>
+                      {hybridModelsForBudget.map(modelo => (
+                        <option key={modelo.id} value={modelo.id}>{modelo.nome_modelo}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={budgetFieldErrors.bateriaId ? 'field-error' : ''}>
+                    Bateria compatível
+                    <select
+                      value={budgetForm.bateriaId}
+                      disabled={!budgetForm.hibridoModeloId}
+                      onChange={e => { setBudgetForm(prev => ({ ...prev, bateriaId: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, bateriaId: false })); }}
+                    >
+                      <option value="">{budgetForm.hibridoModeloId ? 'Selecione a bateria' : 'Selecione o modelo primeiro'}</option>
+                      {hybridBateriasForBudget.map(bateria => (
+                        <option key={bateria.id} value={bateria.id}>
+                          {bateria.nome_bateria}{bateria.capacidade_kwh ? ` ${bateria.capacidade_kwh} kWh` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Quantidade de inversores
+                    <input
+                      type="number"
+                      min="1"
+                      value={budgetForm.quantidadeInversores}
+                      onChange={e => setBudgetForm(prev => ({ ...prev, quantidadeInversores: e.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Tipo de pagamento
+                    <select
+                      value={budgetForm.formaPagamentoTipo}
+                      onChange={e => setBudgetForm(prev => ({ ...prev, formaPagamentoTipo: e.target.value }))}
+                    >
+                      <option value="avista">À vista</option>
+                      <option value="financiado">Financiado</option>
+                      <option value="cartao">Cartão de crédito</option>
+                      <option value="misto">Misto / mesclado</option>
+                    </select>
+                  </label>
+                  <label className="span-2">
+                    Condições / observações
+                    <textarea
+                      value={budgetForm.condicoesPagamento}
+                      onChange={e => setBudgetForm(prev => ({ ...prev, condicoesPagamento: e.target.value }))}
+                      placeholder="Ex: sistema híbrido com bateria, forma de pagamento, validade da proposta..."
+                    />
+                  </label>
+                </div>
+
+                {budgetStatus && (
+                  <p className={`orc-rapido-status ${budgetStatus.includes('sucesso') ? 'orc-status-success' : 'orc-status-error'}`}>
+                    {budgetStatus}
+                  </p>
+                )}
+
+                <div className="orc-hibrido-form-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => { setBudgetForm(emptyBudgetForm); setBudgetFieldErrors({}); setBudgetStatus(''); }}>
+                    Limpar
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    Gerar orçamento híbrido
+                  </button>
+                </div>
+              </form>
 
               <div className="orc-hibrido-grid">
                 <div className="admin-card orc-hibrido-card">

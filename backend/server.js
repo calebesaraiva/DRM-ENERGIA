@@ -7286,7 +7286,8 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
     status = 'Orçamento manual',
     tipo = 'completo',
   } = req.body;
-  const isQuickBudget = String(tipo || '').trim().toLowerCase() === 'rapido';
+  const normalizedBudgetType = String(tipo || '').trim().toLowerCase();
+  const isQuickBudget = ['rapido', 'hibrido'].includes(normalizedBudgetType);
 
   let cliente = null;
   if (clienteId) {
@@ -7338,7 +7339,7 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
     geracao_estimada_kwh: Number(geracaoMensal.toFixed(2)),
     geracao_anual_kwh: Number((geracaoMensal * 12).toFixed(2)),
     cidade_base: dimensionamento.cidade_base || snapshotClienteCidade || '',
-    origem: isQuickBudget ? 'Orçamento rápido' : 'Orçamento interno',
+    origem: normalizedBudgetType === 'hibrido' ? 'Orçamento híbrido' : isQuickBudget ? 'Orçamento rápido' : 'Orçamento interno',
   };
   const normalizedFinanceiro = {
     ...financeiro,
@@ -7362,7 +7363,7 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
     snapshotClienteCidade,
     status,
     data,
-    isQuickBudget ? 'rapido' : 'completo',
+    normalizedBudgetType === 'hibrido' ? 'hibrido' : isQuickBudget ? 'rapido' : 'completo',
     JSON.stringify(normalizedDimensionamento),
     JSON.stringify(normalizedFinanceiro),
     ownerId,
@@ -7379,7 +7380,7 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
     clienteCidade: snapshotClienteCidade,
     status,
     data,
-    tipo: isQuickBudget ? 'rapido' : 'completo',
+    tipo: normalizedBudgetType === 'hibrido' ? 'hibrido' : isQuickBudget ? 'rapido' : 'completo',
     dimensionamento: normalizedDimensionamento,
     financeiro: normalizedFinanceiro,
     assignedUserId: ownerId,
