@@ -965,6 +965,7 @@ const AdminDashboard = () => {
   const [selectedOrcamento, setSelectedOrcamento] = useState(null);
   const [budgetForm, setBudgetForm] = useState(getInitialBudgetForm);
   const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(() => localStorage.getItem(budgetDraftOpenStorageKey) === '1');
+  const [budgetMode, setBudgetMode] = useState(() => localStorage.getItem(budgetDraftOpenStorageKey) === '1' ? 'rapido' : 'completo');
   const [budgetStatus, setBudgetStatus] = useState('');
   const [budgetFieldErrors, setBudgetFieldErrors] = useState({});
   const [contratos, setContratos] = useState([]);
@@ -3383,6 +3384,7 @@ const AdminDashboard = () => {
 
   const openBudgetFormForClient = (cliente = null) => {
     rememberPanelStep();
+    setBudgetMode('rapido');
     setBudgetStatus('');
     setBudgetFieldErrors({});
     const firstEquip = equipamentos.find(e => e.active);
@@ -3497,6 +3499,7 @@ const AdminDashboard = () => {
       setBudgetForm(emptyBudgetForm);
       setBudgetStatus('Orçamento criado com sucesso.');
       setIsBudgetFormOpen(false);
+      setBudgetMode(orcamento.clienteId ? 'completo' : 'rapido');
       if (!orcamento.clienteId) setSelectedOrcClient(null);
       request('/api/admin/resumo').then(setResumo).catch(() => {});
     } catch (err) {
@@ -5852,7 +5855,44 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {activeTab === 'orcamentos' && isBudgetFormOpen && (
+          {activeTab === 'orcamentos' && (
+            <div className="orc-budget-mode-shell">
+              <div className="orc-budget-mode-switch" role="tablist" aria-label="Tipo de orçamento">
+                <button
+                  type="button"
+                  className={budgetMode === 'rapido' ? 'active' : ''}
+                  onClick={() => {
+                    setBudgetMode('rapido');
+                    setIsBudgetFormOpen(true);
+                  }}
+                >
+                  Orçamento rápido
+                </button>
+                <button
+                  type="button"
+                  className={budgetMode === 'completo' ? 'active' : ''}
+                  onClick={() => {
+                    setBudgetMode('completo');
+                    setIsBudgetFormOpen(false);
+                  }}
+                >
+                  Orçamento completo
+                </button>
+                <button
+                  type="button"
+                  className={budgetMode === 'hibrido' ? 'active' : ''}
+                  onClick={() => {
+                    setBudgetMode('hibrido');
+                    setIsBudgetFormOpen(false);
+                  }}
+                >
+                  Orçamento híbrido
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'orcamentos' && budgetMode === 'rapido' && (
             <div className="orc-rapido-page">
               <form className="orc-rapido-card" onSubmit={createManualBudget} noValidate>
 
@@ -6135,7 +6175,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {activeTab === 'orcamentos' && !isBudgetFormOpen && (
+          {activeTab === 'orcamentos' && budgetMode === 'completo' && (
             <div className="orc-layout">
 
               {/* ── LEFT: Client selector ── */}
@@ -6423,6 +6463,115 @@ const AdminDashboard = () => {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'orcamentos' && budgetMode === 'hibrido' && (
+            <div className="orc-hibrido-page">
+              <div className="admin-card orc-hibrido-hero">
+                <div>
+                  <span className="section-kicker">Orçamento híbrido</span>
+                  <h3>Sistema solar com inversor híbrido e bateria</h3>
+                  <p>Use esta área para localizar os modelos híbridos cadastrados e iniciar um orçamento com armazenamento de energia.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setActiveTab('produtosPacotes');
+                    setProdutoSubTab('hibrido');
+                  }}
+                >
+                  Gerenciar inversores híbridos
+                </button>
+              </div>
+
+              <div className="orc-hibrido-grid">
+                <div className="admin-card orc-hibrido-card">
+                  <div className="orc-hibrido-card-head">
+                    <h4>Marcas híbridas</h4>
+                    <span>{marcasHibrido.length}</span>
+                  </div>
+                  <div className="orc-hibrido-list">
+                    {marcasHibrido.length === 0 && <p className="muted-text">Nenhuma marca híbrida cadastrada ainda.</p>}
+                    {marcasHibrido.map(marca => (
+                      <button
+                        key={marca.id}
+                        type="button"
+                        className={`orc-hibrido-item${selectedMarcaHibridoId === marca.id ? ' active' : ''}`}
+                        onClick={() => {
+                          setSelectedMarcaHibridoId(marca.id);
+                          setSelectedModeloHibridoId(null);
+                        }}
+                      >
+                        <strong>{marca.nome_marca}</strong>
+                        <span>{modelosHibrido.filter(modelo => modelo.marca_id === marca.id).length} modelos</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="admin-card orc-hibrido-card">
+                  <div className="orc-hibrido-card-head">
+                    <h4>Modelos do inversor</h4>
+                    <span>{modelosHibridoForMarca.length}</span>
+                  </div>
+                  <div className="orc-hibrido-list">
+                    {!selectedMarcaHibridoId && <p className="muted-text">Selecione uma marca para ver os modelos.</p>}
+                    {selectedMarcaHibridoId && modelosHibridoForMarca.length === 0 && <p className="muted-text">Nenhum modelo para esta marca.</p>}
+                    {modelosHibridoForMarca.map(modelo => (
+                      <button
+                        key={modelo.id}
+                        type="button"
+                        className={`orc-hibrido-item${selectedModeloHibridoId === modelo.id ? ' active' : ''}`}
+                        onClick={() => setSelectedModeloHibridoId(modelo.id)}
+                      >
+                        <strong>{modelo.nome_modelo}</strong>
+                        <span>{bateriasHibrido.filter(bateria => bateria.modelo_hibrido_id === modelo.id).length} baterias</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="admin-card orc-hibrido-card">
+                  <div className="orc-hibrido-card-head">
+                    <h4>Baterias compatíveis</h4>
+                    <span>{bateriasForModelo.length}</span>
+                  </div>
+                  <div className="orc-hibrido-list">
+                    {!selectedModeloHibridoId && <p className="muted-text">Selecione um modelo híbrido para ver as baterias.</p>}
+                    {selectedModeloHibridoId && bateriasForModelo.length === 0 && <p className="muted-text">Nenhuma bateria vinculada a este modelo.</p>}
+                    {bateriasForModelo.map(bateria => (
+                      <div key={bateria.id} className="orc-hibrido-item static">
+                        <strong>{bateria.nome_bateria}</strong>
+                        <span>{bateria.capacidade_kwh ? `${bateria.capacidade_kwh} kWh` : 'Capacidade não informada'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="admin-card orc-hibrido-actions">
+                <div>
+                  <h4>Como gerar um orçamento híbrido agora</h4>
+                  <p>Escolha o inversor e bateria aqui, depois gere o orçamento rápido ou completo e use essas informações no PDF para o cliente.</p>
+                </div>
+                <div className="orc-hibrido-action-buttons">
+                  <button type="button" className="btn btn-outline" onClick={() => openBudgetFormForClient()}>
+                    Criar orçamento rápido
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setBudgetMode('completo');
+                      setIsBudgetFormOpen(false);
+                    }}
+                  >
+                    Ir para orçamento completo
+                  </button>
+                </div>
               </div>
             </div>
           )}

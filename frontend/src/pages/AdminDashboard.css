@@ -15883,6 +15883,13 @@
   background: #f8fafc;
 }
 
+.orc-budget-mode-shell {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
 .orc-budget-mode-switch button {
   border: 0;
   min-height: 40px;
@@ -15902,6 +15909,139 @@
 
 .quick-budget-grid {
   margin-bottom: 10px;
+}
+
+.orc-hibrido-page {
+  display: grid;
+  gap: 18px;
+}
+
+.orc-hibrido-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 28px;
+  border-left: 4px solid #f97316;
+}
+
+.orc-hibrido-hero h3,
+.orc-hibrido-hero p {
+  margin: 0;
+}
+
+.orc-hibrido-hero h3 {
+  margin-top: 4px;
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.orc-hibrido-hero p {
+  margin-top: 8px;
+  color: #64748b;
+  max-width: 680px;
+}
+
+.orc-hibrido-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.orc-hibrido-card {
+  padding: 18px;
+}
+
+.orc-hibrido-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.orc-hibrido-card-head h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.orc-hibrido-card-head span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-weight: 900;
+}
+
+.orc-hibrido-list {
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.orc-hibrido-item {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.orc-hibrido-item:hover,
+.orc-hibrido-item.active {
+  border-color: #fb923c;
+  background: #fff7ed;
+}
+
+.orc-hibrido-item.static {
+  cursor: default;
+}
+
+.orc-hibrido-item strong {
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.orc-hibrido-item span {
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.orc-hibrido-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 24px;
+}
+
+.orc-hibrido-actions h4,
+.orc-hibrido-actions p {
+  margin: 0;
+}
+
+.orc-hibrido-actions p {
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.orc-hibrido-action-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .quick-budget-empty-actions {
@@ -16059,6 +16199,21 @@
   }
 
   .orc-budget-mode-switch button {
+    width: 100%;
+  }
+
+  .orc-hibrido-hero,
+  .orc-hibrido-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .orc-hibrido-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .orc-hibrido-action-buttons,
+  .orc-hibrido-action-buttons .btn {
     width: 100%;
   }
 }
