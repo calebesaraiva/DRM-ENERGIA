@@ -2287,7 +2287,15 @@ const getRoundRobinLeadSummary = async () => {
   };
 };
 
-const getNextLeadOwner = async () => {
+let leadOwnerRotationQueue = Promise.resolve();
+
+const runLeadOwnerRotationLocked = (callback) => {
+  const next = leadOwnerRotationQueue.then(callback, callback);
+  leadOwnerRotationQueue = next.catch(() => {});
+  return next;
+};
+
+const getNextLeadOwner = async () => runLeadOwnerRotationLocked(async () => {
   const eligible = await getLeadOwners();
 
   if (eligible.length === 0) return null;
@@ -2299,8 +2307,9 @@ const getNextLeadOwner = async () => {
 
   await setSetting('leadRoundRobinIndex', nextIndex);
   return owner;
-};
+});
 
+const LEAD_ROTATION_USERNAMES = ['renejr', 'gleyson', 'carlito'];
 const LEAD_ROTATION_EXCLUDED_USERNAMES = new Set(['agdon']);
 
 const getLeadOwners = async () => {
@@ -2310,12 +2319,17 @@ const getLeadOwners = async () => {
     .filter(user => {
       const username = String(user.username || '').trim().toLowerCase();
       return (
-        !LEAD_ROTATION_EXCLUDED_USERNAMES.has(username)
+        LEAD_ROTATION_USERNAMES.includes(username)
+        && !LEAD_ROTATION_EXCLUDED_USERNAMES.has(username)
         && user.role !== 'ADM'
         && can(user, 'leads')
         && normalizeWhatsAppPhone(user.whatsapp)
       );
-    });
+    })
+    .sort((a, b) => (
+      LEAD_ROTATION_USERNAMES.indexOf(String(a.username || '').trim().toLowerCase())
+      - LEAD_ROTATION_USERNAMES.indexOf(String(b.username || '').trim().toLowerCase())
+    ));
 };
 
 const normalizeLeadDistribution = async () => {
