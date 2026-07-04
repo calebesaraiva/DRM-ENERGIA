@@ -3079,6 +3079,15 @@ const formatCurrency = (value) => Number(value || 0).toLocaleString('pt-BR', {
   currency: 'BRL',
 });
 
+// Investimento "cheio" exibido no PDF de orçamento: Y + 5%, arredondado para cima até o próximo final 50.
+// Usado apenas para apresentação comercial no PDF - nunca substitui o valor real (Y) em contrato/cobrança.
+const calcularInvestimentoCheio = (valorProjeto) => {
+  const y = Number(valorProjeto);
+  if (!Number.isFinite(y) || y <= 0) return 0;
+  const bruto = y * 1.05;
+  return Math.ceil((bruto - 50) / 100) * 100 + 50;
+};
+
 const formatDateBr = (value = new Date()) => new Date(value).toLocaleDateString('pt-BR');
 const formatDateOnlyBr = (value) => {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -3990,6 +3999,15 @@ const buildOrcamentoPdf = async (orcamento) => {
       doc.font('Helvetica-Bold').fontSize(16).fillColor(dark).text(String(value || '-'), x + 10, y + 27, { width: w - 20 });
     };
 
+    // ── investment card helper (INVESTIMENTO / de R$ X / por R$ Y) ────────
+    const investmentCard = (x, y, w, valorProjeto) => {
+      const investimentoCheio = calcularInvestimentoCheio(valorProjeto);
+      doc.roundedRect(x, y, w, 60, 6).fillAndStroke('#FFF7ED', '#FED7AA');
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#9A3412').text('INVESTIMENTO', x + 10, y + 9, { width: w - 20 });
+      doc.font('Helvetica').fontSize(8).fillColor(muted).text(`de ${formatCurrency(investimentoCheio)}`, x + 10, y + 21, { width: w - 20 });
+      doc.font('Helvetica-Bold').fontSize(14).fillColor(dark).text(`por ${formatCurrency(valorProjeto)}`, x + 10, y + 32, { width: w - 20 });
+    };
+
     // ══════════════════════════════════════════════════════════════════════
     //  PAGE 1 — PROPOSTA COMERCIAL SOLAR
     // ══════════════════════════════════════════════════════════════════════
@@ -4008,7 +4026,7 @@ const buildOrcamentoPdf = async (orcamento) => {
     const cardW = (W - 16) / 3;
     metricCard(ML,                    cardY, cardW, 'POTÊNCIA', `${dimensionamento.potencia_real_instalada_kwp || 0} kWp`);
     metricCard(ML + cardW + 8,        cardY, cardW, 'GERAÇÃO',  `${dimensionamento.geracao_estimada_kwh || 0} kWh/mês`);
-    metricCard(ML + (cardW + 8) * 2,  cardY, cardW, 'VALOR',    formatCurrency(financeiro.preco_final_cliente_rs));
+    investmentCard(ML + (cardW + 8) * 2, cardY, cardW, financeiro.preco_final_cliente_rs);
     doc.y = cardY + 70;
 
     // FORMA DE PAGAMENTO
