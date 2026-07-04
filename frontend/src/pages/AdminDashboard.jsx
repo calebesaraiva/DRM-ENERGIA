@@ -1566,6 +1566,11 @@ const AdminDashboard = () => {
     [orcamentos]
   );
 
+  const allBudgetList = useMemo(
+    () => [...orcamentos].sort((a, b) => Number(b.id || 0) - Number(a.id || 0)),
+    [orcamentos]
+  );
+
   const selectedHybridMarca = useMemo(
     () => marcasHibrido.find(marca => String(marca.id) === String(budgetForm.hibridoMarcaId)) || null,
     [budgetForm.hibridoMarcaId, marcasHibrido]
@@ -6409,6 +6414,102 @@ const AdminDashboard = () => {
                     <p>Selecione um cliente ao lado para o fluxo completo ou use o botão Novo orçamento para criar uma proposta rápida com poucos dados.</p>
                     <div className="quick-budget-empty-actions">
                       <button type="button" className="btn btn-primary" onClick={() => openBudgetFormForClient()}>Novo orçamento rápido</button>
+                    </div>
+                    <div className="orc-all-budgets-section">
+                      <div className="orc-all-budgets-head">
+                        <div>
+                          <h4 className="orc-budgets-title">Todos os orçamentos</h4>
+                          <p className="orc-budgets-sub">Baixe qualquer orçamento com o nome do cliente e a data no arquivo.</p>
+                        </div>
+                        <span>{allBudgetList.length} orçamento{allBudgetList.length !== 1 ? 's' : ''}</span>
+                      </div>
+                      {allBudgetList.length === 0 ? (
+                        <div className="orc-list-empty compact">
+                          <p>Nenhum orçamento gerado ainda.</p>
+                        </div>
+                      ) : (
+                        <div className="orc-table-wrap">
+                          <table className="orc-table">
+                            <thead>
+                              <tr>
+                                <th>ID</th>
+                                <th>CLIENTE</th>
+                                <th>DATA</th>
+                                <th>TIPO</th>
+                                <th>SISTEMA</th>
+                                <th>VALOR</th>
+                                <th>AÇÕES</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {allBudgetList.map(orc => (
+                                <tr key={orc.id}>
+                                  <td className="orc-td-id">#{orc.id}</td>
+                                  <td>
+                                    <div className="orc-system-cell">
+                                      <strong>{orc.clienteNome || 'Cliente sem nome'}</strong>
+                                      <span>{orc.clienteCpfCnpj || orc.clienteCidade || 'Dados básicos'}</span>
+                                    </div>
+                                  </td>
+                                  <td>{dateBr(orc.data)}</td>
+                                  <td><span className="quick-budget-badge">{String(orc.tipo || 'completo')}</span></td>
+                                  <td>
+                                    <div className="orc-system-cell">
+                                      <strong>{orc.dimensionamento?.potencia_real_instalada_kwp || 0} kWp</strong>
+                                      <span>{orc.dimensionamento?.numero_paineis_necessarios || 0} placas • {orc.dimensionamento?.inversor_modelo || 'Inversor'}</span>
+                                    </div>
+                                  </td>
+                                  <td className="orc-td-valor">{money(orc.financeiro?.preco_final_cliente_rs)}</td>
+                                  <td>
+                                    <div className="orc-table-actions">
+                                      {hasPermission('contratos') && (
+                                        <button
+                                          type="button"
+                                          className="orc-action-btn orc-action-approve"
+                                          title="Aprovar orçamento e gerar contrato"
+                                          onClick={() => aprovarOrcamentoParaContrato(orc)}
+                                        >
+                                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.1-4.1-1.4 1.4 5.5 5.5L20.5 8.1l-1.4-1.4-9.9 9.9Z" fill="currentColor"/></svg>
+                                        </button>
+                                      )}
+                                      <a
+                                        className="orc-action-btn"
+                                        href={getOrcamentoDownloadUrl(orc.id)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="Baixar orçamento PDF"
+                                      >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-18v12l-5-5-1.4 1.4L12 17l6.4-6.6L17 9l-5 5V2h-2Z" fill="currentColor"/></svg>
+                                      </a>
+                                      {orc.clienteTelefone && (
+                                        <a
+                                          className="orc-action-btn orc-action-wa"
+                                          href={getPanelWhatsAppUrl(orc.clienteTelefone)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          title="Enviar via WhatsApp"
+                                        >
+                                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3 4.8 4.2.7.3 1.2.4 1.6.5.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.5-.3ZM12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5.1-1.3A10 10 0 0 0 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2Z" fill="currentColor"/></svg>
+                                        </a>
+                                      )}
+                                      {hasPermission('orcamentos') && (
+                                        <button
+                                          type="button"
+                                          className="orc-action-btn orc-action-delete"
+                                          title="Excluir orçamento de teste"
+                                          onClick={() => excluirOrcamentoTeste(orc)}
+                                        >
+                                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4V2h8v2h5v2H3V4h5Zm-2 4h12l-1 14H7L6 8Zm4 3v8h2v-8h-2Zm4 0v8h2v-8h-2Z" fill="currentColor"/></svg>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                     {quickBudgets.length > 0 && (
                       <div className="quick-budget-list">

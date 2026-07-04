@@ -4266,7 +4266,11 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .toLowerCase();
-  const fileName = `orcamento-solar-${orcamento.id}-${safeClientName || 'cliente'}.pdf`;
+  const safeDate = String(orcamento.data || new Date().toISOString().split('T')[0])
+    .replace(/\D/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  const fileName = `orcamento-${safeClientName || 'cliente'}-${safeDate || orcamento.id}.pdf`;
   const pdf = await buildOrcamentoPdf(orcamento);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Length', pdf.length);

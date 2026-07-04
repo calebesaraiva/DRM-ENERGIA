@@ -16133,6 +16133,44 @@
   margin: 18px 0 8px;
 }
 
+.orc-all-budgets-section {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.orc-all-budgets-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.orc-all-budgets-head h4,
+.orc-all-budgets-head p {
+  margin: 0;
+}
+
+.orc-all-budgets-head span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.orc-list-empty.compact {
+  min-height: 80px;
+  padding: 20px;
+}
+
 .quick-budget-list {
   display: grid;
   gap: 12px;
