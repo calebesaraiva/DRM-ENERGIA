@@ -3482,6 +3482,7 @@ const AdminDashboard = () => {
     }
     setBudgetFieldErrors({});
     setBudgetStatus('Salvando orçamento...');
+    const preparedPdfWindow = prepareOrcamentoPdfWindow();
     try {
       const orcamento = await request('/api/admin/orcamentos', {
         method: 'POST',
@@ -3529,12 +3530,14 @@ const AdminDashboard = () => {
       localStorage.removeItem(budgetDraftStorageKey);
       localStorage.removeItem(budgetDraftOpenStorageKey);
       setBudgetForm(emptyBudgetForm);
-      setBudgetStatus('Orçamento criado com sucesso.');
+      setBudgetStatus('Orçamento criado com sucesso. Abrindo PDF...');
       setIsBudgetFormOpen(false);
       setBudgetMode(orcamento.clienteId ? 'completo' : 'rapido');
       if (!orcamento.clienteId) setSelectedOrcClient(null);
       request('/api/admin/resumo').then(setResumo).catch(() => {});
+      openOrcamentoPdf(orcamento.id, preparedPdfWindow);
     } catch (err) {
+      if (preparedPdfWindow && !preparedPdfWindow.closed) preparedPdfWindow.close();
       setBudgetStatus(err.message);
     }
   };
@@ -3570,6 +3573,7 @@ const AdminDashboard = () => {
 
     setBudgetFieldErrors({});
     setBudgetStatus('Salvando orçamento híbrido...');
+    const preparedPdfWindow = prepareOrcamentoPdfWindow();
     try {
       const orcamento = await request('/api/admin/orcamentos', {
         method: 'POST',
@@ -3623,12 +3627,14 @@ const AdminDashboard = () => {
       });
       setOrcamentos(prev => [orcamento, ...prev.filter(item => item.id !== orcamento.id)]);
       setSelectedOrcamento(orcamento);
-      setBudgetStatus('Orçamento híbrido criado com sucesso.');
+      setBudgetStatus('Orçamento híbrido criado com sucesso. Abrindo PDF...');
       setBudgetMode('completo');
       setIsBudgetFormOpen(false);
       if (!orcamento.clienteId) setSelectedOrcClient(null);
       request('/api/admin/resumo').then(setResumo).catch(() => {});
+      openOrcamentoPdf(orcamento.id, preparedPdfWindow);
     } catch (err) {
+      if (preparedPdfWindow && !preparedPdfWindow.closed) preparedPdfWindow.close();
       setBudgetStatus(err.message);
     }
   };
@@ -4172,6 +4178,28 @@ const AdminDashboard = () => {
   const getOrcamentoDownloadUrl = (orcamentoId) => (
     `${withApiBase(`/api/admin/orcamentos/${orcamentoId}/download`)}?token=${localStorage.getItem('token')}`
   );
+
+  const prepareOrcamentoPdfWindow = useCallback(() => {
+    const pdfWindow = window.open('', '_blank');
+    if (pdfWindow) {
+      pdfWindow.document.write('<!doctype html><title>Gerando orçamento</title><body style="font-family:Arial,sans-serif;padding:32px;color:#111827"><h2>Gerando orçamento...</h2><p>O PDF será aberto automaticamente.</p></body>');
+      pdfWindow.document.close();
+    }
+    return pdfWindow;
+  }, []);
+
+  const openOrcamentoPdf = useCallback((orcamentoId, preparedWindow = null) => {
+    if (!orcamentoId) return;
+    const url = getOrcamentoDownloadUrl(orcamentoId);
+    if (preparedWindow && !preparedWindow.closed) {
+      preparedWindow.location.href = url;
+      return;
+    }
+    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      window.location.href = url;
+    }
+  }, []);
 
   const renderContractReviewField = (label, field, options = {}) => {
     const value = contractReviewForm[field] ?? '';
