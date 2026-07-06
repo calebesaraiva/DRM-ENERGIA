@@ -5166,14 +5166,31 @@ const AdminDashboard = () => {
                                 const etapa = c.etapaComercial || 'Em negociação';
                                 const dataFormatada = c.dataCadastro ? c.dataCadastro.slice(0,10).split('-').reverse().join('/') : '—';
                                 return (
-                                  <tr key={c.id} className={`client-row${selectedCliente?.id === c.id ? ' selected' : ''}`}>
+                                  <tr
+                                    key={c.id}
+                                    className={`client-row${selectedCliente?.id === c.id ? ' selected' : ''}`}
+                                    onClick={() => {
+                                      setSelectedCliente(c);
+                                      setClientFichaTab('resumo');
+                                    }}
+                                  >
                                     <td className="col-id text-muted">{c.id}</td>
                                     <td className="col-nome">
-                                      <button type="button" className="client-name-link" onClick={() => { setSelectedCliente(c); setClientFichaTab('resumo'); }}>{c.nome}</button>
+                                      <button
+                                        type="button"
+                                        className="client-name-link"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setSelectedCliente(c);
+                                          setClientFichaTab('resumo');
+                                        }}
+                                      >
+                                        {c.nome}
+                                      </button>
                                     </td>
                                     <td className="col-wp">
                                       {c.whatsapp ? (
-                                        <a href={whatsappHref || '#'} target="_blank" rel="noopener noreferrer" className="wp-cell-link" title="Abrir WhatsApp">
+                                        <a href={whatsappHref || '#'} target="_blank" rel="noopener noreferrer" className="wp-cell-link" title="Abrir WhatsApp" onClick={event => event.stopPropagation()}>
                                           <svg width="15" height="15" viewBox="0 0 24 24" fill="#25d366" style={{ flexShrink: 0 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.12-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2Zm5.16 14.09c-.22.61-1.27 1.17-1.75 1.21-.44.04-.9.17-2.97-.62-2.51-.97-4.12-3.5-4.24-3.66-.12-.16-1-1.33-1-2.54 0-1.21.64-1.8.86-2.05.22-.25.48-.31.64-.31.16 0 .32.01.46.01.15 0 .35-.06.54.41.2.5.69 1.71.75 1.83.06.12.1.26.02.42-.08.16-.12.26-.24.4-.12.14-.25.32-.36.43-.12.11-.24.23-.1.45.14.22.62.97 1.33 1.57.91.79 1.68 1.03 1.9 1.15.22.12.35.1.48-.06.13-.16.55-.64.7-.86.15-.22.3-.18.5-.11.2.07 1.28.6 1.5.71.22.11.36.17.41.27.05.1.05.57-.17 1.18Z"/></svg>
                                           {c.whatsapp}
                                         </a>
@@ -5185,9 +5202,9 @@ const AdminDashboard = () => {
                                       <div className="etapa-cell">
                                         <span className={`etapa-chip ${etapa === 'Venda concluída' ? 'etapa-concluida' : etapa === 'Venda suspensa' ? 'etapa-suspensa' : 'etapa-negociacao'}`}>{etapa}</span>
                                         <div className="etapa-change-btns">
-                                          {etapa !== 'Venda concluída' && <button type="button" className="etapa-micro-btn concluir" title="Marcar como Venda Concluída" onClick={() => updateClienteEtapa(c.id, 'Venda concluída', {})}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>}
-                                          {etapa !== 'Em negociação' && <button type="button" className="etapa-micro-btn negociar" title="Retomar Negociação" onClick={() => updateClienteEtapa(c.id, 'Em negociação', {})}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.9"/></svg></button>}
-                                          {etapa !== 'Venda suspensa' && <button type="button" className="etapa-micro-btn suspender" title="Suspender Venda (pausar negociação)" onClick={() => { setSuspensaoModal(c); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></button>}
+                                          {etapa !== 'Venda concluída' && <button type="button" className="etapa-micro-btn concluir" title="Marcar como Venda Concluída" onClick={(event) => { event.stopPropagation(); updateClienteEtapa(c.id, 'Venda concluída', {}); }}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>}
+                                          {etapa !== 'Em negociação' && <button type="button" className="etapa-micro-btn negociar" title="Retomar Negociação" onClick={(event) => { event.stopPropagation(); updateClienteEtapa(c.id, 'Em negociação', {}); }}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.9"/></svg></button>}
+                                          {etapa !== 'Venda suspensa' && <button type="button" className="etapa-micro-btn suspender" title="Suspender Venda (pausar negociação)" onClick={(event) => { event.stopPropagation(); setSuspensaoModal(c); setSuspensaoForm({ motivo: '', dataPrevisaoRetorno: '', ultimoContato: '', proximaAcao: '' }); }}><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></button>}
                                         </div>
                                       </div>
                                     </td>

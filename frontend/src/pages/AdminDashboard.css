@@ -17510,6 +17510,10 @@
   background: #fff7ed;
 }
 
+.client-table-v2 .client-row {
+  cursor: pointer;
+}
+
 /* ── Ficha do cliente ──────────────────────────────────────── */
 
 .client-ficha-panel {
