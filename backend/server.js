@@ -2510,6 +2510,15 @@ const createSistemaFvFromContrato = async (contrato) => {
   return await db.get('SELECT * FROM sistemas_fv WHERE id = ?', result.lastID);
 };
 
+const removeSistemaFvFromContrato = async (contratoId) => {
+  if (!contratoId) return;
+  const sistemas = await db.all('SELECT id FROM sistemas_fv WHERE contratoId = ?', contratoId);
+  for (const sistema of sistemas) {
+    await db.run('DELETE FROM sistemas_fv_historico WHERE sistemaId = ?', sistema.id);
+  }
+  await db.run('DELETE FROM sistemas_fv WHERE contratoId = ?', contratoId);
+};
+
 const ensureSistemasFvForApprovedContracts = async () => {
   const contratosAprovados = await db.all('SELECT * FROM contratos WHERE status = ?', 'Aprovado');
   for (const contrato of contratosAprovados) {
@@ -2710,6 +2719,7 @@ async function syncContractsWithClientCommercialStage(clienteId, etapaComercial,
   const updatedContracts = [];
   for (const contrato of related) {
     if (etapaComercial === 'Venda suspensa' && ['Aprovado', 'Pendente'].includes(contrato.status)) {
+      await removeSistemaFvFromContrato(contrato.id);
       await db.run(
         `UPDATE contratos
          SET status = 'Suspenso',
@@ -8357,6 +8367,7 @@ app.put('/api/admin/contratos/:id/revisao', authRequired, requirePermission('con
   const contractClientId = updated.dados?.cliente?.id;
   if (contractClientId) {
     if (updated.status === 'Suspenso') {
+      await removeSistemaFvFromContrato(updated.id);
       await db.run(
         `UPDATE clientes
          SET etapaComercial = 'Venda suspensa',
@@ -9759,17 +9770,20 @@ app.get('/api/admin/sistemas-fv/resumo', authRequired, requirePermission('equipe
 app.get('/api/admin/sistemas-fv', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
   try {
     const { etapa, status, consultor, cidade, search } = req.query;
-    let sql = 'SELECT * FROM sistemas_fv WHERE 1=1';
+    let sql = `SELECT sfv.*
+      FROM sistemas_fv sfv
+      LEFT JOIN contratos ct ON ct.id = sfv.contratoId
+      WHERE (sfv.contratoId IS NULL OR ct.status = 'Aprovado')`;
     const params = [];
-    if (etapa) { sql += ' AND etapaAtual = ?'; params.push(etapa); }
-    if (status) { sql += ' AND status = ?'; params.push(status); }
-    if (consultor) { sql += ' AND consultorNome = ?'; params.push(consultor); }
-    if (cidade) { sql += ' AND cidade = ?'; params.push(cidade); }
+    if (etapa) { sql += ' AND sfv.etapaAtual = ?'; params.push(etapa); }
+    if (status) { sql += ' AND sfv.status = ?'; params.push(status); }
+    if (consultor) { sql += ' AND sfv.consultorNome = ?'; params.push(consultor); }
+    if (cidade) { sql += ' AND sfv.cidade = ?'; params.push(cidade); }
     if (search) {
-      sql += ' AND (clienteNome LIKE ? OR cidade LIKE ? OR consultorNome LIKE ?)';
+      sql += ' AND (sfv.clienteNome LIKE ? OR sfv.cidade LIKE ? OR sfv.consultorNome LIKE ?)';
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
-    sql += ' ORDER BY updatedAt DESC';
+    sql += ' ORDER BY sfv.updatedAt DESC';
     const rows = await db.all(sql, ...params);
     res.json(rows);
   } catch (err) {
