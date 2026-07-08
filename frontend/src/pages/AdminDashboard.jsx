@@ -883,6 +883,10 @@ const AdminDashboard = () => {
   const initialUser = getInitialAdminUser();
   const location = useLocation();
   const navigate = useNavigate();
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'light';
+    return localStorage.getItem('drm-admin-theme') || 'light';
+  });
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(initialUser, location.pathname));
   const [panelHistory, setPanelHistory] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -1261,6 +1265,12 @@ const AdminDashboard = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [closeProjetoDocumentPreview, projetoDocumentPreview]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('drm-admin-theme', theme);
+    document.documentElement.dataset.adminTheme = theme;
+  }, [theme]);
 
   const playNewLeadAlert = useCallback(() => {
     try {
@@ -4521,7 +4531,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className={`admin-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+    <div className={`admin-layout theme-${theme} ${isSidebarOpen ? 'sidebar-open' : ''}`}>
       {/* Toast notifications */}
       <div className="toast-container" aria-live="polite">
         {toasts.map(toast => (
@@ -4623,6 +4633,20 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="topbar-actions">
+            <button
+              type="button"
+              className="theme-toggle-button"
+              onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
+              aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+              title={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                {theme === 'dark'
+                  ? <path d="M12 4V2h-2v2h2Zm0 18v-2h-2v2h2Zm8-8h2v-2h-2v2ZM2 14h2v-2H2v2Zm15.7-8.3 1.4-1.4-1.4-1.4-1.4 1.4 1.4 1.4ZM4.3 21.1l1.4-1.4-1.4-1.4-1.4 1.4 1.4 1.4Zm15.4-1.4-1.4-1.4-1.4 1.4 1.4 1.4 1.4-1.4ZM5.7 5.7 4.3 4.3 2.9 5.7l1.4 1.4 1.4-1.4ZM11 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z" fill="currentColor"/>
+                  : <path d="M21 14.4A8.2 8.2 0 0 1 9.6 3a8.8 8.8 0 1 0 11.4 11.4Z" fill="currentColor"/>}
+              </svg>
+              <span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span>
+            </button>
             <span className="system-status">DRM Solar</span>
             <button onClick={handleSair} className="topbar-logout">Sair</button>
           </div>
