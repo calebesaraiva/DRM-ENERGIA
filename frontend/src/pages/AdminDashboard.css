@@ -11591,6 +11591,7 @@
 .ctr-status-aprovado { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
 .ctr-status-pendente { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 .ctr-status-recusado { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.ctr-status-suspenso { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
 .ctr-table-actions { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
 .ctr-action-text {
@@ -11624,6 +11625,15 @@
   color: #b91c1c;
 }
 .ctr-action-reject:hover { background: #fef2f2; }
+.ctr-modal-suspend {
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+  background: #f8fafc !important;
+}
+.ctr-modal-suspend:hover {
+  border-color: #94a3b8 !important;
+  background: #f1f5f9 !important;
+}
 .ctr-action-waiting {
   display: inline-flex;
   align-items: center;

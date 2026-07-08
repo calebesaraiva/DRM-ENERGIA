@@ -492,6 +492,12 @@ const getResponsibleName = (name) => name || 'Aguardando distribuição';
 const getContractConsultantLabel = (contrato = {}) => (
   contrato.consultorNome || contrato.assignedUserName || contrato.criadoPorNome || 'Sem consultor'
 );
+const getContractStatusClass = (status) => {
+  if (status === 'Aprovado') return 'ctr-status-aprovado';
+  if (status === 'Recusado') return 'ctr-status-recusado';
+  if (status === 'Suspenso') return 'ctr-status-suspenso';
+  return 'ctr-status-pendente';
+};
 const dateBr = (value) => value ? new Date(value).toLocaleDateString('pt-BR') : 'Sem data';
 const getInstStatusForNew = (p = {}) => {
   if (p.medidorTrocadoAt || p.checklist?.sistemaLigado || p.etapa === 'Projeto concluído') return 'Concluída';
@@ -1519,6 +1525,7 @@ const AdminDashboard = () => {
     total: contratos.length,
     pendentes: contratos.filter(contrato => contrato.status === 'Pendente').length,
     aprovados: contratos.filter(contrato => contrato.status === 'Aprovado').length,
+    suspensos: contratos.filter(contrato => contrato.status === 'Suspenso').length,
     recusados: contratos.filter(contrato => contrato.status === 'Recusado').length,
   }), [contratos]);
 
@@ -4008,12 +4015,40 @@ const AdminDashboard = () => {
       setSelectedContrato(null);
       setReviewNote('');
       setReviewError('');
+      const actionLabel = status === 'Aprovado' ? 'aprovado' : status === 'Suspenso' ? 'suspenso' : 'recusado';
       showToast(
-        `Contrato ${contractNumber(contrato)} ${status === 'Aprovado' ? 'aprovado' : 'recusado'} com sucesso.`,
-        status === 'Aprovado' ? 'success' : 'warning'
+        `Contrato ${contractNumber(contrato)} ${actionLabel} com sucesso.`,
+        status === 'Aprovado' ? 'success' : status === 'Suspenso' ? 'warning' : 'warning'
       );
     } catch (err) {
       showToast(`Não foi possível finalizar o contrato ${contractNumber(currentContract)}: ${err.message}`, 'error');
+    }
+  };
+
+  const alterarStatusContrato = async (contrato, status) => {
+    if (!contrato || adminUser.role !== 'ADM') return;
+    const motivoPadrao = status === 'Aprovado'
+      ? 'Venda retomada e contrato aprovado novamente.'
+      : '';
+    const motivo = status === 'Suspenso'
+      ? window.prompt(`Informe o motivo para suspender o ${contractNumber(contrato)}:`)
+      : motivoPadrao;
+    if (status === 'Suspenso' && !String(motivo || '').trim()) return;
+
+    try {
+      const updated = await request(`/api/admin/contratos/${contrato.id}/revisao`, {
+        method: 'PUT',
+        body: JSON.stringify({ status, observacaoAnalise: motivo }),
+      });
+      setContratos(prev => prev.map(item => item.id === updated.id ? updated : item));
+      setSelectedContrato(updated);
+      setContractReviewForm(contractToReviewForm(updated));
+      showToast(
+        `Contrato ${contractNumber(updated)} ${status === 'Suspenso' ? 'suspenso' : 'retomado'} com sucesso.`,
+        status === 'Suspenso' ? 'warning' : 'success'
+      );
+    } catch (err) {
+      showToast(`Não foi possível alterar o contrato ${contractNumber(contrato)}: ${err.message}`, 'error');
     }
   };
 
@@ -7174,6 +7209,7 @@ const AdminDashboard = () => {
                             <option value="todos">Todos</option>
                             <option value="Pendente">Pendente</option>
                             <option value="Aprovado">Aprovado</option>
+                            <option value="Suspenso">Suspenso</option>
                             <option value="Recusado">Recusado</option>
                           </select>
                         </div>
@@ -7244,7 +7280,7 @@ const AdminDashboard = () => {
                         const statusLabel = isConsultorOnly
                           ? (contrato.status === 'Aprovado' ? 'Assinado' : contrato.status === 'Pendente' ? 'Aguardando assinatura' : contrato.status)
                           : contrato.status;
-                        const statusClass = contrato.status === 'Aprovado' ? 'ctr-status-aprovado' : contrato.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente';
+                        const statusClass = getContractStatusClass(contrato.status);
                         return (
                           <tr
                             key={contrato.id}
@@ -7275,7 +7311,7 @@ const AdminDashboard = () => {
                                 {contrato.status === 'Pendente' && adminUser.role !== 'ADM' && (
                                   <span className="ctr-action-waiting">Aguardando aprovação</span>
                                 )}
-                                {contrato.status === 'Aprovado' && (
+                                {['Aprovado', 'Suspenso'].includes(contrato.status) && (
                                   <a
                                     className="orc-action-btn"
                                     href={getContratoDownloadUrl(contrato.id)}
@@ -7288,6 +7324,9 @@ const AdminDashboard = () => {
                                 )}
                                 {contrato.status === 'Recusado' && (
                                   <span className="ctr-action-waiting">Revisar dados</span>
+                                )}
+                                {contrato.status === 'Suspenso' && (
+                                  <span className="ctr-action-waiting">Venda suspensa</span>
                                 )}
                               </div>
                             </td>
@@ -7335,7 +7374,7 @@ const AdminDashboard = () => {
                         <p>{selectedContrato.clienteNome}</p>
                       </div>
                       <div className="ctr-detail-header-right">
-                        <span className={`ctr-status-badge ${selectedContrato.status === 'Aprovado' ? 'ctr-status-aprovado' : selectedContrato.status === 'Recusado' ? 'ctr-status-recusado' : 'ctr-status-pendente'}`}>
+                        <span className={`ctr-status-badge ${getContractStatusClass(selectedContrato.status)}`}>
                           {selectedContrato.status}
                         </span>
                         <button type="button" className="lead-modal-close" onClick={closeContractReview} aria-label="Fechar">×</button>
@@ -7428,18 +7467,35 @@ const AdminDashboard = () => {
                       </div>
                     )}
 
-                    {selectedContrato.status === 'Aprovado' && (
+                    {['Aprovado', 'Suspenso'].includes(selectedContrato.status) && (
                       <div className="approved-actions">
                         <div>
-                          <strong>Contrato liberado</strong>
-                          <span>{isMasterAdmin ? 'Admin master pode salvar ajustes finais.' : 'Contrato aprovado disponível somente para download.'}</span>
-                          <small className={`contract-signature-chip tone-${getContractSignatureMeta(selectedContrato).tone}`}>{getContractSignatureMeta(selectedContrato).label}</small>
-                          <small className="contract-signature-chip tone-success">Assinatura DRM aplicada automaticamente na aprovação</small>
+                          <strong>{selectedContrato.status === 'Suspenso' ? 'Contrato suspenso' : 'Contrato liberado'}</strong>
+                          <span>
+                            {selectedContrato.status === 'Suspenso'
+                              ? 'Venda pausada. O contrato fica preservado no histórico, mas não entra como venda aprovada ativa.'
+                              : isMasterAdmin ? 'Admin master pode salvar ajustes finais.' : 'Contrato aprovado disponível somente para download.'}
+                          </span>
+                          {selectedContrato.status === 'Aprovado' && (
+                            <>
+                              <small className={`contract-signature-chip tone-${getContractSignatureMeta(selectedContrato).tone}`}>{getContractSignatureMeta(selectedContrato).label}</small>
+                              <small className="contract-signature-chip tone-success">Assinatura DRM aplicada automaticamente na aprovação</small>
+                            </>
+                          )}
+                          {selectedContrato.status === 'Suspenso' && selectedContrato.observacaoAnalise && (
+                            <small className="contract-signature-chip tone-muted">{selectedContrato.observacaoAnalise}</small>
+                          )}
                         </div>
                         <div className="approved-actions-buttons">
                           {canEditReviewedContract(selectedContrato) && <button type="button" className="btn btn-outline" onClick={() => saveContractReview(selectedContrato)}>Salvar alterações</button>}
-                          {adminUser.role === 'ADM' && <button type="button" className="btn btn-outline" onClick={() => generateContractSignatureLink(selectedContrato)}>Gerar link do cliente</button>}
-                          {selectedContrato.dados?.assinatura?.link?.token && (
+                          {adminUser.role === 'ADM' && selectedContrato.status === 'Aprovado' && <button type="button" className="btn btn-outline" onClick={() => generateContractSignatureLink(selectedContrato)}>Gerar link do cliente</button>}
+                          {adminUser.role === 'ADM' && selectedContrato.status === 'Aprovado' && (
+                            <button type="button" className="btn btn-outline ctr-modal-suspend" onClick={() => alterarStatusContrato(selectedContrato, 'Suspenso')}>Suspender venda</button>
+                          )}
+                          {adminUser.role === 'ADM' && selectedContrato.status === 'Suspenso' && (
+                            <button type="button" className="btn btn-primary" onClick={() => alterarStatusContrato(selectedContrato, 'Aprovado')}>Retomar venda</button>
+                          )}
+                          {selectedContrato.status === 'Aprovado' && selectedContrato.dados?.assinatura?.link?.token && (
                             <>
                               <button
                                 type="button"

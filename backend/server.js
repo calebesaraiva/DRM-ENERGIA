@@ -2684,6 +2684,9 @@ const getContractConsultantId = (contrato = {}) => (
   contrato.consultorId ?? contrato.assignedUserId ?? contrato.criadoPorId ?? null
 );
 
+const CONTRACT_REVIEW_STATUSES = ['Aprovado', 'Recusado', 'Suspenso'];
+const CONTRACT_DOWNLOAD_STATUSES = ['Aprovado', 'Suspenso'];
+
 const parseContrato = (contrato) => ({
   ...contrato,
   consultorId: getContractConsultantId(contrato),
@@ -2692,6 +2695,60 @@ const parseContrato = (contrato) => ({
   equipamentoDados: parseJsonField(contrato.equipamentoDados),
   assinaturaStatus: contrato.assinaturaStatus || resolveAssinaturaStatus(parseJsonField(contrato.dados)?.assinatura || {}),
 });
+
+const contractBelongsToClient = (contrato, clienteId) => {
+  const parsed = parseContrato(contrato);
+  return Number(parsed.dados?.cliente?.id) === Number(clienteId);
+};
+
+async function syncContractsWithClientCommercialStage(clienteId, etapaComercial, motivo = null, user = {}) {
+  const contratos = await db.all('SELECT * FROM contratos');
+  const related = contratos.filter(contrato => contractBelongsToClient(contrato, clienteId));
+  if (!related.length) return [];
+
+  const now = new Date().toISOString();
+  const updatedContracts = [];
+  for (const contrato of related) {
+    if (etapaComercial === 'Venda suspensa' && ['Aprovado', 'Pendente'].includes(contrato.status)) {
+      await db.run(
+        `UPDATE contratos
+         SET status = 'Suspenso',
+             observacaoAnalise = ?,
+             analisadoPorId = ?,
+             analisadoPorNome = ?,
+             dataAnalise = ?
+         WHERE id = ?`,
+        motivo || 'Venda suspensa no cadastro do cliente.',
+        user.id || null,
+        user.nome || user.username || null,
+        now,
+        contrato.id
+      );
+      updatedContracts.push(parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', contrato.id)));
+    }
+
+    if (etapaComercial === 'Venda concluída' && contrato.status === 'Suspenso') {
+      await db.run(
+        `UPDATE contratos
+         SET status = 'Aprovado',
+             observacaoAnalise = COALESCE(observacaoAnalise, ?),
+             analisadoPorId = ?,
+             analisadoPorNome = ?,
+             dataAnalise = ?
+         WHERE id = ?`,
+        'Venda retomada no cadastro do cliente.',
+        user.id || null,
+        user.nome || user.username || null,
+        now,
+        contrato.id
+      );
+      updatedContracts.push(parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', contrato.id)));
+    }
+  }
+
+  updatedContracts.forEach(contrato => io.emit('contrato_atualizado', contrato));
+  return updatedContracts;
+}
 
 const parseProcuracao = (procuracao) => ({
   ...procuracao,
@@ -6308,6 +6365,12 @@ app.put('/api/admin/clientes/:id/etapa-comercial', authRequired, requirePermissi
     req.params.id
   );
   const updated = publicClient(await db.get('SELECT * FROM clientes WHERE id = ?', req.params.id));
+  await syncContractsWithClientCommercialStage(
+    req.params.id,
+    etapaComercial,
+    etapaComercial === 'Venda suspensa' ? (motivoSuspensao || 'Venda suspensa no cadastro do cliente.') : null,
+    req.user
+  );
   res.json(updated);
 });
 
@@ -8228,13 +8291,13 @@ app.put('/api/admin/contratos/:id/revisao', authRequired, requirePermission('con
   }
 
   const { status, observacaoAnalise } = req.body;
-  if (!['Aprovado', 'Recusado'].includes(status)) {
-    return res.status(400).json({ message: 'Informe se o contrato foi aprovado ou recusado.' });
+  if (!CONTRACT_REVIEW_STATUSES.includes(status)) {
+    return res.status(400).json({ message: 'Informe se o contrato foi aprovado, recusado ou suspenso.' });
   }
 
   const normalizedObservation = String(observacaoAnalise || '').trim();
-  if (status === 'Recusado' && !normalizedObservation) {
-    return res.status(400).json({ message: 'Informe o motivo da recusa do contrato.' });
+  if (['Recusado', 'Suspenso'].includes(status) && !normalizedObservation) {
+    return res.status(400).json({ message: status === 'Suspenso' ? 'Informe o motivo da suspensão do contrato.' : 'Informe o motivo da recusa do contrato.' });
   }
 
   const contrato = await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id);
@@ -8290,6 +8353,31 @@ app.put('/api/admin/contratos/:id/revisao', authRequired, requirePermission('con
     updated = parseContrato(await db.get('SELECT * FROM contratos WHERE id = ?', req.params.id));
     await createProjetoFromContrato(updated);
     await createSistemaFvFromContrato(updated);
+  }
+  const contractClientId = updated.dados?.cliente?.id;
+  if (contractClientId) {
+    if (updated.status === 'Suspenso') {
+      await db.run(
+        `UPDATE clientes
+         SET etapaComercial = 'Venda suspensa',
+             motivoSuspensao = ?,
+             dataSuspensao = ?,
+             dataPrevisaoRetorno = COALESCE(dataPrevisaoRetorno, NULL)
+         WHERE id = ?`,
+        normalizedObservation,
+        new Date().toISOString().split('T')[0],
+        contractClientId
+      );
+    } else if (updated.status === 'Aprovado') {
+      await db.run(
+        `UPDATE clientes
+         SET etapaComercial = 'Venda concluída',
+             motivoSuspensao = NULL,
+             dataSuspensao = NULL
+         WHERE id = ?`,
+        contractClientId
+      );
+    }
   }
   io.emit('contrato_atualizado', updated);
   res.json(updated);
@@ -8560,7 +8648,7 @@ app.get('/api/admin/contratos/:id/download', authRequired, requirePermission('co
     return res.status(403).send('Você não pode baixar este contrato.');
   }
 
-  if (contrato.status !== 'Aprovado') {
+  if (!CONTRACT_DOWNLOAD_STATUSES.includes(contrato.status)) {
     return res.status(403).send('Este contrato só pode ser baixado após aprovação do Deivson/ADM.');
   }
 
