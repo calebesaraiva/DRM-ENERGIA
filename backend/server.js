@@ -930,7 +930,11 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
 };
 
 const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {}) => {
-  if (whatsappRuntime.starting) return getWhatsAppProviderStatus();
+  if (whatsappRuntime.starting) {
+    if (!force) return getWhatsAppProviderStatus();
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    if (whatsappRuntime.starting) return getWhatsAppProviderStatus();
+  }
   if (whatsappRuntime.socket && whatsappRuntime.connected) return getWhatsAppProviderStatus();
   if (whatsappRuntime.socket && !force) return getWhatsAppProviderStatus();
   let firstStatusResolved = false;
