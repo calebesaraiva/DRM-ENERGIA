@@ -611,6 +611,8 @@ const whatsappRuntime = {
   message: 'WhatsApp ainda não conectado.',
   phone: '',
   lastUpdate: '',
+  sessionId: 0,
+  reconnectTimer: null,
 };
 
 const emitWhatsAppRuntimeStatus = () => {
@@ -949,6 +951,10 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
   };
 
   whatsappRuntime.starting = true;
+  if (whatsappRuntime.reconnectTimer) {
+    clearTimeout(whatsappRuntime.reconnectTimer);
+    whatsappRuntime.reconnectTimer = null;
+  }
   whatsappRuntime.status = 'conectando';
   whatsappRuntime.message = 'Preparando sessão do WhatsApp. Aguarde o QR Code aparecer.';
   whatsappRuntime.lastUpdate = new Date().toISOString();
@@ -976,6 +982,7 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
     fs.mkdirSync(WHATSAPP_AUTH_DIR, { recursive: true });
     const { state, saveCreds } = await useMultiFileAuthState(WHATSAPP_AUTH_DIR);
     const { version } = await fetchLatestBaileysVersion();
+    const sessionId = Date.now();
     const socket = makeWASocket({
       version,
       auth: state,
@@ -987,8 +994,13 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
     });
 
     whatsappRuntime.socket = socket;
+    whatsappRuntime.sessionId = sessionId;
     socket.ev.on('creds.update', saveCreds);
     socket.ev.on('connection.update', async (update) => {
+      if (whatsappRuntime.socket !== socket || whatsappRuntime.sessionId !== sessionId) {
+        console.log('[WhatsApp QR] Ignorando evento de sessão antiga.');
+        return;
+      }
       const { connection, lastDisconnect, qr } = update;
       if (qr) {
         whatsappRuntime.qr = qr;
@@ -1033,7 +1045,11 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
         emitWhatsAppRuntimeStatus();
         resolveFirstRuntimeStatus();
         if (shouldReconnect) {
-          setTimeout(() => startWhatsAppQrSession().catch(error => console.error('Erro ao reconectar WhatsApp:', error)), 2500);
+          if (whatsappRuntime.reconnectTimer) clearTimeout(whatsappRuntime.reconnectTimer);
+          whatsappRuntime.reconnectTimer = setTimeout(() => {
+            whatsappRuntime.reconnectTimer = null;
+            startWhatsAppQrSession().catch(error => console.error('Erro ao reconectar WhatsApp:', error));
+          }, 5000);
         }
       }
     });
@@ -1113,6 +1129,11 @@ const disconnectWhatsAppQrSession = async () => {
     console.error('Erro ao desconectar WhatsApp:', error);
   }
   whatsappRuntime.socket = null;
+  whatsappRuntime.sessionId += 1;
+  if (whatsappRuntime.reconnectTimer) {
+    clearTimeout(whatsappRuntime.reconnectTimer);
+    whatsappRuntime.reconnectTimer = null;
+  }
   whatsappRuntime.connected = false;
   whatsappRuntime.qr = '';
   whatsappRuntime.qrDataUrl = '';
@@ -1343,17 +1364,6 @@ const resolveWhatsAppJid = async (socket, rawJid) => {
 };
 
 const sendWhatsAppTextMessage = async (to, text, options = {}) => {
-  // Auto-recuperação: se a sessão caiu no estado fantasma (sem socket), tenta
-  // reconectar uma vez antes de desistir.
-  if (!whatsappRuntime.socket && !whatsappRuntime.starting) {
-    try {
-      await startWhatsAppQrSession({ force: true });
-      await new Promise(resolve => setTimeout(resolve, 4000));
-    } catch (error) {
-      console.error('Falha ao reconectar WhatsApp automaticamente:', error?.message || error);
-    }
-  }
-
   const activeSocket = whatsappRuntime.connected ? whatsappRuntime.socket : null;
   if (activeSocket) {
     const rawJid = normalizeWhatsAppRemoteJid(options.remoteJid || to);
