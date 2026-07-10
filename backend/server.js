@@ -1019,6 +1019,9 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
       if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        if (!shouldReconnect) {
+          fs.rmSync(WHATSAPP_AUTH_DIR, { recursive: true, force: true });
+        }
         whatsappRuntime.connected = false;
         whatsappRuntime.socket = null;
         whatsappRuntime.status = shouldReconnect ? 'reconectando' : 'desconectado';
@@ -6653,7 +6656,7 @@ app.get('/api/admin/whatsapp/status', authRequired, requirePermission('whatsapp'
 
 app.post('/api/admin/whatsapp/connect', authRequired, requirePermission('whatsapp'), async (req, res) => {
   const force = Boolean(req.body?.force);
-  const resetAuth = Boolean(req.body?.resetAuth);
+  const resetAuth = force && !whatsappRuntime.connected;
   const status = await startWhatsAppQrSession({ force, resetAuth });
   res.json({ ...status, visibility: isMasterAdminUser(req.user) ? 'todos' : 'proprios' });
 });
