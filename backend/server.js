@@ -933,6 +933,16 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
   if (whatsappRuntime.starting) return getWhatsAppProviderStatus();
   if (whatsappRuntime.socket && whatsappRuntime.connected) return getWhatsAppProviderStatus();
   if (whatsappRuntime.socket && !force) return getWhatsAppProviderStatus();
+  let firstStatusResolved = false;
+  let resolveFirstStatus;
+  const firstStatusPromise = new Promise(resolve => {
+    resolveFirstStatus = resolve;
+  });
+  const resolveFirstRuntimeStatus = () => {
+    if (firstStatusResolved) return;
+    firstStatusResolved = true;
+    resolveFirstStatus?.();
+  };
 
   whatsappRuntime.starting = true;
   whatsappRuntime.status = 'conectando';
@@ -941,6 +951,7 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
   emitWhatsAppRuntimeStatus();
 
   try {
+    console.log('[WhatsApp QR] Iniciando sessão', JSON.stringify({ force, resetAuth, hasSocket: Boolean(whatsappRuntime.socket), connected: Boolean(whatsappRuntime.connected) }));
     if (force && whatsappRuntime.socket && !whatsappRuntime.connected) {
       try {
         whatsappRuntime.socket.end?.();
@@ -951,6 +962,7 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
     }
 
     if (force && resetAuth && !whatsappRuntime.connected) {
+      console.log('[WhatsApp QR] Limpando sessão antiga para gerar QR novo.');
       whatsappRuntime.qr = '';
       whatsappRuntime.qrDataUrl = '';
       whatsappRuntime.phone = '';
@@ -981,7 +993,9 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
         whatsappRuntime.status = 'aguardando_qrcode';
         whatsappRuntime.message = 'Escaneie o QR Code com o WhatsApp do número oficial.';
         whatsappRuntime.lastUpdate = new Date().toISOString();
+        console.log('[WhatsApp QR] QR Code gerado e disponível no painel.');
         emitWhatsAppRuntimeStatus();
+        resolveFirstRuntimeStatus();
       }
 
       if (connection === 'open') {
@@ -993,7 +1007,9 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
         whatsappRuntime.phone = normalizeWhatsAppPhone(socket.user?.id?.split(':')[0] || socket.user?.id?.split('@')[0] || '');
         whatsappRuntime.message = 'WhatsApp conectado. Os vendedores já podem atender pelo sistema.';
         whatsappRuntime.lastUpdate = new Date().toISOString();
+        console.log('[WhatsApp QR] Conexão aberta', whatsappRuntime.phone);
         emitWhatsAppRuntimeStatus();
+        resolveFirstRuntimeStatus();
       }
 
       if (connection === 'close') {
@@ -1006,7 +1022,9 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
           ? 'Conexão caiu. Tentando reconectar automaticamente.'
           : 'Sessão desconectada. Gere um novo QR Code para conectar.';
         whatsappRuntime.lastUpdate = new Date().toISOString();
+        console.log('[WhatsApp QR] Conexão fechada', JSON.stringify({ statusCode, shouldReconnect }));
         emitWhatsAppRuntimeStatus();
+        resolveFirstRuntimeStatus();
         if (shouldReconnect) {
           setTimeout(() => startWhatsAppQrSession().catch(error => console.error('Erro ao reconectar WhatsApp:', error)), 2500);
         }
@@ -1058,6 +1076,13 @@ const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {})
   } finally {
     whatsappRuntime.starting = false;
     emitWhatsAppRuntimeStatus();
+  }
+
+  if (force) {
+    await Promise.race([
+      firstStatusPromise,
+      new Promise(resolve => setTimeout(resolve, 12000)),
+    ]);
   }
 
   return getWhatsAppProviderStatus();
