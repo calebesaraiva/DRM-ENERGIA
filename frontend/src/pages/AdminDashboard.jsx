@@ -2542,10 +2542,10 @@ const AdminDashboard = () => {
     try {
       const status = await request('/api/admin/whatsapp/connect', {
         method: 'POST',
-        body: JSON.stringify({ force: true }),
+        body: JSON.stringify({ force: true, resetAuth: true }),
       });
       setWhatsappStatus(status);
-      showToast('Novo QR Code gerado.', 'success');
+      showToast(status.qr ? 'Novo QR Code gerado.' : 'Gerando novo QR Code. Ele aparecerá automaticamente.', 'success');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {

@@ -929,7 +929,7 @@ const handleIncomingWhatsAppWebMessage = async (message) => {
   }
 };
 
-const startWhatsAppQrSession = async ({ force = false } = {}) => {
+const startWhatsAppQrSession = async ({ force = false, resetAuth = false } = {}) => {
   if (whatsappRuntime.starting) return getWhatsAppProviderStatus();
   if (whatsappRuntime.socket && whatsappRuntime.connected) return getWhatsAppProviderStatus();
   if (whatsappRuntime.socket && !force) return getWhatsAppProviderStatus();
@@ -948,6 +948,13 @@ const startWhatsAppQrSession = async ({ force = false } = {}) => {
       } catch {}
       whatsappRuntime.socket = null;
       whatsappRuntime.connected = false; // evita estado fantasma (connected sem socket)
+    }
+
+    if (force && resetAuth && !whatsappRuntime.connected) {
+      whatsappRuntime.qr = '';
+      whatsappRuntime.qrDataUrl = '';
+      whatsappRuntime.phone = '';
+      fs.rmSync(WHATSAPP_AUTH_DIR, { recursive: true, force: true });
     }
 
     fs.mkdirSync(WHATSAPP_AUTH_DIR, { recursive: true });
@@ -6617,7 +6624,8 @@ app.get('/api/admin/whatsapp/status', authRequired, requirePermission('whatsapp'
 
 app.post('/api/admin/whatsapp/connect', authRequired, requirePermission('whatsapp'), async (req, res) => {
   const force = Boolean(req.body?.force);
-  const status = await startWhatsAppQrSession({ force });
+  const resetAuth = Boolean(req.body?.resetAuth);
+  const status = await startWhatsAppQrSession({ force, resetAuth });
   res.json({ ...status, visibility: isMasterAdminUser(req.user) ? 'todos' : 'proprios' });
 });
 
