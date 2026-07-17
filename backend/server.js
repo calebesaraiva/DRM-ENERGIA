@@ -2501,6 +2501,41 @@ const ensureProjetosForApprovedContracts = async () => {
   }
 };
 
+const SFV_ETAPAS_OFICIAIS = [
+  'Venda concluída',
+  'Sistema enviado',
+  'Prazo para entrega',
+  'Sistema entregue',
+  'Sistema instalado',
+  'Sistema ligado',
+  'Concluído',
+];
+
+const SFV_LEGACY_ETAPA_MAP = {
+  Documentos: 'Sistema enviado',
+  Homologação: 'Sistema enviado',
+  Entrega: 'Sistema entregue',
+  Instalação: 'Sistema instalado',
+  Ligação: 'Sistema ligado',
+};
+
+const normalizeSfvEtapa = (etapa) => {
+  const value = String(etapa || '').trim();
+  if (!value) return 'Venda concluída';
+  return SFV_LEGACY_ETAPA_MAP[value] || (SFV_ETAPAS_OFICIAIS.includes(value) ? value : 'Venda concluída');
+};
+
+const decorateSistemaFv = (sistema) => {
+  if (!sistema) return sistema;
+  const etapaAtual = normalizeSfvEtapa(sistema.etapaAtual);
+  const etapaDesde = sistema.etapaDesde || sistema.updatedAt || sistema.createdAt || new Date().toISOString();
+  const inicio = new Date(etapaDesde);
+  const diasNaEtapa = Number.isNaN(inicio.getTime())
+    ? 0
+    : Math.max(0, Math.floor((Date.now() - inicio.getTime()) / 86400000));
+  return { ...sistema, etapaAtual, etapaDesde, diasNaEtapa };
+};
+
 const createSistemaFvFromContrato = async (contrato) => {
   if (!contrato || contrato.status !== 'Aprovado') return null;
   const existing = await db.get('SELECT id FROM sistemas_fv WHERE contratoId = ?', contrato.id);
@@ -2531,11 +2566,11 @@ const createSistemaFvFromContrato = async (contrato) => {
     potenciaKwp ? Number(potenciaKwp) : null,
     Number(contrato.valorProjeto) || null,
     contrato.id,
-    'Documentos',
+    'Venda concluída',
     'No prazo',
     prazo.toISOString().split('T')[0],
     contrato.consultorNome || contrato.assignedUserName || 'Equipe DRM',
-    'Criado automaticamente após aprovação do contrato.',
+    'Criado automaticamente após aprovação do contrato. Próximo passo: enviar o sistema.',
     now.toISOString(),
     now.toISOString()
   );
@@ -2545,18 +2580,18 @@ const createSistemaFvFromContrato = async (contrato) => {
       (sistemaId, etapa, status, responsavel, proximaAcao, prazo, observacoes, criadoPorId, criadoPorNome, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     result.lastID,
-    'Documentos',
+    'Venda concluída',
     'No prazo',
     contrato.consultorNome || contrato.assignedUserName || 'Equipe DRM',
-    'Receber documentação do cliente',
+    'Enviar sistema',
     prazo.toISOString().split('T')[0],
-    'Venda concluída. Aguardando recebimento de documentos.',
+    'Venda concluída. Sistema entrou na esteira oficial FV.',
     contrato.criadoPorId || null,
     contrato.criadoPorNome || null,
     now.toISOString()
   );
 
-  return await db.get('SELECT * FROM sistemas_fv WHERE id = ?', result.lastID);
+  return decorateSistemaFv(await db.get('SELECT * FROM sistemas_fv WHERE id = ?', result.lastID));
 };
 
 const removeSistemaFvFromContrato = async (contratoId) => {
@@ -4933,7 +4968,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       potenciaKwp REAL,
       valorVenda REAL,
       contratoId INTEGER,
-      etapaAtual TEXT DEFAULT 'Documentos',
+      etapaAtual TEXT DEFAULT 'Venda concluída',
       status TEXT DEFAULT 'No prazo',
       prazoAtual TEXT,
       proximaAcao TEXT,
@@ -5017,6 +5052,31 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   if (!existingOrcamentoColumns.includes('tipo')) {
     await db.exec("ALTER TABLE orcamentos ADD COLUMN tipo TEXT DEFAULT 'completo'");
   }
+
+  await db.exec(`
+    UPDATE sistemas_fv
+    SET etapaAtual = CASE etapaAtual
+      WHEN 'Documentos' THEN 'Sistema enviado'
+      WHEN 'Homologação' THEN 'Sistema enviado'
+      WHEN 'Entrega' THEN 'Sistema entregue'
+      WHEN 'Instalação' THEN 'Sistema instalado'
+      WHEN 'Ligação' THEN 'Sistema ligado'
+      ELSE etapaAtual
+    END
+    WHERE etapaAtual IN ('Documentos', 'Homologação', 'Entrega', 'Instalação', 'Ligação')
+  `);
+  await db.exec(`
+    UPDATE sistemas_fv_historico
+    SET etapa = CASE etapa
+      WHEN 'Documentos' THEN 'Sistema enviado'
+      WHEN 'Homologação' THEN 'Sistema enviado'
+      WHEN 'Entrega' THEN 'Sistema entregue'
+      WHEN 'Instalação' THEN 'Sistema instalado'
+      WHEN 'Ligação' THEN 'Sistema ligado'
+      ELSE etapa
+    END
+    WHERE etapa IN ('Documentos', 'Homologação', 'Entrega', 'Instalação', 'Ligação')
+  `);
 
   const leadColumns = await db.all('PRAGMA table_info(leads)');
   const existingLeadColumns = leadColumns.map(column => column.name);
@@ -9798,7 +9858,7 @@ app.put('/api/admin/tabelas-precos/:id', authRequired, requirePermission('precos
 
 // --- ESTEIRA DE SISTEMAS FV ---
 
-const SFV_ETAPAS = ['Venda concluída', 'Documentos', 'Homologação', 'Entrega', 'Instalação', 'Ligação', 'Concluído'];
+const SFV_ETAPAS = SFV_ETAPAS_OFICIAIS;
 const SFV_STATUS = ['No prazo', 'Atenção', 'Atrasado', 'Concessionária', 'Pausado'];
 
 app.get('/api/admin/sistemas-fv/resumo', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
@@ -9808,7 +9868,8 @@ app.get('/api/admin/sistemas-fv/resumo', authRequired, requirePermission('equipe
     for (const etapa of SFV_ETAPAS) porEtapa[etapa] = 0;
     let atrasados = 0;
     for (const row of rows) {
-      porEtapa[row.etapaAtual] = (porEtapa[row.etapaAtual] || 0) + row.count;
+      const etapa = normalizeSfvEtapa(row.etapaAtual);
+      porEtapa[etapa] = (porEtapa[etapa] || 0) + row.count;
       if (row.status === 'Atrasado' || row.status === 'Atenção') atrasados += row.count;
     }
     res.json({ porEtapa, atrasados, total: rows.reduce((s, r) => s + r.count, 0) });
@@ -9820,7 +9881,13 @@ app.get('/api/admin/sistemas-fv/resumo', authRequired, requirePermission('equipe
 app.get('/api/admin/sistemas-fv', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
   try {
     const { etapa, status, consultor, cidade, search } = req.query;
-    let sql = `SELECT sfv.*
+    let sql = `SELECT sfv.*,
+        COALESCE((
+          SELECT MAX(h.createdAt)
+          FROM sistemas_fv_historico h
+          WHERE h.sistemaId = sfv.id
+            AND h.etapa = sfv.etapaAtual
+        ), sfv.updatedAt, sfv.createdAt) AS etapaDesde
       FROM sistemas_fv sfv
       LEFT JOIN contratos ct ON ct.id = sfv.contratoId
       WHERE (sfv.contratoId IS NULL OR ct.status = 'Aprovado')`;
@@ -9835,7 +9902,7 @@ app.get('/api/admin/sistemas-fv', authRequired, requirePermission('equipeTecnica
     }
     sql += ' ORDER BY sfv.updatedAt DESC';
     const rows = await db.all(sql, ...params);
-    res.json(rows);
+    res.json(rows.map(decorateSistemaFv));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -9846,23 +9913,24 @@ app.post('/api/admin/sistemas-fv', authRequired, requirePermission('equipeTecnic
     const { clienteId, clienteNome, clienteTelefone, consultorId, consultorNome, cidade, estado, potenciaKwp, valorVenda, contratoId, etapaAtual, status, prazoAtual, proximaAcao, responsavelAtual, observacoes } = req.body;
     if (!clienteNome) return res.status(400).json({ error: 'clienteNome obrigatório' });
     const now = new Date().toISOString();
+    const normalizedEtapa = normalizeSfvEtapa(etapaAtual || 'Venda concluída');
     const result = await db.run(
       `INSERT INTO sistemas_fv (clienteId, clienteNome, clienteTelefone, consultorId, consultorNome, cidade, estado, potenciaKwp, valorVenda, contratoId, etapaAtual, status, prazoAtual, proximaAcao, responsavelAtual, observacoes, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       clienteId || null, clienteNome, clienteTelefone || null, consultorId || null, consultorNome || null,
       cidade || null, estado || null, potenciaKwp ? Number(potenciaKwp) : null, valorVenda ? Number(valorVenda) : null,
-      contratoId || null, etapaAtual || 'Documentos', status || 'No prazo',
+      contratoId || null, normalizedEtapa, status || 'No prazo',
       prazoAtual || null, proximaAcao || null, responsavelAtual || req.user.nome || null, observacoes || null, now, now
     );
     await db.run(
       `INSERT INTO sistemas_fv_historico (sistemaId, etapa, status, responsavel, proximaAcao, prazo, observacoes, criadoPorId, criadoPorNome, createdAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      result.lastID, etapaAtual || 'Documentos', status || 'No prazo',
+      result.lastID, normalizedEtapa, status || 'No prazo',
       responsavelAtual || req.user.nome, proximaAcao || null, prazoAtual || null,
       'Sistema criado manualmente.', req.user.id, req.user.nome, now
     );
     const sistema = await db.get('SELECT * FROM sistemas_fv WHERE id = ?', result.lastID);
-    res.status(201).json(sistema);
+    res.status(201).json(decorateSistemaFv(sistema));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -9875,6 +9943,8 @@ app.put('/api/admin/sistemas-fv/:id', authRequired, requirePermission('equipeTec
 
     const { etapaAtual, status, prazoAtual, proximaAcao, responsavelAtual, observacoes, potenciaKwp, valorVenda, cidade, estado, consultorNome, consultorId } = req.body;
     const now = new Date().toISOString();
+    const normalizedEtapaAtual = etapaAtual ? normalizeSfvEtapa(etapaAtual) : null;
+    const sistemaEtapaAtual = normalizeSfvEtapa(sistema.etapaAtual);
 
     await db.run(
       `UPDATE sistemas_fv SET
@@ -9892,7 +9962,7 @@ app.put('/api/admin/sistemas-fv/:id', authRequired, requirePermission('equipeTec
         consultorId = COALESCE(?, consultorId),
         updatedAt = ?
        WHERE id = ?`,
-      etapaAtual || null, status || null, prazoAtual || null, proximaAcao || null,
+      normalizedEtapaAtual || null, status || null, prazoAtual || null, proximaAcao || null,
       responsavelAtual || null, observacoes || null,
       potenciaKwp != null ? Number(potenciaKwp) : null,
       valorVenda != null ? Number(valorVenda) : null,
@@ -9900,14 +9970,14 @@ app.put('/api/admin/sistemas-fv/:id', authRequired, requirePermission('equipeTec
       consultorId || null, now, req.params.id
     );
 
-    const etapaChanged = etapaAtual && etapaAtual !== sistema.etapaAtual;
+    const etapaChanged = normalizedEtapaAtual && normalizedEtapaAtual !== sistemaEtapaAtual;
     const statusChanged = status && status !== sistema.status;
     if (etapaChanged || statusChanged || proximaAcao || observacoes) {
       await db.run(
         `INSERT INTO sistemas_fv_historico (sistemaId, etapa, status, responsavel, proximaAcao, prazo, observacoes, criadoPorId, criadoPorNome, createdAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         req.params.id,
-        etapaAtual || sistema.etapaAtual,
+        normalizedEtapaAtual || sistemaEtapaAtual,
         status || sistema.status,
         responsavelAtual || req.user.nome,
         proximaAcao || null,
@@ -9918,7 +9988,7 @@ app.put('/api/admin/sistemas-fv/:id', authRequired, requirePermission('equipeTec
     }
 
     const updated = await db.get('SELECT * FROM sistemas_fv WHERE id = ?', req.params.id);
-    res.json(updated);
+    res.json(decorateSistemaFv(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -9927,7 +9997,7 @@ app.put('/api/admin/sistemas-fv/:id', authRequired, requirePermission('equipeTec
 app.get('/api/admin/sistemas-fv/:id/historico', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
   try {
     const rows = await db.all('SELECT * FROM sistemas_fv_historico WHERE sistemaId = ? ORDER BY createdAt DESC', req.params.id);
-    res.json(rows);
+    res.json(rows.map(row => ({ ...row, etapa: normalizeSfvEtapa(row.etapa) })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

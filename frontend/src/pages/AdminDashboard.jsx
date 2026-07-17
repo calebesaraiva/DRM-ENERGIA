@@ -1850,18 +1850,30 @@ const AdminDashboard = () => {
   // ── End Instalações redesign useMemos ──────────────────────────────────────
 
   // ── Esteira Sistemas FV useMemos ────────────────────────────────────────────
-  const SFV_ETAPAS = ['Venda concluída', 'Documentos', 'Homologação', 'Entrega', 'Instalação', 'Ligação', 'Concluído'];
+  const SFV_ETAPAS = ['Venda concluída', 'Sistema enviado', 'Prazo para entrega', 'Sistema entregue', 'Sistema instalado', 'Sistema ligado', 'Concluído'];
+  const sfvFilterStage = {
+    vendas: 'Venda concluída',
+    enviado: 'Sistema enviado',
+    prazo: 'Prazo para entrega',
+    entregue: 'Sistema entregue',
+    instalado: 'Sistema instalado',
+    ligado: 'Sistema ligado',
+    concluido: 'Concluído',
+  };
   const sfvStatusColor = { 'No prazo': '#22c55e', 'Atenção': '#f97316', 'Atrasado': '#ef4444', 'Concessionária': '#3b82f6', 'Pausado': '#94a3b8' };
-  const sfvEtapaColor = { 'Venda concluída': '#f97316', 'Documentos': '#8b5cf6', 'Homologação': '#3b82f6', 'Entrega': '#f59e0b', 'Instalação': '#10b981', 'Ligação': '#06b6d4', 'Concluído': '#22c55e' };
+  const sfvEtapaColor = {
+    'Venda concluída': '#f97316',
+    'Sistema enviado': '#3b82f6',
+    'Prazo para entrega': '#f59e0b',
+    'Sistema entregue': '#8b5cf6',
+    'Sistema instalado': '#10b981',
+    'Sistema ligado': '#06b6d4',
+    'Concluído': '#22c55e',
+  };
 
   const filteredSistemasFv = useMemo(() => {
     let items = sistemasFv;
-    if (sfvFilter === 'vendas') items = items.filter(s => s.etapaAtual === 'Venda concluída');
-    else if (sfvFilter === 'homologacao') items = items.filter(s => s.etapaAtual === 'Homologação');
-    else if (sfvFilter === 'entrega') items = items.filter(s => s.etapaAtual === 'Entrega');
-    else if (sfvFilter === 'instalacao') items = items.filter(s => s.etapaAtual === 'Instalação');
-    else if (sfvFilter === 'ligacao') items = items.filter(s => s.etapaAtual === 'Ligação');
-    else if (sfvFilter === 'concluido') items = items.filter(s => s.etapaAtual === 'Concluído');
+    if (sfvFilterStage[sfvFilter]) items = items.filter(s => s.etapaAtual === sfvFilterStage[sfvFilter]);
     else if (sfvFilter === 'atrasados') items = items.filter(s => ['Atrasado', 'Atenção'].includes(s.status));
     if (sfvSearch) {
       const q = sfvSearch.toLowerCase();
@@ -9871,19 +9883,20 @@ const AdminDashboard = () => {
               <div className="sfv-stats-row">
                 {[
                   { label: 'Vendas fechadas', key: 'Venda concluída', color: '#f97316' },
-                  { label: 'Em homologação', key: 'Homologação', color: '#3b82f6' },
-                  { label: 'Entrega agendada', key: 'Entrega', color: '#f59e0b' },
-                  { label: 'Instalação agendada', key: 'Instalação', color: '#10b981' },
-                  { label: 'Aguardando ligação', key: 'Ligação', color: '#06b6d4' },
-                  { label: 'Sistemas ligados', key: 'Concluído', color: '#22c55e' },
+                  { label: 'Sistema enviado', key: 'Sistema enviado', color: '#3b82f6' },
+                  { label: 'Prazo para entrega', key: 'Prazo para entrega', color: '#f59e0b' },
+                  { label: 'Sistema entregue', key: 'Sistema entregue', color: '#8b5cf6' },
+                  { label: 'Sistema instalado', key: 'Sistema instalado', color: '#10b981' },
+                  { label: 'Sistema ligado', key: 'Sistema ligado', color: '#06b6d4' },
+                  { label: 'Concluídos', key: 'Concluído', color: '#22c55e' },
                   { label: 'Atrasados/atenção', key: '__atrasados__', color: '#ef4444' },
                 ].map(({ label, key, color }) => (
                   <button
                     key={key}
                     type="button"
-                    className={`sfv-stat-card${(sfvFilter === (key === '__atrasados__' ? 'atrasados' : key === 'Venda concluída' ? 'vendas' : key.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,''))) ? ' active' : ''}`}
+                    className={`sfv-stat-card${(sfvFilter === (key === '__atrasados__' ? 'atrasados' : key === 'Venda concluída' ? 'vendas' : key === 'Sistema enviado' ? 'enviado' : key === 'Prazo para entrega' ? 'prazo' : key === 'Sistema entregue' ? 'entregue' : key === 'Sistema instalado' ? 'instalado' : key === 'Sistema ligado' ? 'ligado' : key === 'Concluído' ? 'concluido' : 'todos')) ? ' active' : ''}`}
                     style={{ borderTopColor: color }}
-                    onClick={() => setSfvFilter(key === '__atrasados__' ? 'atrasados' : key === 'Venda concluída' ? 'vendas' : key === 'Homologação' ? 'homologacao' : key === 'Entrega' ? 'entrega' : key === 'Instalação' ? 'instalacao' : key === 'Ligação' ? 'ligacao' : key === 'Concluído' ? 'concluido' : 'todos')}
+                    onClick={() => setSfvFilter(key === '__atrasados__' ? 'atrasados' : key === 'Venda concluída' ? 'vendas' : key === 'Sistema enviado' ? 'enviado' : key === 'Prazo para entrega' ? 'prazo' : key === 'Sistema entregue' ? 'entregue' : key === 'Sistema instalado' ? 'instalado' : key === 'Sistema ligado' ? 'ligado' : key === 'Concluído' ? 'concluido' : 'todos')}
                   >
                     <strong className="sfv-stat-num" style={{ color }}>
                       {key === '__atrasados__' ? sfvResumo.atrasados : (sfvResumo.porEtapa[key] || 0)}
@@ -9898,10 +9911,11 @@ const AdminDashboard = () => {
                 {[
                   { id: 'todos', label: 'Todos' },
                   { id: 'vendas', label: 'Vendas' },
-                  { id: 'homologacao', label: 'Homologação' },
-                  { id: 'entrega', label: 'Entrega' },
-                  { id: 'instalacao', label: 'Instalação' },
-                  { id: 'ligacao', label: 'Ligação' },
+                  { id: 'enviado', label: 'Enviado' },
+                  { id: 'prazo', label: 'Prazo entrega' },
+                  { id: 'entregue', label: 'Entregue' },
+                  { id: 'instalado', label: 'Instalado' },
+                  { id: 'ligado', label: 'Ligado' },
                   { id: 'concluido', label: 'Concluído' },
                   { id: 'atrasados', label: 'Atrasados' },
                 ].map(tab => (
@@ -9971,6 +9985,7 @@ const AdminDashboard = () => {
                                       {s.potenciaKwp && <span>{Number(s.potenciaKwp).toFixed(1)} kWp</span>}
                                     </div>
                                     {s.consultorNome && <div className="sfv-card-consultor">{s.consultorNome}</div>}
+                                    <div className="sfv-card-days">{Number(s.diasNaEtapa || 0)} dia{Number(s.diasNaEtapa || 0) === 1 ? '' : 's'} na etapa</div>
                                     <div className="sfv-card-footer">
                                       {s.prazoAtual && (
                                         <span className={`sfv-card-prazo${isOverdue ? ' overdue' : ''}`}>
@@ -10003,6 +10018,7 @@ const AdminDashboard = () => {
                             <th>Potência</th>
                             <th>Etapa atual</th>
                             <th>Responsável</th>
+                            <th>Dias na etapa</th>
                             <th>Próxima ação</th>
                             <th>Prazo</th>
                             <th>Status</th>
@@ -10011,7 +10027,7 @@ const AdminDashboard = () => {
                         </thead>
                         <tbody>
                           {filteredSistemasFv.length === 0 && (
-                            <tr><td colSpan={10} className="sfv-tbl-empty">Nenhum sistema encontrado</td></tr>
+                            <tr><td colSpan={11} className="sfv-tbl-empty">Nenhum sistema encontrado</td></tr>
                           )}
                           {filteredSistemasFv.map(s => {
                             const isOverdue = s.prazoAtual && new Date(s.prazoAtual) < new Date();
@@ -10031,6 +10047,7 @@ const AdminDashboard = () => {
                                   </span>
                                 </td>
                                 <td>{s.responsavelAtual || '—'}</td>
+                                <td>{Number(s.diasNaEtapa || 0)} dia{Number(s.diasNaEtapa || 0) === 1 ? '' : 's'}</td>
                                 <td className="sfv-tbl-acao">{s.proximaAcao || '—'}</td>
                                 <td style={isOverdue ? { color: '#ef4444', fontWeight: 700 } : {}}>
                                   {s.prazoAtual ? new Date(s.prazoAtual).toLocaleDateString('pt-BR') : '—'}
@@ -10087,6 +10104,10 @@ const AdminDashboard = () => {
                       <div className="sfv-ficha-meta-item">
                         <span>Responsável</span>
                         <strong>{sfvSelected.responsavelAtual || '—'}</strong>
+                      </div>
+                      <div className="sfv-ficha-meta-item">
+                        <span>Dias na etapa</span>
+                        <strong>{Number(sfvSelected.diasNaEtapa || 0)} dia{Number(sfvSelected.diasNaEtapa || 0) === 1 ? '' : 's'}</strong>
                       </div>
                     </div>
 

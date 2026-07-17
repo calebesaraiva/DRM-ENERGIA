@@ -18316,6 +18316,15 @@ button.pg-mini-card:hover { background: #fafafa; }
   font-size: 0.7rem;
   color: #94a3b8;
 }
+.sfv-card-days {
+  align-self: flex-start;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+}
 .sfv-card-footer {
   display: flex;
   align-items: center;
@@ -18793,6 +18802,11 @@ button.pg-mini-card:hover { background: #fafafa; }
 .admin-layout.theme-dark .sfv-card:hover,
 .admin-layout.theme-dark .whatsapp-conversation:hover {
   background: rgba(249, 115, 22, 0.08);
+}
+
+.admin-layout.theme-dark .sfv-card-days {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
 }
 
 .admin-layout.theme-dark input,
