@@ -822,6 +822,7 @@ const emptyBudgetForm = {
   hibridoMarcaId: '',
   hibridoModeloId: '',
   bateriaId: '',
+  quantidadeBaterias: '1',
   inversoresAdicionais: [],
   quantidadeCaboCc: '',
   areaPorPainelM2: '2.6',
@@ -3591,6 +3592,7 @@ const AdminDashboard = () => {
     if (!budgetForm.hibridoMarcaId) errors.hibridoMarcaId = true;
     if (!budgetForm.hibridoModeloId) errors.hibridoModeloId = true;
     if (!budgetForm.bateriaId) errors.bateriaId = true;
+    if (!budgetForm.quantidadeBaterias || Number(budgetForm.quantidadeBaterias) < 1) errors.quantidadeBaterias = true;
     if (Object.keys(errors).length > 0) {
       setBudgetFieldErrors(errors);
       setBudgetStatus('Preencha os dados do cliente, sistema híbrido e valor.');
@@ -3636,6 +3638,7 @@ const AdminDashboard = () => {
             bateria_id: budgetForm.bateriaId,
             bateria_modelo: bateriaLabel,
             bateria_capacidade_kwh: selectedHybridBateria?.capacidade_kwh || '',
+            quantidade_baterias: budgetForm.quantidadeBaterias || '1',
             quantidade_cabo_cc: budgetForm.quantidadeCaboCc,
             irradiacao_solar: budgetForm.irradiacaoSolar,
             perda_percentual: budgetForm.perdaPercentual,
@@ -6965,6 +6968,15 @@ const AdminDashboard = () => {
                         </option>
                       ))}
                     </select>
+                  </label>
+                  <label className={budgetFieldErrors.quantidadeBaterias ? 'field-error' : ''}>
+                    Quantidade de baterias
+                    <input
+                      type="number"
+                      min="1"
+                      value={budgetForm.quantidadeBaterias}
+                      onChange={e => { setBudgetForm(prev => ({ ...prev, quantidadeBaterias: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, quantidadeBaterias: false })); }}
+                    />
                   </label>
                   <label>
                     Quantidade de inversores

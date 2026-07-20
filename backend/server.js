@@ -4245,13 +4245,20 @@ const buildOrcamentoPdf = async (orcamento) => {
     const inversorTableRows = Array.from(inversorMap.values()).map(inv => [
       'Inversor', inv.desc || '-', String(inv.quantidade), true,
     ]);
+    const bateriaModelo = String(dimensionamento.bateria_modelo || '').trim();
+    const bateriaCapacidade = String(dimensionamento.bateria_capacidade_kwh || '').trim();
+    const bateriaDesc = bateriaModelo
+      || (bateriaCapacidade ? `Bateria de lítio ${bateriaCapacidade} kWh` : '');
+    const quantidadeBaterias = Number(dimensionamento.quantidade_baterias || 0);
+    const caboCc = String(dimensionamento.quantidade_cabo_cc || '').trim();
 
     const tableRows = [
       ['Placas',                  (dimensionamento.placa_modelo || '-'),
         String(dimensionamento.numero_paineis_necessarios || 1), true],
       ...inversorTableRows,
+      ...(bateriaDesc ? [['Bateria de lítio', bateriaDesc, String(quantidadeBaterias || 1), true]] : []),
       ['Estruturas de fixação',   'Inclusas - quantidade necessária para instalação', '1', false],
-      ['Cabos',                   'Inclusos - quantidade necessária para instalação',  '1', false],
+      ['Cabos CC',                caboCc ? `${caboCc} m de cabo solar CC` : 'Inclusos - quantidade necessária para instalação',  caboCc || '1', false],
       ['Conectores',              'Inclusos - quantidade necessária para instalação',  '1', false],
       ['Proteções',               'Inclusas - quantidade necessária para instalação',  '1', false],
       ['Materiais',               'Inclusos',   '1', false],
@@ -7552,6 +7559,13 @@ app.post('/api/admin/orcamentos', authRequired, requirePermission('orcamentos'),
     potencia_inversor_kw: Number(dimensionamento.potencia_inversor_kw || dimensionamento.potenciaInversorKw || 0),
     inversor_modelo: dimensionamento.inversor_modelo || dimensionamento.inversorModelo || '',
     quantidade_inversores: Number(dimensionamento.quantidade_inversores || 1),
+    inversor_hibrido: Boolean(dimensionamento.inversor_hibrido),
+    inversor_hibrido_marca_id: dimensionamento.inversor_hibrido_marca_id || null,
+    inversor_hibrido_modelo_id: dimensionamento.inversor_hibrido_modelo_id || null,
+    bateria_id: dimensionamento.bateria_id || null,
+    bateria_modelo: dimensionamento.bateria_modelo || '',
+    bateria_capacidade_kwh: dimensionamento.bateria_capacidade_kwh || '',
+    quantidade_baterias: Number(dimensionamento.quantidade_baterias || dimensionamento.quantidadeBaterias || 1),
     quantidade_cabo_cc: dimensionamento.quantidade_cabo_cc || dimensionamento.quantidadeCabo || '',
     irradiacao_solar: irradiacao,
     perda_percentual: perdaPercentual,
