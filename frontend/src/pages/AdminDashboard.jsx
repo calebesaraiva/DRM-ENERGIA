@@ -3591,8 +3591,7 @@ const AdminDashboard = () => {
     if (!budgetForm.numeroPaineis || Number(budgetForm.numeroPaineis) < 1) errors.numeroPaineis = true;
     if (!budgetForm.hibridoMarcaId) errors.hibridoMarcaId = true;
     if (!budgetForm.hibridoModeloId) errors.hibridoModeloId = true;
-    if (!budgetForm.bateriaId) errors.bateriaId = true;
-    if (!budgetForm.quantidadeBaterias || Number(budgetForm.quantidadeBaterias) < 1) errors.quantidadeBaterias = true;
+    if (budgetForm.bateriaId && (!budgetForm.quantidadeBaterias || Number(budgetForm.quantidadeBaterias) < 1)) errors.quantidadeBaterias = true;
     if (Object.keys(errors).length > 0) {
       setBudgetFieldErrors(errors);
       setBudgetStatus('Preencha os dados do cliente, sistema híbrido e valor.');
@@ -3635,10 +3634,10 @@ const AdminDashboard = () => {
             inversor_hibrido: true,
             inversor_hibrido_marca_id: budgetForm.hibridoMarcaId,
             inversor_hibrido_modelo_id: budgetForm.hibridoModeloId,
-            bateria_id: budgetForm.bateriaId,
+            bateria_id: budgetForm.bateriaId || '',
             bateria_modelo: bateriaLabel,
             bateria_capacidade_kwh: selectedHybridBateria?.capacidade_kwh || '',
-            quantidade_baterias: budgetForm.quantidadeBaterias || '1',
+            quantidade_baterias: budgetForm.bateriaId ? (budgetForm.quantidadeBaterias || '1') : '',
             quantidade_cabo_cc: budgetForm.quantidadeCaboCc,
             irradiacao_solar: budgetForm.irradiacaoSolar,
             perda_percentual: budgetForm.perdaPercentual,
@@ -6916,7 +6915,7 @@ const AdminDashboard = () => {
                     />
                   </label>
                   <label>
-                    Cabo CC
+                    Cabo CC opcional
                     <input
                       value={budgetForm.quantidadeCaboCc}
                       onChange={e => setBudgetForm(prev => ({ ...prev, quantidadeCaboCc: e.target.value }))}
@@ -6955,13 +6954,13 @@ const AdminDashboard = () => {
                     </select>
                   </label>
                   <label className={budgetFieldErrors.bateriaId ? 'field-error' : ''}>
-                    Bateria compatível
+                    Bateria compatível opcional
                     <select
                       value={budgetForm.bateriaId}
                       disabled={!budgetForm.hibridoModeloId}
                       onChange={e => { setBudgetForm(prev => ({ ...prev, bateriaId: e.target.value })); setBudgetFieldErrors(prev => ({ ...prev, bateriaId: false })); }}
                     >
-                      <option value="">{budgetForm.hibridoModeloId ? 'Selecione a bateria' : 'Selecione o modelo primeiro'}</option>
+                      <option value="">{budgetForm.hibridoModeloId ? 'Sem bateria neste orçamento' : 'Selecione o modelo primeiro'}</option>
                       {hybridBateriasForBudget.map(bateria => (
                         <option key={bateria.id} value={bateria.id}>
                           {bateria.nome_bateria}{bateria.capacidade_kwh ? ` ${bateria.capacidade_kwh} kWh` : ''}
