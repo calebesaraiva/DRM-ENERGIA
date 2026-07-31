@@ -508,7 +508,7 @@ const getInstStatusForNew = (p = {}) => {
   return 'Aguardando envio';
 };
 const contractNumber = (contrato = {}) => (
-  `CT-${String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(contrato.id || '').padStart(4, '0')}`
+  `CT-${String(contrato.dataVenda || contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(contrato.id || '').padStart(4, '0')}`
 );
 const currencyToNumber = currencyInputToNumber;
 const whatsappLeadMessage = (lead = {}) => (
@@ -519,6 +519,7 @@ const whatsappClientMessage = (cliente = {}) => (
 );
 
 const emptyContractManual = {
+  dataVenda: new Date().toISOString().slice(0, 10),
   geracaoKwh: '',
   geracaoAnualKwh: '',
   potenciaKwp: '',
@@ -542,6 +543,7 @@ const contractToReviewForm = (contrato = {}) => ({
   clienteCidade: contrato.clienteCidade || '',
   consultorId: contrato.consultorId ?? '',
   consultorNome: contrato.consultorNome || contrato.assignedUserName || contrato.criadoPorNome || '',
+  dataVenda: String(contrato.dataVenda || contrato.dados?.manual?.dataVenda || contrato.dataCriacao || '').slice(0, 10),
   valorProjeto: contrato.valorProjeto ?? contrato.dados?.manual?.valorSistema ?? '',
   valorEntrada: contrato.dados?.manual?.valorEntrada ?? contrato.equipamentoDados?.valorEntrada ?? '',
   valorSaldo: contrato.dados?.manual?.valorSaldo ?? contrato.equipamentoDados?.valorSaldo ?? '',
@@ -1728,12 +1730,13 @@ const AdminDashboard = () => {
     if (contratoSearch.trim()) {
       const q = contratoSearch.trim().toLowerCase();
       list = list.filter(c => {
-        const num = `CT-${String(c.dataCriacao || '').slice(0, 4)}-${String(c.id).padStart(4, '0')}`.toLowerCase();
+        const contractDate = c.dataVenda || c.dataCriacao || '';
+        const num = `CT-${String(contractDate).slice(0, 4)}-${String(c.id).padStart(4, '0')}`.toLowerCase();
         return String(c.clienteNome || '').toLowerCase().includes(q) || num.includes(q);
       });
     }
-    if (contratoDateFrom) list = list.filter(c => (c.dataCriacao || '') >= contratoDateFrom);
-    if (contratoDateTo)   list = list.filter(c => (c.dataCriacao || '') <= contratoDateTo);
+    if (contratoDateFrom) list = list.filter(c => String(c.dataVenda || c.dataCriacao || '').slice(0, 10) >= contratoDateFrom);
+    if (contratoDateTo)   list = list.filter(c => String(c.dataVenda || c.dataCriacao || '').slice(0, 10) <= contratoDateTo);
     return list;
   }, [contratoStatusFilter, contratoSearch, contratoDateFrom, contratoDateTo, contratos]);
 
@@ -3759,7 +3762,13 @@ const AdminDashboard = () => {
   const openContractModal = async (orcamento) => {
     const equipamento = equipamentos.find(item => item.id === Number(selectedEquipamentos[orcamento.id])) || equipamentos.find(item => item.active);
     const manual = buildContractManualFromOrcamento(orcamento, equipamento);
-    await gerarContratoPorOrcamento(orcamento, equipamento?.id || '', manual);
+    setQuickModal(null);
+    setContractModal({
+      open: true,
+      orcamento,
+      equipamentoId: equipamento?.id || '',
+      manual,
+    });
   };
 
   const aprovarOrcamentoParaContrato = async (orcamento) => {
@@ -3772,7 +3781,7 @@ const AdminDashboard = () => {
           });
       setOrcamentos(prev => prev.map(item => item.id === updated.id ? updated : item));
       setSelectedOrcamento(updated);
-      showToast(`Orçamento #${updated.id} aprovado. Gerando contrato com o kit escolhido.`, 'success');
+      showToast(`Orçamento #${updated.id} aprovado. Confira a data da venda para gerar o contrato.`, 'success');
       await openContractModal(updated);
     } catch (err) {
       showToast(err.message, 'error');
@@ -3952,6 +3961,10 @@ const AdminDashboard = () => {
     if (!orcamento) return;
     if (!manual.consultorId) {
       showToast('Selecione o consultor responsável pela venda.', 'warning');
+      return;
+    }
+    if (!manual.dataVenda) {
+      showToast('Informe a data da venda antes de gerar o contrato.', 'warning');
       return;
     }
 
@@ -7326,9 +7339,10 @@ const AdminDashboard = () => {
                     </thead>
                     <tbody>
                       {paginatedContratos.map((contrato) => {
-                        const year = String(contrato.dataCriacao || '').slice(0, 4) || new Date().getFullYear();
+                        const contractDate = contrato.dataVenda || contrato.dataCriacao;
+                        const year = String(contractDate || '').slice(0, 4) || new Date().getFullYear();
                         const numContrato = `CT-${year}-${String(contrato.id).padStart(4, '0')}`;
-                        const dataFormatada = dateBr(contrato.dataCriacao);
+                        const dataFormatada = dateBr(contractDate);
                         const potencia = contrato.dados?.manual?.potenciaKwp ?? contrato.dados?.dimensionamento?.potencia_real_instalada_kwp ?? '';
                         const sistemaLabel = potencia ? `${potencia} kWp` : '—';
                         const statusLabel = isConsultorOnly
@@ -7459,7 +7473,7 @@ const AdminDashboard = () => {
                             )}
                           </label>
                           <label className="ctr-review-field"><span>Responsável</span><strong>{getResponsibleName(selectedContrato.assignedUserName || selectedContrato.criadoPorNome)}</strong></label>
-                          <label className="ctr-review-field"><span>Data</span><strong>{dateBr(selectedContrato.dataCriacao)}</strong></label>
+                          {renderContractReviewField('Data da venda', 'dataVenda', { type: 'date', format: dateBr })}
                         </div>
                       </section>
 
@@ -11409,6 +11423,15 @@ const AdminDashboard = () => {
                     <option key={user.id} value={user.id}>{user.nome}</option>
                   ))}
                 </select>
+              </label>
+              <label>
+                Data da venda *
+                <input
+                  type="date"
+                  value={contractModal.manual.dataVenda || new Date().toISOString().slice(0, 10)}
+                  onChange={(event) => updateContractManual('dataVenda', event.target.value)}
+                  required
+                />
               </label>
               <label>
                 Geração em kWh

@@ -2953,9 +2953,11 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
   const financeiro = dados.financeiro || {};
   const dimensionamento = dados.dimensionamento || {};
   const equipamentoDados = parsed.equipamentoDados || {};
+  const nextDataVenda = normalizeDateOnly(body.dataVenda ?? parsed.dataVenda ?? existing.dataVenda ?? existing.dataCriacao);
 
   const nextManual = {
     ...manual,
+    dataVenda: nextDataVenda,
     valorSistema: body.valorProjeto ?? manual.valorSistema ?? '',
     valorEntrada: body.valorEntrada ?? manual.valorEntrada ?? '',
     valorSaldo: body.valorSaldo ?? manual.valorSaldo ?? '',
@@ -3028,6 +3030,7 @@ const normalizeContractReviewPayload = (body = {}, existing = {}) => {
       ? getContractConsultantId(existing)
       : numberOrNull(body.consultorId),
     consultorNome: String(body.consultorNome ?? existing.consultorNome ?? existing.assignedUserName ?? existing.criadoPorNome ?? '').trim(),
+    dataVenda: nextDataVenda,
     valorProjeto: moneyNumberOrNull(body.valorProjeto) ?? Number(existing.valorProjeto || 0),
     dados: {
       ...dados,
@@ -3259,6 +3262,13 @@ const formatDateOnlyBr = (value) => {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return match ? `${match[3]}/${match[2]}/${match[1]}` : formatDateBr(value);
 };
+const normalizeDateOnly = (value, fallback = new Date()) => {
+  const raw = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = raw ? new Date(raw) : new Date(fallback);
+  if (Number.isNaN(parsed.getTime())) return new Date(fallback).toISOString().slice(0, 10);
+  return parsed.toISOString().slice(0, 10);
+};
 
 const getContractTemplate = async () => {
   const saved = await getSetting('contractTemplate', null);
@@ -3336,6 +3346,7 @@ const buildContratoHtml = async (contrato) => {
       prazoExecucao: manual.prazoExecucao || 40,
       status: parsed.status,
       aprovadoPor: parsed.analisadoPorNome || 'Administrador',
+      dataVenda: formatDateOnlyBr(parsed.dataVenda || manual.dataVenda || parsed.dataCriacao),
       dataAprovacao: parsed.dataAnalise ? new Date(parsed.dataAnalise).toLocaleDateString('pt-BR') : '',
     },
   };
@@ -3352,6 +3363,7 @@ const buildContratoHtml = async (contrato) => {
     ['Quantidade de painéis', variables.projeto.paineis],
     ['Quantidade de cabo', variables.projeto.quantidadeCabo],
     ['Valor do sistema', variables.contrato.valor],
+    ['Data da venda', variables.contrato.dataVenda],
     ['Forma de pagamento', variables.contrato.formaPagamento],
   ];
   const materialRows = [
@@ -3702,6 +3714,7 @@ const buildContratoPdf = async (contrato) => {
       prazoExecucao: manual.prazoExecucao || 40,
       status: parsed.status,
       aprovadoPor: parsed.analisadoPorNome || 'Administrador',
+      dataVenda: formatDateOnlyBr(parsed.dataVenda || manual.dataVenda || parsed.dataCriacao),
       dataAprovacao: parsed.dataAnalise ? new Date(parsed.dataAnalise).toLocaleDateString('pt-BR') : '',
     },
   };
@@ -3717,6 +3730,7 @@ const buildContratoPdf = async (contrato) => {
   ];
   const commercialRows = [
     ['Valor do sistema', contractVariables.contrato.valor],
+    ['Data da venda', contractVariables.contrato.dataVenda],
     ['Entrada', contractVariables.contrato.entrada],
     ['Saldo', contractVariables.contrato.saldo],
     ['Condição de pagamento', contractVariables.contrato.formaPagamento],
@@ -4088,7 +4102,7 @@ const buildProcuracaoPdf = async (procuracao) => {
     paragraph(`Esta procuração possui validade de 06 (seis) meses, até ${formatDateBr(parsed.validadeAte)}.`, { bold: true });
 
     doc.moveDown(1.2);
-    paragraph(`${text(city).toUpperCase()} - ${text(state).toUpperCase()}, ${formatDateBr(parsed.dataCriacao)}.`, { size: 9, gap: 4 });
+    paragraph(`${text(city).toUpperCase()} - ${text(state).toUpperCase()}, ${formatDateBr(parsed.dataVenda || parsed.dataCriacao)}.`, { size: 9, gap: 4 });
     const signatureY = Math.max(doc.y + 42, 660);
     doc.strokeColor(dark).moveTo(doc.page.margins.left + 70, signatureY).lineTo(doc.page.margins.left + width - 70, signatureY).stroke();
     doc.font('Helvetica-Bold').fontSize(9).fillColor(dark).text(text(parsed.clienteNome).toUpperCase(), doc.page.margins.left, signatureY + 9, { width, align: 'center' });
@@ -4543,6 +4557,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       analisadoPorNome TEXT,
       observacaoAnalise TEXT,
       dataCriacao TEXT,
+      dataVenda TEXT,
       dataAnalise TEXT,
       assignedUserId INTEGER,
       assignedUserName TEXT,
@@ -5195,6 +5210,10 @@ const sendOrcamentoPdf = async (res, orcamento) => {
   }
   if (!existingContratoColumns.includes('consultorNome')) {
     await db.exec('ALTER TABLE contratos ADD COLUMN consultorNome TEXT');
+  }
+  if (!existingContratoColumns.includes('dataVenda')) {
+    await db.exec('ALTER TABLE contratos ADD COLUMN dataVenda TEXT');
+    await db.exec('UPDATE contratos SET dataVenda = substr(COALESCE(dataAnalise, dataCriacao), 1, 10) WHERE dataVenda IS NULL OR dataVenda = ""');
   }
   if (!existingContratoColumns.includes('assinaturaStatus')) {
     await db.exec("ALTER TABLE contratos ADD COLUMN assinaturaStatus TEXT DEFAULT 'Pendente de assinaturas'");
@@ -8193,6 +8212,8 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   manualFinal.consultorId = consultorId;
   manualFinal.consultorNome = consultorNome;
   const now = new Date().toISOString();
+  const dataVenda = normalizeDateOnly(manualFinal.dataVenda, now);
+  manualFinal.dataVenda = dataVenda;
   const dados = {
     cliente: cliente ? publicClient(cliente) : {
       id: orcamento.clienteId || null,
@@ -8221,8 +8242,8 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
   const result = await db.run(
     `INSERT INTO contratos
       (orcamentoId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, valorProjeto, status, dados,
-       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome, assinaturaStatus)
-     VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       criadoPorId, criadoPorNome, dataCriacao, dataVenda, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome, assinaturaStatus)
+     VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     orcamento.id,
     orcamento.clienteNome,
     orcamento.clienteTelefone,
@@ -8233,6 +8254,7 @@ app.post('/api/admin/contratos', authRequired, requirePermission('contratos'), a
     req.user.id,
     req.user.nome,
     now,
+    dataVenda,
     orcamento.assignedUserId,
     orcamento.assignedUserName,
     equipamento?.id || null,
@@ -8295,6 +8317,8 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
   const geracaoMensal = Number(manualFinal.geracaoKwh || 0);
   const valorSistema = moneyNumberOrNull(manualFinal.valorSistema) || 0;
   const now = new Date().toISOString();
+  const dataVenda = normalizeDateOnly(manualFinal.dataVenda, now);
+  manualFinal.dataVenda = dataVenda;
   const clienteSnapshot = {
     ...cliente,
     enderecoCompleto: buildClientAddress(cliente),
@@ -8337,8 +8361,8 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
   const result = await db.run(
     `INSERT INTO contratos
       (orcamentoId, clienteNome, clienteTelefone, clienteEmail, clienteCidade, valorProjeto, status, dados,
-       criadoPorId, criadoPorNome, dataCriacao, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome, assinaturaStatus)
-     VALUES (NULL, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       criadoPorId, criadoPorNome, dataCriacao, dataVenda, assignedUserId, assignedUserName, equipamentoId, equipamentoNome, equipamentoDados, consultorId, consultorNome, assinaturaStatus)
+     VALUES (NULL, ?, ?, ?, ?, ?, 'Pendente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     cliente.nome,
     cliente.whatsapp,
     cliente.email,
@@ -8348,6 +8372,7 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
     req.user.id,
     req.user.nome,
     now,
+    dataVenda,
     req.user.id,
     req.user.nome,
     equipamento?.id || null,
@@ -8391,6 +8416,7 @@ app.put('/api/admin/contratos/:id', authRequired, requirePermission('contratos')
            clienteCidade = ?,
            consultorId = ?,
            consultorNome = ?,
+           dataVenda = ?,
            valorProjeto = ?,
            dados = ?,
            equipamentoDados = ?
@@ -8401,6 +8427,7 @@ app.put('/api/admin/contratos/:id', authRequired, requirePermission('contratos')
       data.clienteCidade,
       data.consultorId,
       data.consultorNome,
+      data.dataVenda,
       data.valorProjeto,
       JSON.stringify(data.dados),
       JSON.stringify(data.equipamentoDados),
@@ -8684,7 +8711,7 @@ app.get('/api/assinatura/contrato/:token', async (req, res) => {
 
   res.json({
     id: parsed.id,
-    numero: `CT-${String(parsed.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(parsed.id || '').padStart(4, '0')}`,
+    numero: `CT-${String(parsed.dataVenda || parsed.dataCriacao || '').slice(0, 4) || new Date().getFullYear()}-${String(parsed.id || '').padStart(4, '0')}`,
     clienteNome: parsed.clienteNome,
     clienteCpfCnpj: parsed.dados?.cliente?.cpfCnpj || parsed.dados?.manual?.cpfCnpj || '',
     clienteDataNascimento: parsed.dados?.cliente?.dataNascimento || parsed.dados?.cliente?.nascimento || parsed.dados?.manual?.dataNascimento || '',
@@ -9581,13 +9608,13 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
   };
 
   const valorAprovadoMes = contratos.reduce((total, contrato) => {
-    const data = new Date(contrato.dataAnalise || contrato.dataCriacao || 0);
+    const data = new Date(contrato.dataVenda || contrato.dataAnalise || contrato.dataCriacao || 0);
     const sameMonth = data.getMonth() === hoje.getMonth() && data.getFullYear() === hoje.getFullYear();
     return contrato.status === 'Aprovado' && sameMonth ? total + Number(contrato.valorProjeto || 0) : total;
   }, 0);
   const vendasConsultoresAccumulator = contratos.reduce((acc, contrato) => {
     if (contrato.status !== 'Aprovado') return acc;
-    const data = new Date(contrato.dataAnalise || contrato.dataCriacao || 0);
+    const data = new Date(contrato.dataVenda || contrato.dataAnalise || contrato.dataCriacao || 0);
     if (Number.isNaN(data.getTime())) return acc;
     const consultor = getContractConsultantName(contrato);
     if (!acc[consultor]) {
@@ -9729,7 +9756,7 @@ app.get('/api/admin/resumo', authRequired, requirePermission('dashboard'), async
 
 app.get('/api/admin/financeiro', authRequired, requirePermission('financeiro'), async (req, res) => {
   const rows = await db.all('SELECT financeiro, status, data, assignedUserName FROM orcamentos');
-  const contratos = await db.all('SELECT valorProjeto, status, dataAnalise, dataCriacao, criadoPorNome, assignedUserName, consultorNome, consultorId FROM contratos');
+  const contratos = await db.all('SELECT valorProjeto, status, dataVenda, dataAnalise, dataCriacao, criadoPorNome, assignedUserName, consultorNome, consultorId FROM contratos');
   const despesas = await db.all('SELECT * FROM despesas_fixas ORDER BY active DESC, valor DESC');
   const now = new Date();
   const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -9756,7 +9783,7 @@ app.get('/api/admin/financeiro', authRequired, requirePermission('financeiro'), 
 
   const contratosResumo = contratos.reduce((acc, contrato) => {
     const valor = Number(contrato.valorProjeto) || 0;
-    const key = monthKey(contrato.dataAnalise || contrato.dataCriacao);
+    const key = monthKey(contrato.dataVenda || contrato.dataAnalise || contrato.dataCriacao);
     if (contrato.status === 'Aprovado') {
       acc.valorAprovadoTotal += valor;
       if (key === currentKey) acc.valorAprovadoMes += valor;
