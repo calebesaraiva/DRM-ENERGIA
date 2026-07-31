@@ -1187,15 +1187,19 @@
 
 .user-create-panel {
   display: grid;
-  grid-template-columns: minmax(240px, 1.2fr) repeat(5, minmax(140px, 1fr)) auto;
+  grid-template-columns: minmax(240px, 1.2fr) repeat(3, minmax(150px, 1fr));
   gap: 0.75rem;
-  align-items: end;
+  align-items: stretch;
   margin-bottom: 1rem;
   padding: 1rem;
-  border: 1px solid #d9f99d;
+  border: 1px solid #fed7aa;
   border-radius: 16px;
-  background: linear-gradient(135deg, #f0fdf4 0%, #fff 72%);
-  box-shadow: 0 14px 32px rgba(22, 163, 74, 0.08);
+  background: linear-gradient(135deg, #fff7ed 0%, #fff 72%);
+  box-shadow: 0 14px 32px rgba(249, 115, 22, 0.08);
+}
+
+.user-create-panel > div:first-child {
+  align-self: center;
 }
 
 .user-create-panel h4,
@@ -1222,6 +1226,41 @@
   background: #fff;
   color: #111827;
   font: inherit;
+}
+
+.user-create-checkbox {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.72rem 0.85rem;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.user-create-checkbox input {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  accent-color: #f97316;
+}
+
+.user-create-checkbox span {
+  display: grid;
+  gap: 0.14rem;
+}
+
+.user-create-checkbox strong {
+  font-size: 0.86rem;
+  color: #111827;
+}
+
+.user-create-checkbox small {
+  color: #64748b;
+  font-size: 0.74rem;
+  line-height: 1.25;
 }
 
 .user-create-panel input:focus,
@@ -1390,6 +1429,26 @@
 .pending-chip {
   background: #fff7ed;
   color: #c2410c;
+}
+
+.master-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0.32rem 0.68rem;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.permission-card input:disabled,
+.permission-card select:disabled,
+.permission-presets button:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
 }
 
 .permissions-grid {

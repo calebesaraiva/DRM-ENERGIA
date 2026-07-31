@@ -5349,12 +5349,22 @@ const sendOrcamentoPdf = async (res, orcamento) => {
     }
   }
 
-  const savedUsers = await db.all('SELECT id, username, permissions FROM usuarios');
+  const savedUsers = await db.all('SELECT id, username, role, permissions FROM usuarios');
   for (const savedUser of savedUsers) {
     let rawPermissions = {};
     try {
       rawPermissions = savedUser.permissions ? JSON.parse(savedUser.permissions) : {};
     } catch {}
+
+    if (String(savedUser.username || '').toLowerCase() === MASTER_ADMIN_USERNAME) {
+      await db.run(
+        'UPDATE usuarios SET role = ?, active = 1, permissions = ? WHERE id = ?',
+        'ADM',
+        JSON.stringify(ADMIN_PERMISSIONS),
+        savedUser.id
+      );
+      continue;
+    }
 
     const normalizedSavedPermissions = normalizePermissions(
       String(savedUser.username || '').toLowerCase() === 'renejr'
@@ -8825,13 +8835,18 @@ app.post('/api/admin/usuarios', authRequired, requirePermission('usuarios'), asy
   }
   const mergedPermissions = normalizePermissions(permissions || {
     dashboard: true,
-    leads: true,
+    clientes: true,
     orcamentos: true,
     contratos: true,
+    gerenciarClientes: true,
   });
 
-  if (!normalizedName || !normalizedUsername || !normalizedWhatsApp) {
-    return res.status(400).json({ message: 'Informe nome, usuário e WhatsApp para cadastrar no rodízio.' });
+  if (!normalizedName || !normalizedUsername) {
+    return res.status(400).json({ message: 'Informe nome e usuário para cadastrar o vendedor.' });
+  }
+
+  if ((mergedPermissions.leads || mergedPermissions.whatsapp) && !normalizedWhatsApp) {
+    return res.status(400).json({ message: 'Informe o WhatsApp quando o vendedor participar do rodízio ou do atendimento WhatsApp.' });
   }
 
   const exists = await db.get('SELECT id FROM usuarios WHERE username = ? OR email = ?', normalizedUsername, normalizedEmail);
@@ -8872,14 +8887,18 @@ app.put('/api/admin/usuarios/:id/permissoes', authRequired, requirePermission('p
   const { permissions, active, whatsapp, nome, role } = req.body;
   const user = await db.get('SELECT * FROM usuarios WHERE id = ?', req.params.id);
   if (!user) return res.status(404).json({ message: 'Usuário não encontrado.' });
-  const nextRole = ['ADM', 'EQUIPE_TECNICA_COMERCIAL', 'CONSULTOR'].includes(role) ? role : user.role;
+  const isMasterAdminTarget = String(user.username || '').toLowerCase() === MASTER_ADMIN_USERNAME;
+  const nextRole = isMasterAdminTarget
+    ? 'ADM'
+    : (['ADM', 'EQUIPE_TECNICA_COMERCIAL', 'CONSULTOR'].includes(role) ? role : user.role);
+  const nextPermissions = isMasterAdminTarget ? ADMIN_PERMISSIONS : normalizePermissions(permissions);
 
   await db.run(
     'UPDATE usuarios SET nome = ?, role = ?, permissions = ?, active = ?, whatsapp = ? WHERE id = ?',
     String(nome || user.nome).trim(),
     nextRole,
-    JSON.stringify(normalizePermissions(permissions)),
-    active === false ? 0 : 1,
+    JSON.stringify(nextPermissions),
+    isMasterAdminTarget ? 1 : (active === false ? 0 : 1),
     typeof whatsapp === 'undefined' ? user.whatsapp : normalizeWhatsAppPhone(whatsapp),
     req.params.id
   );

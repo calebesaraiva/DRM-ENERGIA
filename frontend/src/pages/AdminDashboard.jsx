@@ -862,6 +862,7 @@ const emptyUserForm = {
   whatsapp: '',
   role: 'CONSULTOR',
   temporaryPassword: '',
+  participaRodizio: false,
 };
 
 const getInitialAdminUser = () => {
@@ -1338,7 +1339,7 @@ const AdminDashboard = () => {
       tabs: [
         { id: 'financeiro', label: 'Financeiro', permission: 'financeiro' },
         { id: 'comunicacoes', label: 'Comunicações', permission: 'usuarios' },
-        { id: 'usuarios', label: 'Acessos', permission: 'usuarios' },
+        { id: 'usuarios', label: 'Vendedores', permission: 'usuarios' },
       ],
     },
   ].map(group => ({
@@ -1366,7 +1367,7 @@ const AdminDashboard = () => {
     { id: 'qa-precos', label: 'Preço dos sistemas', tab: 'precosSistemas', permission: 'precosSistemas', group: 'Catálogo', description: 'Calculadora e tabelas de preço.' },
     { id: 'qa-financeiro', label: 'Financeiro', tab: 'financeiro', permission: 'financeiro', group: 'Gestão', description: 'Números financeiros e despesas.' },
     { id: 'qa-comunicacoes', label: 'Comunicações', tab: 'comunicacoes', permission: 'usuarios', group: 'Gestão', description: 'Mensagens, e-mail e disparos.' },
-    { id: 'qa-usuarios', label: 'Acessos', tab: 'usuarios', permission: 'usuarios', group: 'Gestão', description: 'Usuários, permissões e senhas.', badge: usuarios.length },
+    { id: 'qa-usuarios', label: 'Vendedores', tab: 'usuarios', permission: 'usuarios', group: 'Gestão', description: 'Usuários, permissões e senhas.', badge: usuarios.length },
   ].filter(action => hasPermission(action.permission));
   const quickActions = availableQuickActions.filter(action => (
     quickActionPrefs === null ? defaultQuickActionIds.includes(action.id) : quickActionPrefs.includes(action.id)
@@ -3290,21 +3291,27 @@ const AdminDashboard = () => {
   const createUsuario = async (event) => {
     event.preventDefault();
     try {
+    const participaRodizio = Boolean(newUserForm.participaRodizio);
     const user = await request('/api/admin/usuarios', {
       method: 'POST',
       body: JSON.stringify({
         ...newUserForm,
         permissions: normalizePanelPermissions({
           dashboard: true,
-          leads: true,
+          clientes: true,
+          gerenciarClientes: true,
           orcamentos: true,
           contratos: true,
+          leads: participaRodizio,
+          whatsapp: participaRodizio,
           ...(newUserForm.role === 'EQUIPE_TECNICA_COMERCIAL' ? {
             ordensServico: true,
             precosSistemas: true,
             equipeTecnica: true,
           } : {}),
           ...(newUserForm.role === 'ADM' ? {
+            leads: true,
+            whatsapp: true,
             clientes: true,
             ordensServico: true,
             precosSistemas: true,
@@ -10277,8 +10284,8 @@ const AdminDashboard = () => {
               <div className="section-heading">
                 <div>
                   <span className="section-kicker">Controle de acesso</span>
-                  <h3>Usuários e permissões</h3>
-                  <p>Defina exatamente quais áreas cada pessoa pode visualizar dentro do sistema.</p>
+                  <h3>Vendedores e equipe</h3>
+                  <p>Crie vendedores, ative ou desative acessos e defina quem participa do rodízio de leads.</p>
                 </div>
                 <div className="section-stats">
                   <div>
@@ -10298,8 +10305,8 @@ const AdminDashboard = () => {
 
               <form className="user-create-panel" onSubmit={createUsuario}>
                 <div>
-                  <h4>Adicionar consultor ao rodízio</h4>
-                  <p>Informe nome e WhatsApp. Se tiver permissão de leads e estiver ativo, já entra automaticamente na distribuição.</p>
+                  <h4>Cadastrar vendedor</h4>
+                  <p>O Deivson, como ADM master, controla acessos, senhas e participação no rodízio.</p>
                 </div>
                 <input
                   placeholder="Nome do consultor"
@@ -10321,10 +10328,9 @@ const AdminDashboard = () => {
                   required
                 />
                 <input
-                  placeholder="WhatsApp com DDD"
+                  placeholder="WhatsApp com DDD (opcional)"
                   value={newUserForm.whatsapp}
                   onChange={(event) => setNewUserForm(prev => ({ ...prev, whatsapp: event.target.value }))}
-                  required
                 />
                 <select value={newUserForm.role} onChange={(event) => setNewUserForm(prev => ({ ...prev, role: event.target.value }))}>
                   <option value="CONSULTOR">Consultor</option>
@@ -10336,13 +10342,24 @@ const AdminDashboard = () => {
                   value={newUserForm.temporaryPassword}
                   onChange={(event) => setNewUserForm(prev => ({ ...prev, temporaryPassword: event.target.value }))}
                 />
-                <button className="btn btn-primary" type="submit">Adicionar ao rodízio</button>
+                <label className="user-create-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={newUserForm.participaRodizio}
+                    onChange={(event) => setNewUserForm(prev => ({ ...prev, participaRodizio: event.target.checked }))}
+                  />
+                  <span>
+                    <strong>Participar do rodízio de leads</strong>
+                    <small>Só marque quando o vendedor deve receber leads automáticos.</small>
+                  </span>
+                </label>
+                <button className="btn btn-primary" type="submit">Criar vendedor</button>
               </form>
 
               <div className="user-permissions-list">
                 <div className="ops-toolbar">
                   <div>
-                    <strong>Equipe cadastrada</strong>
+                    <strong>Vendedores cadastrados</strong>
                     <span>{filteredUsuarios.length} de {usuarios.length} usuário{usuarios.length === 1 ? '' : 's'} exibido{usuarios.length === 1 ? '' : 's'}.</span>
                   </div>
                   <div className="lead-search-box">
@@ -10367,18 +10384,21 @@ const AdminDashboard = () => {
                         <select
                           className="role-select"
                           value={user.role}
+                          disabled={String(user.username || '').toLowerCase() === 'deivson'}
                           onChange={(event) => updatePermissions(user.id, user.permissions, user.active, { role: event.target.value })}
                         >
                           <option value="ADM">Administrador</option>
                           <option value="EQUIPE_TECNICA_COMERCIAL">Equipe técnica/comercial</option>
                           <option value="CONSULTOR">Consultor</option>
                         </select>
+                        {String(user.username || '').toLowerCase() === 'deivson' && <span className="master-chip">ADM master</span>}
                         {user.mustChangePassword && <span className="pending-chip">Troca pendente</span>}
                         {!user.emailVerified && <span className="pending-chip">E-mail pendente</span>}
                         <label className="permission-toggle status-toggle">
                           <input
                             type="checkbox"
                             checked={user.active}
+                            disabled={String(user.username || '').toLowerCase() === 'deivson'}
                             onChange={(event) => updatePermissions(user.id, user.permissions, event.target.checked)}
                           />
                           Ativo
@@ -10391,6 +10411,7 @@ const AdminDashboard = () => {
                         <input
                           value={user.whatsapp || ''}
                           placeholder="Ex: 559999999999"
+                          disabled={String(user.username || '').toLowerCase() === 'deivson'}
                           onChange={(event) => setUsuarios(prev => prev.map(item => item.id === user.id ? { ...item, whatsapp: event.target.value } : item))}
                           onBlur={(event) => updatePermissions(user.id, user.permissions, user.active, { whatsapp: event.target.value, role: user.role, nome: user.nome })}
                         />
@@ -10404,6 +10425,7 @@ const AdminDashboard = () => {
                           <button
                             key={preset.id}
                             type="button"
+                            disabled={String(user.username || '').toLowerCase() === 'deivson'}
                             onClick={() => updatePermissions(user.id, normalizePanelPermissions(preset.permissions), user.active, { role: user.role, nome: user.nome, whatsapp: user.whatsapp })}
                           >
                             {preset.label}
@@ -10417,6 +10439,7 @@ const AdminDashboard = () => {
                           <input
                             type="checkbox"
                             checked={Boolean(user.permissions?.[key])}
+                            disabled={String(user.username || '').toLowerCase() === 'deivson'}
                             onChange={(event) => {
                               const checked = event.target.checked;
                               const nextPermissions = { ...user.permissions, [key]: checked };
