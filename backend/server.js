@@ -315,6 +315,21 @@ const INTERNAL_USERS = [
       whatsapp: true,
     },
   },
+  {
+    nome: 'Paulo Henrique',
+    username: 'paulo',
+    email: 'paulo@drm.local',
+    whatsapp: process.env.WHATSAPP_PAULO || '',
+    role: 'CONSULTOR',
+    temporaryPassword: 'Paulo@DRM#2026',
+    permissions: {
+      dashboard: true,
+      clientes: true,
+      orcamentos: true,
+      contratos: true,
+      gerenciarClientes: true,
+    },
+  },
 ];
 
 const mergePermissions = (permissions = {}) => ({
