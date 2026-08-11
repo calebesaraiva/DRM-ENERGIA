@@ -872,6 +872,7 @@ const AdminDashboard = () => {
   const [priceError, setPriceError] = useState('');
   const [quickModal, setQuickModal] = useState(null);
   const [pendingUserModalId, setPendingUserModalId] = useState(null);
+  const [updateDetailsOpen, setUpdateDetailsOpen] = useState(false);
   const [adminUser] = useState(initialUser);
   const [quickActionPrefs, setQuickActionPrefs] = useState(() => (
     Array.isArray(initialUser.quickActions) ? initialUser.quickActions : null
@@ -1363,6 +1364,8 @@ const AdminDashboard = () => {
       description: 'Central de pendências mais bonita, prévia curta no sino, modal completo por colaborador e correção no comportamento de scroll.',
       meta: 'Publicado agora · Correção administrativa',
       unread: true,
+      actionLabel: 'Ver detalhes',
+      onAction: () => setUpdateDetailsOpen(true),
     }];
 
     if (pendingPasswordUsers.length > 0) {
@@ -10556,6 +10559,100 @@ const AdminDashboard = () => {
                     }}
                   >
                     Abrir edição em Vendedores
+                  </button>
+                </div>
+              </div>
+            </div>
+          ), document.body)}
+
+          {updateDetailsOpen && typeof document !== 'undefined' && createPortal((
+            <div className="contract-modal-backdrop collaborator-pending-backdrop" onMouseDown={() => setUpdateDetailsOpen(false)}>
+              <div className="collaborator-pending-modal system-update-details-modal" role="dialog" aria-modal="true" aria-labelledby="system-update-details-title" onMouseDown={event => event.stopPropagation()}>
+                <div className="collaborator-pending-hero">
+                  <div className="collaborator-pending-avatar">AT</div>
+                  <div>
+                    <span>Atualização do sistema</span>
+                    <h3 id="system-update-details-title">Correções publicadas no painel DRM</h3>
+                    <p>Resumo completo do que foi ajustado nesta versão administrativa.</p>
+                  </div>
+                  <button type="button" className="lead-modal-close" onClick={() => setUpdateDetailsOpen(false)} aria-label="Fechar">×</button>
+                </div>
+
+                <div className="collaborator-pending-summary">
+                  <div>
+                    <span>Área</span>
+                    <strong>Admin</strong>
+                  </div>
+                  <div>
+                    <span>Status</span>
+                    <strong>Publicado</strong>
+                  </div>
+                  <div>
+                    <span>Validação</span>
+                    <strong>OK</strong>
+                  </div>
+                </div>
+
+                <section className="collaborator-pending-section">
+                  <div className="collaborator-section-head">
+                    <span>Notificações</span>
+                    <strong>Prévia + detalhe</strong>
+                  </div>
+                  <div className="system-update-list">
+                    <article>
+                      <strong>Prévia curta no sino</strong>
+                      <p>A barra de notificações agora mostra apenas um resumo, evitando conteúdo grande dentro do menu.</p>
+                    </article>
+                    <article>
+                      <strong>Modal completo ao clicar</strong>
+                      <p>As atualizações e pendências abrem em modais próprios com todas as informações necessárias.</p>
+                    </article>
+                    <article>
+                      <strong>Scroll corrigido</strong>
+                      <p>Ao abrir o sino, o scroll do fundo fica travado e o menu usa rolagem interna controlada.</p>
+                    </article>
+                  </div>
+                </section>
+
+                <section className="collaborator-pending-section">
+                  <div className="collaborator-section-head">
+                    <span>Colaboradores</span>
+                    <strong>Pendências mais claras</strong>
+                  </div>
+                  <div className="system-update-list">
+                    <article>
+                      <strong>Nomes clicáveis</strong>
+                      <p>Os colaboradores com pendência aparecem como chips no sino. Clicar no nome abre a ficha do colaborador.</p>
+                    </article>
+                    <article>
+                      <strong>Ficha completa</strong>
+                      <p>O modal mostra senha temporária, e-mail verificado, WhatsApp, status de acesso, perfil e funções liberadas.</p>
+                    </article>
+                    <article>
+                      <strong>Bloqueio temporário</strong>
+                      <p>O admin pode bloquear funções até o colaborador regularizar o perfil e liberar novamente quando estiver tudo certo.</p>
+                    </article>
+                  </div>
+                </section>
+
+                <section className="collaborator-pending-section">
+                  <div className="collaborator-section-head">
+                    <span>Segurança</span>
+                    <strong>Testado antes de publicar</strong>
+                  </div>
+                  <div className="collaborator-permission-cloud system-update-cloud">
+                    <span>Lint frontend</span>
+                    <span>Build produção</span>
+                    <span>Check backend</span>
+                    <span>Smoke crítico</span>
+                    <span>Deploy automático</span>
+                    <span>Produção 200 OK</span>
+                  </div>
+                </section>
+
+                <div className="collaborator-pending-actions">
+                  <button type="button" className="btn btn-primary" onClick={() => setUpdateDetailsOpen(false)}>
+                    Entendi
                   </button>
                 </div>
               </div>
