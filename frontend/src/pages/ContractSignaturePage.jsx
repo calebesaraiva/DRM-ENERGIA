@@ -75,7 +75,13 @@ function ContractSignaturePage() {
   }, [token]);
 
   useEffect(() => {
-    loadContract();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) loadContract();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadContract]);
 
   useEffect(() => {

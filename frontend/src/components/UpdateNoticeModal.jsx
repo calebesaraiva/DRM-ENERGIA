@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import './UpdateNoticeModal.css';
 
-const UPDATE_NOTICE_ID = 'drm-update-consultores-2026-08-10';
+const UPDATE_NOTICE_ID = 'drm-update-qualidade-operacao-2026-08-11';
 
 const UpdateNoticeModal = ({ user, audience = 'equipe' }) => {
   const storageKey = useMemo(() => {
@@ -33,16 +33,17 @@ const UpdateNoticeModal = ({ user, audience = 'equipe' }) => {
       <section className="update-notice-modal" role="dialog" aria-modal="true" aria-labelledby="update-notice-title">
         <div className="update-notice-header">
           <span>Nota de atualização</span>
-          <h2 id="update-notice-title">Correção liberada no sistema DRM</h2>
+          <h2 id="update-notice-title">Pacote de estabilidade liberado</h2>
         </div>
         <div className="update-notice-body">
           <p>
-            Corrigimos o fluxo que impedia consultores de cadastrar clientes e gerar contratos quando a lista de responsáveis não carregava no painel.
+            Liberamos melhorias para deixar o uso diário mais estável nos cadastros, contratos, equipe técnica e controle de acesso.
           </p>
           <ul>
-            <li>Cadastro de clientes com consultor responsável funcionando.</li>
-            <li>Geração de contrato direto pelo cliente usando o consultor logado como padrão.</li>
-            <li>Lista de consultores liberada para quem tem acesso a clientes ou contratos.</li>
+            <li>Consultores conseguem cadastrar clientes e gerar contratos normalmente.</li>
+            <li>Equipe técnica e O.S carregam responsáveis sem depender do acesso administrativo.</li>
+            <li>Deivson pode resetar senhas temporárias diretamente no painel de usuários.</li>
+            <li>Novas validações automáticas ajudam a evitar regressões antes de subir correções.</li>
           </ul>
           <p className="update-notice-note">
             Quem estiver com senha temporária ainda precisa trocar a senha no primeiro acesso para liberar o painel.

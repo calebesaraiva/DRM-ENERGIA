@@ -116,25 +116,23 @@ const permissionPresets = [
   },
 ];
 
+const CLIENTE_REQUIRED_FIELDS = ['nome', 'cpfCnpj', 'whatsapp', 'cidade', 'endereco', 'cep', 'estado'];
+const SFV_ETAPAS = ['Venda concluída', 'Sistema enviado', 'Prazo para entrega', 'Sistema entregue', 'Sistema instalado', 'Sistema ligado', 'Concluído'];
+const SFV_FILTER_STAGE = {
+  vendas: 'Venda concluída',
+  enviado: 'Sistema enviado',
+  prazo: 'Prazo para entrega',
+  entregue: 'Sistema entregue',
+  instalado: 'Sistema instalado',
+  ligado: 'Sistema ligado',
+  concluido: 'Concluído',
+};
+
 const roleLabels = {
   ADM: 'Administrador',
   EQUIPE_TECNICA_COMERCIAL: 'Equipe técnica/comercial',
   CONSULTOR: 'Consultor',
 };
-
-const siteEventLabels = {
-  initial_load:        'Acesso ao site (1ª abertura)',
-  route_change:        'Navegação entre páginas',
-  simulation_cta:      'Clique em "Simular"',
-  whatsapp_cta:        'Clique no botão WhatsApp',
-  modal_auto_whatsapp: 'Simulação concluída → WhatsApp aberto',
-  modal_success:       'Formulário de simulação preenchido',
-  page_view:           'Visualização de página',
-  whatsapp_click:      'Clique no WhatsApp',
-  simulation_click:    'Iniciou simulação',
-  simulation_completed:'Simulação finalizada',
-};
-const labelSiteEvent = (source) => siteEventLabels[source] || source.replace(/_/g, ' ');
 
 const defaultContractConfig = {
   empresa: { nome: '', cnpj: '', telefone: '', email: '', endereco: '' },
@@ -231,11 +229,6 @@ const OS_MOTIVO_OPTIONS = [
   'Solicitação da concessionária',
   'Retorno de instalação',
   'Outro',
-];
-const OS_ASSINATURA_OPTIONS = [
-  { value: 'cliente_acompanhou', label: 'Cliente acompanhou' },
-  { value: 'cliente_aprovou', label: 'Cliente aprovou' },
-  { value: 'cliente_recusou', label: 'Cliente recusou aprovação' },
 ];
 const createEmptyOsForm = () => ({
   clienteNome: '',
@@ -490,9 +483,6 @@ const percent = (value) => `${((Number(value || 0)) * 100).toLocaleString('pt-BR
 })}%`;
 
 const getResponsibleName = (name) => name || 'Aguardando distribuição';
-const getContractConsultantLabel = (contrato = {}) => (
-  contrato.consultorNome || contrato.assignedUserName || contrato.criadoPorNome || 'Sem consultor'
-);
 const getContractStatusClass = (status) => {
   if (status === 'Aprovado') return 'ctr-status-aprovado';
   if (status === 'Recusado') return 'ctr-status-recusado';
@@ -595,14 +585,6 @@ const emptyEquipamentoForm = {
   observacoes: '',
   active: true,
 };
-
-const equipamentoTypeOptions = ['Kit solar', 'Pacote completo', 'Serviço', 'Material'];
-const pagamentoTypeOptions = [
-  { value: 'avista', label: 'À vista' },
-  { value: 'financiado', label: 'Financiado' },
-  { value: 'cartao', label: 'Cartão' },
-  { value: 'misto', label: 'Misto' },
-];
 
 const equipamentoToForm = (item = {}) => ({
   ...emptyEquipamentoForm,
@@ -723,38 +705,6 @@ const getInstallationStage = (projeto = {}) => {
   return 'Equipamento enviado';
 };
 
-const projectOperationColumns = [
-  {
-    id: 'equipamento-enviado',
-    label: 'Equipamento enviado',
-    matches: (projeto) => getInstallationStage(projeto) === 'Equipamento enviado',
-  },
-  {
-    id: 'equipamento-entregue',
-    label: 'Equipamento entregue',
-    matches: (projeto) => getInstallationStage(projeto) === 'Equipamento entregue',
-  },
-  {
-    id: 'instalacao-agendada',
-    label: 'Instalação agendada',
-    matches: (projeto) => getInstallationStage(projeto) === 'Instalação agendada',
-  },
-  {
-    id: 'instalacao-concluida',
-    label: 'Instalação concluída',
-    matches: (projeto) => getInstallationStage(projeto) === 'Instalação concluída',
-  },
-  {
-    id: 'pedido-ligacao',
-    label: 'Pedido de ligação realizado',
-    matches: (projeto) => getInstallationStage(projeto) === 'Pedido de ligação realizado',
-  },
-  {
-    id: 'ligacao-realizada',
-    label: 'Ligação realizada',
-    matches: (projeto) => getInstallationStage(projeto) === 'Ligação realizada pela concessionária',
-  },
-];
 const projectChecklistLabels = {
   documentacaoRecebida: 'Documentação recebida',
   documentacaoCorrigida: 'Documentação corrigida',
@@ -959,7 +909,6 @@ const AdminDashboard = () => {
   const [instActionsOpen, setInstActionsOpen] = useState(null);
   const [instChecklistState, setInstChecklistState] = useState({});
   const INST_PER_PAGE = 10;
-  const INST_STATUS_FLOW = ['Aguardando envio','Em transporte','Entrega agendada','Equipamento entregue','Materiais com pendência','Aguardando instalação','Instalação agendada','Reagendada','Em instalação','Aguardando conferência técnica','Concluída','Cancelada'];
   // ── End Instalações redesign state ─────────────────────────────────────────
   // ── Esteira Sistemas FV state ───────────────────────────────────────────────
   const [sistemasFv, setSistemasFv] = useState([]);
@@ -972,7 +921,7 @@ const AdminDashboard = () => {
   const [sfvHistorico, setSfvHistorico] = useState([]);
   const [sfvUpdateOpen, setSfvUpdateOpen] = useState(false);
   const [sfvUpdateForm, setSfvUpdateForm] = useState({ etapaAtual: '', status: '', proximaAcao: '', prazoAtual: '', responsavelAtual: '', observacoes: '' });
-  const [sfvFichaTab, setSfvFichaTab] = useState('resumo');
+  const [, setSfvFichaTab] = useState('resumo');
   // ── End Esteira Sistemas FV state ───────────────────────────────────────────
   const [pendenciaForm, setPendenciaForm] = useState(emptyPendenciaForm);
   const [envioHomologacaoForm, setEnvioHomologacaoForm] = useState(emptyEnvioHomologacaoForm);
@@ -1040,8 +989,6 @@ const AdminDashboard = () => {
   const [showBateriaForm, setShowBateriaForm] = useState(false);
   const [hibridoCadForm, setHibridoCadForm] = useState({ marca_id: '', modelo_hibrido_id: '', nome_bateria: '', capacidade_kwh: '', status: 'ativo' });
   const equipamentoNomeRef = useRef(null);
-  const signatureCanvasRef = useRef(null);
-  const signatureDrawingRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
   const contractSignatureCanvasRef = useRef(null);
   const contractSignatureDrawingRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
   const whatsappMessagesEndRef = useRef(null);
@@ -1561,7 +1508,6 @@ const AdminDashboard = () => {
     recusados: contratos.filter(contrato => contrato.status === 'Recusado').length,
   }), [contratos]);
 
-  const CLIENTE_REQUIRED_FIELDS = ['nome', 'cpfCnpj', 'whatsapp', 'cidade', 'endereco', 'cep', 'estado'];
   const clientesAptos = useMemo(() => {
     const clienteComContrato = new Set(
       contratos.map(ct => Number(ct.dados?.cliente?.id)).filter(Boolean)
@@ -1873,16 +1819,6 @@ const AdminDashboard = () => {
   // ── End Instalações redesign useMemos ──────────────────────────────────────
 
   // ── Esteira Sistemas FV useMemos ────────────────────────────────────────────
-  const SFV_ETAPAS = ['Venda concluída', 'Sistema enviado', 'Prazo para entrega', 'Sistema entregue', 'Sistema instalado', 'Sistema ligado', 'Concluído'];
-  const sfvFilterStage = {
-    vendas: 'Venda concluída',
-    enviado: 'Sistema enviado',
-    prazo: 'Prazo para entrega',
-    entregue: 'Sistema entregue',
-    instalado: 'Sistema instalado',
-    ligado: 'Sistema ligado',
-    concluido: 'Concluído',
-  };
   const sfvStatusColor = { 'No prazo': '#22c55e', 'Atenção': '#f97316', 'Atrasado': '#ef4444', 'Concessionária': '#3b82f6', 'Pausado': '#94a3b8' };
   const sfvEtapaColor = {
     'Venda concluída': '#f97316',
@@ -1896,7 +1832,7 @@ const AdminDashboard = () => {
 
   const filteredSistemasFv = useMemo(() => {
     let items = sistemasFv;
-    if (sfvFilterStage[sfvFilter]) items = items.filter(s => s.etapaAtual === sfvFilterStage[sfvFilter]);
+    if (SFV_FILTER_STAGE[sfvFilter]) items = items.filter(s => s.etapaAtual === SFV_FILTER_STAGE[sfvFilter]);
     else if (sfvFilter === 'atrasados') items = items.filter(s => ['Atrasado', 'Atenção'].includes(s.status));
     if (sfvSearch) {
       const q = sfvSearch.toLowerCase();
@@ -1986,11 +1922,6 @@ const AdminDashboard = () => {
       return matchesStatus && matchesPriority && matchesResponsavel && matchesCidade && matchesTipo && matchesDataFrom && matchesDataTo && matchesSistema && matchesContrato && matchesAtrasadas && matchesSearch;
     });
   }, [ordensServico, osCidadeFilter, osPriorityFilter, osResponsavelFilter, osSearch, osStatusFilter, osTipoFilter, osDataFrom, osDataTo, osSistemaFilter, osContratoFilter, osAtrasadasOnly]);
-
-  const paginatedOrdensServico = useMemo(
-    () => filteredOrdensServico.slice((osPage - 1) * 10, osPage * 10),
-    [filteredOrdensServico, osPage]
-  );
 
   const selectedOs = useMemo(
     () => ordensServico.find((item) => item.id === selectedOsId) || filteredOrdensServico[0] || ordensServico[0] || null,
@@ -3169,6 +3100,8 @@ const AdminDashboard = () => {
     setPriceError('');
   };
 
+  // TODO: split the product package workbench out of this large dashboard file.
+  // eslint-disable-next-line no-unused-vars
   const renderProdutosPacotes = () => (
     <div className="pkit-body">
       <aside className="pkit-catalog-panel">
@@ -3360,6 +3293,27 @@ const AdminDashboard = () => {
     }
   };
 
+  const resetUserPassword = async (user) => {
+    if (!user?.id || String(user.username || '').toLowerCase() === 'deivson') return;
+    try {
+      const result = await request(`/api/admin/usuarios/${user.id}/reset-password`, {
+        method: 'POST',
+      });
+      setUsuarios(prev => prev.map(item => (
+        item.id === user.id ? { ...item, mustChangePassword: true } : item
+      )));
+      const passwordText = result.temporaryPassword ? ` Senha temporária: ${result.temporaryPassword}` : '';
+      try {
+        if (result.temporaryPassword) await navigator.clipboard?.writeText(result.temporaryPassword);
+      } catch {
+        // Copying is only a convenience; the toast still shows the password.
+      }
+      showToast(`Senha de ${user.nome} redefinida.${passwordText}`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const createCliente = async (event) => {
     event.preventDefault();
     try {
@@ -3516,6 +3470,7 @@ const AdminDashboard = () => {
     setActiveTab('orcamentos');
   };
 
+  // eslint-disable-next-line no-unused-vars
   const applyEquipmentToBudget = (equipamentoId) => {
     const equipamento = equipamentos.find(item => String(item.id) === String(equipamentoId));
     setBudgetForm(prev => ({
@@ -3970,6 +3925,7 @@ const AdminDashboard = () => {
     showToast(`Contrato ${contractNumber(contrato)} gerado com os dados do orçamento.`, 'success');
   };
 
+  // eslint-disable-next-line no-unused-vars
   const gerarContratoPorOrcamento = async (orcamento, equipamentoId, manual) => {
     try {
       const contrato = await request('/api/admin/contratos', {
@@ -4237,6 +4193,7 @@ const AdminDashboard = () => {
     contractSignatureDrawingRef.current.isDrawing = false;
   };
 
+  // eslint-disable-next-line no-unused-vars
   const openDrmSignatureModal = (contrato) => {
     setContractSignatureModal({
       open: true,
@@ -4512,7 +4469,7 @@ const AdminDashboard = () => {
 
   const saveHibridoCad = async (event) => {
     event.preventDefault();
-    const { marca_id, modelo_hibrido_id, nome_bateria, capacidade_kwh, status } = hibridoCadForm;
+    const { modelo_hibrido_id, nome_bateria, capacidade_kwh, status } = hibridoCadForm;
     if (!modelo_hibrido_id || !nome_bateria.trim()) return;
     try {
       const bateria = await request('/api/admin/baterias-litio', {
@@ -10438,6 +10395,16 @@ const AdminDashboard = () => {
                         {String(user.username || '').toLowerCase() === 'deivson' && <span className="master-chip">ADM master</span>}
                         {user.mustChangePassword && <span className="pending-chip">Troca pendente</span>}
                         {!user.emailVerified && <span className="pending-chip">E-mail pendente</span>}
+                        {String(user.username || '').toLowerCase() !== 'deivson' && (
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm-admin"
+                            onClick={() => resetUserPassword(user)}
+                            title="Redefinir senha temporária e exigir troca no próximo acesso"
+                          >
+                            Resetar senha
+                          </button>
+                        )}
                         <label className="permission-toggle status-toggle">
                           <input
                             type="checkbox"
