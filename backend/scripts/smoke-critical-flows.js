@@ -67,6 +67,8 @@ const run = async () => {
 
   if (mutating) {
     const suffix = Date.now();
+    const clientEmail = `smoke-${suffix}@example.com`;
+    const clientPassword = `ClienteSmoke#${suffix}`;
     const client = await assertStatus(
       'consultant can create client',
       request('/api/admin/clientes', {
@@ -76,6 +78,8 @@ const run = async () => {
           whatsapp: `55999${String(suffix).slice(-8)}`,
           cidade: 'Imperatriz',
           estado: 'MA',
+          email: clientEmail,
+          password: clientPassword,
           cpfCnpj: '12345678909',
           endereco: 'Rua Smoke',
           cep: '65900000',
@@ -106,6 +110,92 @@ const run = async () => {
       201
     );
     if (!contract?.id) throw new Error('contract creation did not return an id.');
+
+    const approved = await assertStatus(
+      'admin can approve contract',
+      request(`/api/admin/contratos/${contract.id}/revisao`, {
+        user: users.admin,
+        method: 'PUT',
+        body: {
+          status: 'Aprovado',
+          observacaoAnalise: 'Aprovado pelo smoke test.',
+        },
+      }),
+      200
+    );
+    if (approved.status !== 'Aprovado') throw new Error('contract approval did not persist.');
+
+    const systems = await assertStatus(
+      'technician can list approved system',
+      request('/api/admin/sistemas-fv', { user: users.technician }),
+      200
+    );
+    const system = Array.isArray(systems)
+      ? systems.find(item => Number(item.contratoId) === Number(contract.id))
+      : null;
+    if (!system) throw new Error('approved contract did not create a visible technical system.');
+
+    const serviceOrder = await assertStatus(
+      'technician can create service order',
+      request('/api/admin/ordens-servico', {
+        user: users.technician,
+        method: 'POST',
+        body: {
+          clienteNome: client.nome,
+          clienteTelefone: client.whatsapp,
+          contratoId: contract.id,
+          origem: 'Smoke test',
+          problema: 'Validação automática do fluxo operacional.',
+          categoria: 'Vistoria técnica',
+          prioridade: 'Normal',
+          responsavelId: users.technician.id,
+          observacoes: 'O.S. criada pelo smoke test.',
+        },
+      }),
+      201
+    );
+    if (!serviceOrder?.id) throw new Error('service order creation did not return an id.');
+
+    const serviceOrders = await assertStatus(
+      'technician can list assigned service order',
+      request('/api/admin/ordens-servico', { user: users.technician }),
+      200
+    );
+    if (!Array.isArray(serviceOrders) || !serviceOrders.some(item => Number(item.id) === Number(serviceOrder.id))) {
+      throw new Error('technician service order list did not include the created item.');
+    }
+
+    const clientToken = jwt.sign(
+      {
+        id: client.id,
+        nome: client.nome,
+        email: client.email,
+        role: 'CLIENTE',
+        userType: 'cliente',
+        permissions: {},
+      },
+      jwtSecret,
+      { expiresIn: '10m' }
+    );
+    const portal = await assertStatus(
+      'client can access portal',
+      fetch(`${baseUrl}/api/cliente/portal`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${clientToken}`,
+        },
+      }).then(async response => ({
+        response,
+        data: await response.json().catch(() => null),
+      })),
+      200
+    );
+    if (!portal.contratos?.some(item => Number(item.id) === Number(contract.id))) {
+      throw new Error('client portal did not include the approved contract.');
+    }
+    if (!portal.ordensServico?.some(item => Number(item.id) === Number(serviceOrder.id))) {
+      throw new Error('client portal did not include the service order.');
+    }
   }
 };
 
