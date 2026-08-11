@@ -31,6 +31,8 @@ const socket = io(getApiBaseUrl() || undefined, {
   reconnectionDelayMax: 5000,
 });
 const isLocalRuntime = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const MASTER_ADMIN_USERNAMES = new Set(['deivson', 'calebe']);
+const isMasterAdminUsername = (username) => MASTER_ADMIN_USERNAMES.has(String(username || '').toLowerCase());
 
 const LEADS_PER_PAGE = 8;
 
@@ -999,15 +1001,15 @@ const AdminDashboard = () => {
     || (permission === 'gerenciarClientes' && adminUser.permissions?.clientes)
   ), [adminUser.permissions, adminUser.role]);
 
-  const isMasterAdmin = adminUser.role === 'ADM' && String(adminUser.username || '').toLowerCase() === 'deivson';
+  const isMasterAdmin = adminUser.role === 'ADM' && isMasterAdminUsername(adminUser.username);
   const canArchiveWhatsappNotLead = isMasterAdmin || String(adminUser.username || '').toLowerCase() === 'renejr';
   const isConsultorOnly = adminUser.role !== 'ADM' && String(adminUser.username || '').toLowerCase() !== 'renejr';
   const leadAssignableUsers = useMemo(
-    () => usuarios.filter(user => user.active !== 0 && user.permissions?.leads && String(user.username || '').toLowerCase() !== 'deivson'),
+    () => usuarios.filter(user => user.active !== 0 && user.permissions?.leads && !isMasterAdminUsername(user.username)),
     [usuarios]
   );
   const whatsappTransferUsers = useMemo(
-    () => usuarios.filter(user => user.active !== 0 && user.permissions?.whatsapp && String(user.username || '').toLowerCase() !== 'deivson'),
+    () => usuarios.filter(user => user.active !== 0 && user.permissions?.whatsapp && !isMasterAdminUsername(user.username)),
     [usuarios]
   );
 
@@ -1345,7 +1347,7 @@ const AdminDashboard = () => {
     () => usuarios.filter(user => (
       user.active !== 0
       && user.mustChangePassword
-      && String(user.username || '').toLowerCase() !== 'deivson'
+      && !isMasterAdminUsername(user.username)
     )),
     [usuarios]
   );
@@ -2033,7 +2035,7 @@ const AdminDashboard = () => {
     });
 
     const handleNewOrcamento = (novoOrcamento) => {
-      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson') || novoOrcamento.assignedUserId === loggedInUser.id;
+      const canSee = (loggedInUser.role === 'ADM' && isMasterAdminUsername(loggedInUser.username)) || novoOrcamento.assignedUserId === loggedInUser.id;
       if (canSee) setOrcamentos(prev => [novoOrcamento, ...prev]);
     };
 
@@ -2044,7 +2046,7 @@ const AdminDashboard = () => {
     };
 
     const handleNewLead = (novoLead) => {
-      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson')
+      const canSee = (loggedInUser.role === 'ADM' && isMasterAdminUsername(loggedInUser.username))
         || Number(novoLead.assignedUserId) === Number(loggedInUser.id);
       setLeads(prev => (
         canSee
@@ -2100,7 +2102,7 @@ const AdminDashboard = () => {
         setWhatsappMobileChatOpen(prev => selectedWhatsappConversation?.id === conversation.id ? false : prev);
         return;
       }
-      const canSee = (loggedInUser.role === 'ADM' && String(loggedInUser.username || '').toLowerCase() === 'deivson')
+      const canSee = (loggedInUser.role === 'ADM' && isMasterAdminUsername(loggedInUser.username))
         || Number(conversation.assignedUserId) === Number(loggedInUser.id);
       if (!canSee) {
         setWhatsappConversations(prev => prev.filter(item => item.id !== conversation.id));
@@ -3164,7 +3166,7 @@ const AdminDashboard = () => {
   };
 
   const resetUserPassword = async (user) => {
-    if (!user?.id || String(user.username || '').toLowerCase() === 'deivson') return;
+    if (!user?.id || isMasterAdminUsername(user.username)) return;
     try {
       const result = await request(`/api/admin/usuarios/${user.id}/reset-password`, {
         method: 'POST',
@@ -10261,17 +10263,17 @@ const AdminDashboard = () => {
                         <select
                           className="role-select"
                           value={user.role}
-                          disabled={String(user.username || '').toLowerCase() === 'deivson'}
+                          disabled={isMasterAdminUsername(user.username)}
                           onChange={(event) => updatePermissions(user.id, user.permissions, user.active, { role: event.target.value })}
                         >
                           <option value="ADM">Administrador</option>
                           <option value="EQUIPE_TECNICA_COMERCIAL">Equipe técnica/comercial</option>
                           <option value="CONSULTOR">Consultor</option>
                         </select>
-                        {String(user.username || '').toLowerCase() === 'deivson' && <span className="master-chip">ADM master</span>}
+                        {isMasterAdminUsername(user.username) && <span className="master-chip">ADM master</span>}
                         {user.mustChangePassword && <span className="pending-chip">Troca pendente</span>}
                         {!user.emailVerified && <span className="pending-chip">E-mail pendente</span>}
-                        {String(user.username || '').toLowerCase() !== 'deivson' && (
+                        {!isMasterAdminUsername(user.username) && (
                           <button
                             type="button"
                             className="btn btn-outline btn-sm-admin"
@@ -10285,7 +10287,7 @@ const AdminDashboard = () => {
                           <input
                             type="checkbox"
                             checked={user.active}
-                            disabled={String(user.username || '').toLowerCase() === 'deivson'}
+                            disabled={isMasterAdminUsername(user.username)}
                             onChange={(event) => updatePermissions(user.id, user.permissions, event.target.checked)}
                           />
                           Ativo
@@ -10298,7 +10300,7 @@ const AdminDashboard = () => {
                         <input
                           value={user.whatsapp || ''}
                           placeholder="Ex: 559999999999"
-                          disabled={String(user.username || '').toLowerCase() === 'deivson'}
+                          disabled={isMasterAdminUsername(user.username)}
                           onChange={(event) => setUsuarios(prev => prev.map(item => item.id === user.id ? { ...item, whatsapp: event.target.value } : item))}
                           onBlur={(event) => updatePermissions(user.id, user.permissions, user.active, { whatsapp: event.target.value, role: user.role, nome: user.nome })}
                         />
@@ -10312,7 +10314,7 @@ const AdminDashboard = () => {
                           <button
                             key={preset.id}
                             type="button"
-                            disabled={String(user.username || '').toLowerCase() === 'deivson'}
+                            disabled={isMasterAdminUsername(user.username)}
                             onClick={() => updatePermissions(user.id, normalizePanelPermissions(preset.permissions), user.active, { role: user.role, nome: user.nome, whatsapp: user.whatsapp })}
                           >
                             {preset.label}
@@ -10326,7 +10328,7 @@ const AdminDashboard = () => {
                           <input
                             type="checkbox"
                             checked={Boolean(user.permissions?.[key])}
-                            disabled={String(user.username || '').toLowerCase() === 'deivson'}
+                            disabled={isMasterAdminUsername(user.username)}
                             onChange={(event) => {
                               const checked = event.target.checked;
                               const nextPermissions = { ...user.permissions, [key]: checked };

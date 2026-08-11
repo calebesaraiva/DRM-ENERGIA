@@ -374,8 +374,14 @@ const parseQuickActions = (value) => {
 };
 
 const can = (user, permission) => user?.permissions?.[permission] === true;
-const MASTER_ADMIN_USERNAME = String(process.env.MASTER_ADMIN_USERNAME || 'deivson').toLowerCase();
-const isMasterAdminUser = (user) => user?.role === 'ADM' && String(user?.username || '').toLowerCase() === MASTER_ADMIN_USERNAME;
+const MASTER_ADMIN_USERNAMES_SOURCE = process.env.MASTER_ADMIN_USERNAMES || `${process.env.MASTER_ADMIN_USERNAME || 'deivson'},calebe`;
+const MASTER_ADMIN_USERNAMES = MASTER_ADMIN_USERNAMES_SOURCE
+  .split(',')
+  .map(username => username.trim().toLowerCase())
+  .filter(Boolean);
+const MASTER_ADMIN_USERNAME = MASTER_ADMIN_USERNAMES[0] || 'deivson';
+const isMasterAdminUsername = (username) => MASTER_ADMIN_USERNAMES.includes(String(username || '').toLowerCase());
+const isMasterAdminUser = (user) => user?.role === 'ADM' && isMasterAdminUsername(user?.username);
 
 const normalizeWhatsAppPhone = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
@@ -5375,7 +5381,7 @@ const sendOrcamentoPdf = async (res, orcamento) => {
       rawPermissions = savedUser.permissions ? JSON.parse(savedUser.permissions) : {};
     } catch {}
 
-    if (String(savedUser.username || '').toLowerCase() === MASTER_ADMIN_USERNAME) {
+    if (isMasterAdminUsername(savedUser.username)) {
       await db.run(
         'UPDATE usuarios SET role = ?, active = 1, permissions = ? WHERE id = ?',
         'ADM',
@@ -8975,7 +8981,7 @@ app.put('/api/admin/usuarios/:id/permissoes', authRequired, requirePermission('p
   const { permissions, active, whatsapp, nome, role } = req.body;
   const user = await db.get('SELECT * FROM usuarios WHERE id = ?', req.params.id);
   if (!user) return res.status(404).json({ message: 'Usuário não encontrado.' });
-  const isMasterAdminTarget = String(user.username || '').toLowerCase() === MASTER_ADMIN_USERNAME;
+  const isMasterAdminTarget = isMasterAdminUsername(user.username);
   const nextRole = isMasterAdminTarget
     ? 'ADM'
     : (['ADM', 'EQUIPE_TECNICA_COMERCIAL', 'CONSULTOR'].includes(role) ? role : user.role);
