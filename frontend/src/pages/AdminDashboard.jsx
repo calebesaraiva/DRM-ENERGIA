@@ -1354,23 +1354,36 @@ const AdminDashboard = () => {
     [usuarios]
   );
   const adminNotifications = useMemo(() => {
-    if (!isMasterAdmin || pendingPasswordUsers.length === 0) return [];
+    if (!isMasterAdmin) return [];
 
-    return [{
-      id: 'pending-password-users',
-      type: 'warning',
-      title: `${pendingPasswordUsers.length} colaborador${pendingPasswordUsers.length === 1 ? '' : 'es'} com acesso pendente`,
-      description: 'Clique em um nome para ver a ficha completa de pendências e decidir se bloqueia as funções até regularizar.',
-      people: pendingPasswordUsers.map(user => ({
-        id: user.id,
-        label: user.nome || user.username || user.email,
-        initial: getUserInitial(user),
-      })),
-      onPersonClick: (person) => setPendingUserModalId(person.id),
-      meta: 'Ação recomendada: revisar perfil, senha temporária, e-mail e WhatsApp.',
-      actionLabel: 'Abrir vendedores',
-      onAction: () => navigatePanel({ activeTab: 'usuarios' }),
+    const notifications = [{
+      id: 'system-update-pending-center',
+      type: 'success',
+      title: 'Atualização publicada no painel',
+      description: 'Central de pendências mais bonita, prévia curta no sino, modal completo por colaborador e correção no comportamento de scroll.',
+      meta: 'Publicado agora · Correção administrativa',
+      unread: true,
     }];
+
+    if (pendingPasswordUsers.length > 0) {
+      notifications.unshift({
+        id: 'pending-password-users',
+        type: 'warning',
+        title: `${pendingPasswordUsers.length} colaborador${pendingPasswordUsers.length === 1 ? '' : 'es'} com acesso pendente`,
+        description: 'Prévia dos colaboradores que precisam regularizar o perfil. Clique em um nome para ver a ficha completa.',
+        people: pendingPasswordUsers.map(user => ({
+          id: user.id,
+          label: user.nome || user.username || user.email,
+          initial: getUserInitial(user),
+        })),
+        onPersonClick: (person) => setPendingUserModalId(person.id),
+        meta: 'Ação recomendada: revisar perfil, senha temporária, e-mail e WhatsApp.',
+        actionLabel: 'Abrir vendedores',
+        onAction: () => navigatePanel({ activeTab: 'usuarios' }),
+      });
+    }
+
+    return notifications;
   }, [isMasterAdmin, navigatePanel, pendingPasswordUsers]);
   const pendingUserModal = useMemo(
     () => usuarios.find(user => Number(user.id) === Number(pendingUserModalId)) || null,

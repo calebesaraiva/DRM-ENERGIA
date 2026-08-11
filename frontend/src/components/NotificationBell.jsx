@@ -14,10 +14,14 @@ function NotificationBell({
   emptyTitle = 'Nenhuma pendência crítica',
   emptyText = 'Tudo certo no momento.',
   align = 'right',
+  maxItems = 3,
+  maxPeoplePreview = 4,
 }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
   const visibleItems = useMemo(() => items.filter(Boolean), [items]);
+  const previewItems = useMemo(() => visibleItems.slice(0, maxItems), [maxItems, visibleItems]);
+  const hiddenItems = Math.max(visibleItems.length - previewItems.length, 0);
   const unreadCount = visibleItems.filter(item => item.unread !== false).length;
 
   useEffect(() => {
@@ -28,9 +32,19 @@ function NotificationBell({
         setOpen(false);
       }
     };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
 
     document.addEventListener('pointerdown', closeOnOutsideClick);
-    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
 
   const handleAction = (item) => {
@@ -60,7 +74,7 @@ function NotificationBell({
       </button>
 
       {open && (
-        <section className="notification-drawer" aria-label={title}>
+        <section className="notification-drawer" aria-label={title} onWheel={event => event.stopPropagation()} onTouchMove={event => event.stopPropagation()}>
           <div className="notification-drawer-head">
             <div>
               <span>Central DRM</span>
@@ -70,16 +84,19 @@ function NotificationBell({
           </div>
 
           <div className="notification-drawer-list">
-            {visibleItems.length ? visibleItems.map(item => (
+            {previewItems.length ? previewItems.map(item => {
+              const peoplePreview = Array.isArray(item.people) ? item.people.slice(0, maxPeoplePreview) : [];
+              const hiddenPeople = Array.isArray(item.people) ? Math.max(item.people.length - peoplePreview.length, 0) : 0;
+              return (
               <article className={`notification-item ${item.type || 'info'}`} key={item.id || item.title}>
                 <div className="notification-item-dot" aria-hidden="true"></div>
                 <div className="notification-item-body">
                   <span>{typeLabels[item.type] || typeLabels.info}</span>
                   <strong>{item.title}</strong>
                   {item.description && <p>{item.description}</p>}
-                  {Array.isArray(item.people) && item.people.length > 0 && (
+                  {peoplePreview.length > 0 && (
                     <div className="notification-people-list">
-                      {item.people.map(person => (
+                      {peoplePreview.map(person => (
                         <button
                           type="button"
                           key={person.id || person.label}
@@ -90,6 +107,7 @@ function NotificationBell({
                           {person.label}
                         </button>
                       ))}
+                      {hiddenPeople > 0 && <em>+{hiddenPeople}</em>}
                     </div>
                   )}
                   {item.meta && <small>{item.meta}</small>}
@@ -100,10 +118,15 @@ function NotificationBell({
                   )}
                 </div>
               </article>
-            )) : (
+            );}) : (
               <div className="notification-empty">
                 <strong>{emptyTitle}</strong>
                 <p>{emptyText}</p>
+              </div>
+            )}
+            {hiddenItems > 0 && (
+              <div className="notification-preview-note">
+                +{hiddenItems} aviso{hiddenItems === 1 ? '' : 's'} oculto{hiddenItems === 1 ? '' : 's'} nesta prévia.
               </div>
             )}
           </div>
