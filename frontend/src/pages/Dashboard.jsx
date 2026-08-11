@@ -7,6 +7,7 @@ import ClientTrackingCenter from '../components/ClientTrackingCenter';
 import CompleteSystemGuide from '../components/CompleteSystemGuide';
 import ClientCommunicationCenter from '../components/ClientCommunicationCenter';
 import ClientFinancingSimulator from '../components/ClientFinancingSimulator';
+import UpdateNoticeModal from '../components/UpdateNoticeModal';
 
 const money = (value) => Number(value || 0).toLocaleString('pt-BR', {
   style: 'currency',
@@ -287,6 +288,8 @@ function Dashboard() {
 
   return (
     <div className="client-portal">
+      <UpdateNoticeModal user={user || portal?.cliente} audience="cliente" />
+
       <header className="portal-topbar">
         <Link to="/" className="portal-logo-link">
           <img src="/assets/logo.png" alt="DRM Energia Solar" />

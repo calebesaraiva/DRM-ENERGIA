@@ -8297,7 +8297,7 @@ app.post('/api/admin/contratos-direto', authRequired, requirePermission('contrat
     ? await db.get('SELECT * FROM equipamentos WHERE id = ?', equipamentoId)
     : await db.get('SELECT * FROM equipamentos WHERE active = 1 ORDER BY id DESC LIMIT 1');
   const manualFinal = mergeManualWithEquipamento(manual, equipamento);
-  const requestedConsultantId = Number(manualFinal.consultorId || cliente.consultorId || 0);
+  const requestedConsultantId = Number(manualFinal.consultorId || cliente.consultorId || req.user.id || 0);
   const selectedConsultant = requestedConsultantId
     ? await db.get('SELECT id, nome FROM usuarios WHERE id = ? AND active = 1', requestedConsultantId)
     : null;
@@ -8847,6 +8847,37 @@ app.get('/api/admin/contratos/:id/download', authRequired, requirePermission('co
 app.get('/api/admin/usuarios', authRequired, requirePermission('usuarios'), async (req, res) => {
   const usuarios = await db.all('SELECT id, nome, username, email, whatsapp, role, permissions, mustChangePassword, active, emailVerified, createdAt FROM usuarios ORDER BY id ASC');
   res.json(usuarios.map(user => ({ ...user, permissions: parsePermissions(user.permissions), mustChangePassword: Boolean(user.mustChangePassword), active: Boolean(user.active), emailVerified: hasVerifiedEmail(user) })));
+});
+
+app.get('/api/admin/consultores', authRequired, async (req, res) => {
+  if (req.user.role !== 'ADM' && !can(req.user, 'contratos') && !can(req.user, 'clientes')) {
+    return res.status(403).json({ message: 'Sem permissão para listar consultores.' });
+  }
+  const usuarios = await db.all(
+    `SELECT id, nome, username, role, permissions, active
+       FROM usuarios
+      WHERE active = 1
+      ORDER BY nome ASC`
+  );
+  res.json(usuarios
+    .map(user => ({
+      ...user,
+      permissions: parsePermissions(user.permissions),
+      active: Boolean(user.active),
+    }))
+    .filter(user => user.role === 'ADM' || can(user, 'contratos') || can(user, 'clientes') || can(user, 'orcamentos'))
+    .map(user => ({
+      id: user.id,
+      nome: user.nome,
+      username: user.username,
+      role: user.role,
+      active: user.active,
+      permissions: {
+        clientes: can(user, 'clientes'),
+        orcamentos: can(user, 'orcamentos'),
+        contratos: can(user, 'contratos'),
+      },
+    })));
 });
 
 app.post('/api/admin/usuarios', authRequired, requirePermission('usuarios'), async (req, res) => {

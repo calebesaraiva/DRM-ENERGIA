@@ -7,6 +7,7 @@ import { getApiBaseUrl, withApiBase } from '../utils/apiBase';
 import AdminCommunicationCenter from '../components/AdminCommunicationCenter';
 import PricingWorkbench from '../components/PricingWorkbench';
 import CurrencyInput from '../components/CurrencyInput';
+import UpdateNoticeModal from '../components/UpdateNoticeModal';
 import { currencyInputToNumber } from '../utils/currency';
 
 const socket = io(getApiBaseUrl() || undefined, {
@@ -937,6 +938,7 @@ const AdminDashboard = () => {
   const [userSearch, setUserSearch] = useState('');
   const [newUserForm, setNewUserForm] = useState(emptyUserForm);
   const [usuarios, setUsuarios] = useState([]);
+  const [contractConsultants, setContractConsultants] = useState([]);
   const [financeiro, setFinanceiro] = useState(null);
   const [resumo, setResumo] = useState(null);
   const [projetos, setProjetos] = useState([]);
@@ -1509,13 +1511,18 @@ const AdminDashboard = () => {
   );
 
   const contractConsultantOptions = useMemo(() => {
-    const base = usuarios
-      .filter(user => user.active && user.role !== 'CLIENTE')
+    const byId = new Map();
+    [...usuarios, ...contractConsultants].forEach(user => {
+      if (!user?.active || user.role === 'CLIENTE') return;
+      byId.set(String(user.id), user);
+    });
+    const base = [...byId.values()]
       .map(user => ({
         value: String(user.id),
         label: user.nome,
         nome: user.nome,
-      }));
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
     const currentName = String(contractReviewForm.consultorNome || '').trim();
     if (currentName && !base.some(option => option.nome === currentName)) {
       base.unshift({
@@ -1528,7 +1535,7 @@ const AdminDashboard = () => {
       { value: '', label: 'Selecione o consultor', nome: '' },
       ...base,
     ];
-  }, [usuarios, contractReviewForm.consultorId, contractReviewForm.consultorNome]);
+  }, [usuarios, contractConsultants, contractReviewForm.consultorId, contractReviewForm.consultorNome]);
 
   const pendingPasswordTotal = useMemo(
     () => usuarios.filter(user => user.mustChangePassword).length,
@@ -2062,6 +2069,9 @@ const AdminDashboard = () => {
       calls.push(request('/api/admin/modelos-inversor-hibrido').then(setModelosHibrido));
       calls.push(request('/api/admin/baterias-litio').then(setBateriasHibrido));
       calls.push(request('/api/admin/contrato-config').then(setContractConfig));
+    }
+    if (user.role === 'ADM' || user.permissions?.contratos || user.permissions?.clientes) {
+      calls.push(request('/api/admin/consultores').then(setContractConsultants));
     }
     if (user.role === 'ADM' || user.permissions?.equipeTecnica) {
       calls.push(request('/api/admin/projetos').then(async (items) => {
@@ -3339,9 +3349,14 @@ const AdminDashboard = () => {
   const createCliente = async (event) => {
     event.preventDefault();
     try {
+      const payload = {
+        ...novoCliente,
+        consultorId: novoCliente.consultorId || adminUser.id || '',
+        consultorNome: novoCliente.consultorNome || adminUser.nome || '',
+      };
       const cliente = await request('/api/admin/clientes', {
         method: 'POST',
-        body: JSON.stringify(novoCliente),
+        body: JSON.stringify(payload),
       });
       setClientes(prev => [cliente, ...prev]);
       setNovoCliente(emptyClientForm);
@@ -3838,8 +3853,8 @@ const AdminDashboard = () => {
       manual: applyEquipamentoToManual({
         ...emptyContractManual,
         formaPagamentoTipo: 'avista',
-        consultorId: cliente.consultorId || '',
-        consultorNome: cliente.consultorNome || '',
+        consultorId: cliente.consultorId || adminUser.id || '',
+        consultorNome: cliente.consultorNome || adminUser.nome || '',
       }, equipamento),
     });
   };
@@ -4577,6 +4592,8 @@ const AdminDashboard = () => {
         ))}
       </div>
 
+      <UpdateNoticeModal user={adminUser} audience="equipe" />
+
       {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
       <aside className="admin-sidebar">
         <div className="sidebar-header">
@@ -5107,7 +5124,7 @@ const AdminDashboard = () => {
                             className="cc-input"
                             value={novoCliente.consultorId}
                             onChange={(e) => {
-                              const consultant = usuarios.find(user => String(user.id) === e.target.value);
+                              const consultant = contractConsultantOptions.find(option => option.value === e.target.value);
                               setNovoCliente(prev => ({
                                 ...prev,
                                 consultorId: e.target.value,
@@ -5115,9 +5132,8 @@ const AdminDashboard = () => {
                               }));
                             }}
                           >
-                            <option value="">Selecione o consultor</option>
-                            {usuarios.filter(user => user.active && user.role !== 'CLIENTE').map(user => (
-                              <option key={user.id} value={user.id}>{user.nome}</option>
+                            {contractConsultantOptions.map(option => (
+                              <option key={`${option.value}-${option.nome || 'blank'}`} value={option.value}>{option.label}</option>
                             ))}
                           </select>
                         </div>
@@ -11406,7 +11422,7 @@ const AdminDashboard = () => {
                 <select
                   value={contractModal.manual.consultorId || ''}
                   onChange={(event) => {
-                    const consultant = usuarios.find(user => String(user.id) === event.target.value);
+                    const consultant = contractConsultantOptions.find(option => option.value === event.target.value);
                     setContractModal(prev => ({
                       ...prev,
                       manual: {
@@ -11418,9 +11434,8 @@ const AdminDashboard = () => {
                   }}
                   required
                 >
-                  <option value="">Selecione o consultor</option>
-                  {usuarios.filter(user => user.active && user.role !== 'CLIENTE').map(user => (
-                    <option key={user.id} value={user.id}>{user.nome}</option>
+                  {contractConsultantOptions.map(option => (
+                    <option key={`${option.value}-${option.nome || 'blank'}`} value={option.value}>{option.label}</option>
                   ))}
                 </select>
               </label>
