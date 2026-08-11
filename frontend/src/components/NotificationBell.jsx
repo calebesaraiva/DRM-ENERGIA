@@ -38,6 +38,11 @@ function NotificationBell({
     setOpen(false);
   };
 
+  const handlePersonClick = (item, person) => {
+    item.onPersonClick?.(person);
+    setOpen(false);
+  };
+
   return (
     <div className={`notification-bell-wrap align-${align}`} ref={wrapperRef}>
       <button
@@ -72,6 +77,21 @@ function NotificationBell({
                   <span>{typeLabels[item.type] || typeLabels.info}</span>
                   <strong>{item.title}</strong>
                   {item.description && <p>{item.description}</p>}
+                  {Array.isArray(item.people) && item.people.length > 0 && (
+                    <div className="notification-people-list">
+                      {item.people.map(person => (
+                        <button
+                          type="button"
+                          key={person.id || person.label}
+                          onClick={() => handlePersonClick(item, person)}
+                          title="Ver pendências do colaborador"
+                        >
+                          <span>{person.initial}</span>
+                          {person.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {item.meta && <small>{item.meta}</small>}
                   {item.actionLabel && (
                     <button type="button" onClick={() => handleAction(item)}>

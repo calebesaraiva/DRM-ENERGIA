@@ -63,7 +63,7 @@
   top: calc(100% + 0.65rem);
   right: 0;
   z-index: 80;
-  width: min(360px, calc(100vw - 1.5rem));
+  width: min(430px, calc(100vw - 1.5rem));
   overflow: hidden;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -128,9 +128,10 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.65rem;
-  padding: 0.72rem;
-  border-radius: 10px;
-  background: #fff;
+  padding: 0.86rem;
+  border: 1px solid #eef2f7;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
 }
 
 .notification-item + .notification-item {
@@ -179,13 +180,56 @@
   line-height: 1.4;
 }
 
+.notification-people-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.72rem;
+}
+
+.notification-people-list button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.34rem 0.58rem 0.34rem 0.38rem;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.notification-people-list button:hover {
+  transform: translateY(-1px);
+  border-color: #fb923c;
+  background: #ffedd5;
+}
+
+.notification-people-list span {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #c2410c;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 950;
+}
+
 .notification-item-body small {
   margin-top: 0.45rem;
   color: #94a3b8;
   text-transform: none;
 }
 
-.notification-item-body button {
+.notification-item-body > button {
   min-height: 32px;
   margin-top: 0.65rem;
   padding: 0.38rem 0.7rem;
@@ -197,6 +241,10 @@
   font-size: 0.78rem;
   font-weight: 900;
   cursor: pointer;
+}
+
+.notification-item-body > button {
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.12);
 }
 
 .notification-empty {
@@ -253,6 +301,18 @@
   background: rgba(15, 23, 42, 0.72);
 }
 
+.admin-layout.theme-dark .notification-people-list button,
+.admin-layout.theme-dark .notification-item-body > button {
+  border-color: rgba(251, 146, 60, 0.34);
+  background: rgba(249, 115, 22, 0.13);
+  color: #fed7aa;
+}
+
+.admin-layout.theme-dark .notification-people-list span {
+  background: #fb923c;
+  color: #111827;
+}
+
 .admin-layout.theme-dark .notification-item-body p,
 .admin-layout.theme-dark .notification-empty p {
   color: #cbd5e1;
@@ -262,6 +322,6 @@
   .notification-drawer {
     right: 0;
     left: auto;
-    width: min(360px, calc(100vw - 2rem));
+    width: min(430px, calc(100vw - 2rem));
   }
 }

@@ -33,6 +33,7 @@ const socket = io(getApiBaseUrl() || undefined, {
 const isLocalRuntime = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 const MASTER_ADMIN_USERNAMES = new Set(['deivson', 'calebe']);
 const isMasterAdminUsername = (username) => MASTER_ADMIN_USERNAMES.has(String(username || '').toLowerCase());
+const getUserInitial = (user = {}) => String(user.nome || user.username || '?').trim().charAt(0).toUpperCase() || '?';
 
 const LEADS_PER_PAGE = 8;
 
@@ -870,6 +871,7 @@ const AdminDashboard = () => {
   const [priceResult, setPriceResult] = useState(null);
   const [priceError, setPriceError] = useState('');
   const [quickModal, setQuickModal] = useState(null);
+  const [pendingUserModalId, setPendingUserModalId] = useState(null);
   const [adminUser] = useState(initialUser);
   const [quickActionPrefs, setQuickActionPrefs] = useState(() => (
     Array.isArray(initialUser.quickActions) ? initialUser.quickActions : null
@@ -1354,23 +1356,69 @@ const AdminDashboard = () => {
   const adminNotifications = useMemo(() => {
     if (!isMasterAdmin || pendingPasswordUsers.length === 0) return [];
 
-    const names = pendingPasswordUsers
-      .slice(0, 5)
-      .map(user => user.nome || user.username || user.email)
-      .filter(Boolean)
-      .join(', ');
-    const remaining = Math.max(pendingPasswordUsers.length - 5, 0);
-
     return [{
       id: 'pending-password-users',
       type: 'warning',
       title: `${pendingPasswordUsers.length} colaborador${pendingPasswordUsers.length === 1 ? '' : 'es'} com acesso pendente`,
-      description: `${names}${remaining ? ` e mais ${remaining}` : ''} precisam trocar a senha temporária para usar o painel sem bloqueio.`,
-      meta: 'Ação recomendada: confirmar primeiro acesso ou resetar senha.',
+      description: 'Clique em um nome para ver a ficha completa de pendências e decidir se bloqueia as funções até regularizar.',
+      people: pendingPasswordUsers.map(user => ({
+        id: user.id,
+        label: user.nome || user.username || user.email,
+        initial: getUserInitial(user),
+      })),
+      onPersonClick: (person) => setPendingUserModalId(person.id),
+      meta: 'Ação recomendada: revisar perfil, senha temporária, e-mail e WhatsApp.',
       actionLabel: 'Abrir vendedores',
       onAction: () => navigatePanel({ activeTab: 'usuarios' }),
     }];
   }, [isMasterAdmin, navigatePanel, pendingPasswordUsers]);
+  const pendingUserModal = useMemo(
+    () => usuarios.find(user => Number(user.id) === Number(pendingUserModalId)) || null,
+    [pendingUserModalId, usuarios]
+  );
+  const pendingUserIssues = useMemo(() => {
+    if (!pendingUserModal) return [];
+    const issues = [];
+    if (pendingUserModal.mustChangePassword) {
+      issues.push({
+        id: 'password',
+        severity: 'critical',
+        title: 'Senha temporária ainda não trocada',
+        description: 'O colaborador precisa fazer o primeiro acesso e cadastrar a senha definitiva. Enquanto isso, o backend bloqueia as rotas internas e libera apenas a tela de troca de senha.',
+      });
+    }
+    if (!pendingUserModal.emailVerified) {
+      issues.push({
+        id: 'email',
+        severity: 'warning',
+        title: 'E-mail de recuperação não verificado',
+        description: 'O e-mail ainda não foi confirmado. Isso pode dificultar recuperação de acesso e auditoria do perfil.',
+      });
+    }
+    if ((pendingUserModal.permissions?.leads || pendingUserModal.permissions?.whatsapp) && !pendingUserModal.whatsapp) {
+      issues.push({
+        id: 'whatsapp',
+        severity: 'warning',
+        title: 'WhatsApp ausente para atendimento ou rodízio',
+        description: 'Quem participa de leads ou WhatsApp precisa ter número cadastrado para distribuição e contato operacional.',
+      });
+    }
+    if (!pendingUserModal.active) {
+      issues.push({
+        id: 'blocked',
+        severity: 'info',
+        title: 'Funções bloqueadas pelo administrador',
+        description: 'O usuário está inativo e não consegue entrar no painel até ser liberado novamente.',
+      });
+    }
+    return issues;
+  }, [pendingUserModal]);
+  const pendingUserPermissions = useMemo(() => {
+    if (!pendingUserModal?.permissions) return [];
+    return Object.entries(permissionLabels)
+      .filter(([key]) => pendingUserModal.permissions?.[key])
+      .map(([key, label]) => ({ key, label }));
+  }, [pendingUserModal]);
 
   const contratoSummary = useMemo(() => ({
     total: contratos.length,
@@ -3118,6 +3166,21 @@ const AdminDashboard = () => {
       body: JSON.stringify({ permissions: normalizedPermissions, active, ...extra }),
     });
     setUsuarios(prev => prev.map(user => user.id === userId ? { ...user, permissions: normalizedPermissions, active, ...extra } : user));
+  };
+
+  const togglePendingUserAccess = async (user) => {
+    if (!user?.id || isMasterAdminUsername(user.username)) return;
+    const nextActive = !user.active;
+    try {
+      await updatePermissions(user.id, user.permissions, nextActive, {
+        role: user.role,
+        nome: user.nome,
+        whatsapp: user.whatsapp,
+      });
+      showToast(nextActive ? 'Funções liberadas para o colaborador.' : 'Funções bloqueadas até regularização.', nextActive ? 'success' : 'warning');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const createUsuario = async (event) => {
@@ -10271,8 +10334,26 @@ const AdminDashboard = () => {
                           <option value="CONSULTOR">Consultor</option>
                         </select>
                         {isMasterAdminUsername(user.username) && <span className="master-chip">ADM master</span>}
-                        {user.mustChangePassword && <span className="pending-chip">Troca pendente</span>}
-                        {!user.emailVerified && <span className="pending-chip">E-mail pendente</span>}
+                        {(user.mustChangePassword || !user.emailVerified) && (
+                          <button
+                            type="button"
+                            className="pending-chip pending-chip-button"
+                            onClick={() => setPendingUserModalId(user.id)}
+                            title="Ver pendências do colaborador"
+                          >
+                            {user.mustChangePassword ? 'Troca pendente' : 'E-mail pendente'}
+                          </button>
+                        )}
+                        {user.mustChangePassword && !user.emailVerified && (
+                          <button
+                            type="button"
+                            className="pending-chip pending-chip-button"
+                            onClick={() => setPendingUserModalId(user.id)}
+                            title="Ver pendências do colaborador"
+                          >
+                            E-mail pendente
+                          </button>
+                        )}
                         {!isMasterAdminUsername(user.username) && (
                           <button
                             type="button"
@@ -10356,6 +10437,117 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
+
+          {pendingUserModal && typeof document !== 'undefined' && createPortal((
+            <div className="contract-modal-backdrop collaborator-pending-backdrop" onMouseDown={() => setPendingUserModalId(null)}>
+              <div className="collaborator-pending-modal" role="dialog" aria-modal="true" aria-labelledby="collaborator-pending-title" onMouseDown={event => event.stopPropagation()}>
+                <div className="collaborator-pending-hero">
+                  <div className="collaborator-pending-avatar">{getUserInitial(pendingUserModal)}</div>
+                  <div>
+                    <span>Ficha de pendências</span>
+                    <h3 id="collaborator-pending-title">{pendingUserModal.nome}</h3>
+                    <p>@{pendingUserModal.username} · {roleLabels[pendingUserModal.role] || pendingUserModal.role || 'Perfil interno'}</p>
+                  </div>
+                  <button type="button" className="lead-modal-close" onClick={() => setPendingUserModalId(null)} aria-label="Fechar">×</button>
+                </div>
+
+                <div className="collaborator-pending-summary">
+                  <div>
+                    <span>Pendências</span>
+                    <strong>{pendingUserIssues.length}</strong>
+                  </div>
+                  <div>
+                    <span>Acesso</span>
+                    <strong>{pendingUserModal.active ? 'Ativo' : 'Bloqueado'}</strong>
+                  </div>
+                  <div>
+                    <span>Permissões</span>
+                    <strong>{pendingUserPermissions.length}</strong>
+                  </div>
+                </div>
+
+                <section className="collaborator-pending-section">
+                  <div className="collaborator-section-head">
+                    <span>O que falta</span>
+                    <strong>{pendingUserIssues.length ? 'Ação necessária' : 'Perfil regularizado'}</strong>
+                  </div>
+                  <div className="collaborator-issues-grid">
+                    {pendingUserIssues.length ? pendingUserIssues.map(issue => (
+                      <article className={`collaborator-issue ${issue.severity}`} key={issue.id}>
+                        <i aria-hidden="true"></i>
+                        <div>
+                          <strong>{issue.title}</strong>
+                          <p>{issue.description}</p>
+                        </div>
+                      </article>
+                    )) : (
+                      <article className="collaborator-issue success">
+                        <i aria-hidden="true"></i>
+                        <div>
+                          <strong>Nenhuma pendência crítica encontrada</strong>
+                          <p>O colaborador está com senha, status e dados principais prontos para uso.</p>
+                        </div>
+                      </article>
+                    )}
+                  </div>
+                </section>
+
+                <section className="collaborator-pending-section">
+                  <div className="collaborator-section-head">
+                    <span>Dados do colaborador</span>
+                    <strong>Perfil e contato</strong>
+                  </div>
+                  <div className="collaborator-data-grid">
+                    <div><span>Nome</span><strong>{pendingUserModal.nome || 'Não informado'}</strong></div>
+                    <div><span>Usuário</span><strong>{pendingUserModal.username || 'Não informado'}</strong></div>
+                    <div><span>E-mail</span><strong>{pendingUserModal.email || 'Não informado'}</strong></div>
+                    <div><span>WhatsApp</span><strong>{pendingUserModal.whatsapp || 'Não informado'}</strong></div>
+                    <div><span>Tipo</span><strong>{roleLabels[pendingUserModal.role] || pendingUserModal.role || 'Não definido'}</strong></div>
+                    <div><span>E-mail verificado</span><strong>{pendingUserModal.emailVerified ? 'Sim' : 'Não'}</strong></div>
+                  </div>
+                </section>
+
+                <section className="collaborator-pending-section">
+                  <div className="collaborator-section-head">
+                    <span>Funções liberadas</span>
+                    <strong>{pendingUserPermissions.length || 'Nenhuma'}</strong>
+                  </div>
+                  <div className="collaborator-permission-cloud">
+                    {pendingUserPermissions.length ? pendingUserPermissions.map(permission => (
+                      <span key={permission.key}>{permission.label}</span>
+                    )) : <p>Nenhuma função operacional habilitada no momento.</p>}
+                  </div>
+                </section>
+
+                <div className="collaborator-pending-actions">
+                  {!isMasterAdminUsername(pendingUserModal.username) && (
+                    <button
+                      type="button"
+                      className={pendingUserModal.active ? 'btn btn-outline collaborator-block-btn' : 'btn btn-primary'}
+                      onClick={() => togglePendingUserAccess(pendingUserModal)}
+                    >
+                      {pendingUserModal.active ? 'Bloquear funções até regularizar' : 'Liberar funções'}
+                    </button>
+                  )}
+                  {!isMasterAdminUsername(pendingUserModal.username) && (
+                    <button type="button" className="btn btn-outline" onClick={() => resetUserPassword(pendingUserModal)}>
+                      Resetar senha temporária
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      setPendingUserModalId(null);
+                      navigatePanel({ activeTab: 'usuarios' });
+                    }}
+                  >
+                    Abrir edição em Vendedores
+                  </button>
+                </div>
+              </div>
+            </div>
+          ), document.body)}
 
           {activeTab === 'comunicacoes' && comunicacoes && (
             <AdminCommunicationCenter
