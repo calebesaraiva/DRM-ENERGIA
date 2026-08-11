@@ -939,6 +939,7 @@ const AdminDashboard = () => {
   const [newUserForm, setNewUserForm] = useState(emptyUserForm);
   const [usuarios, setUsuarios] = useState([]);
   const [contractConsultants, setContractConsultants] = useState([]);
+  const [operationalUsers, setOperationalUsers] = useState([]);
   const [financeiro, setFinanceiro] = useState(null);
   const [resumo, setResumo] = useState(null);
   const [projetos, setProjetos] = useState([]);
@@ -1537,6 +1538,16 @@ const AdminDashboard = () => {
     ];
   }, [usuarios, contractConsultants, contractReviewForm.consultorId, contractReviewForm.consultorNome]);
 
+  const operationalUserOptions = useMemo(() => {
+    const byId = new Map();
+    [...usuarios, ...operationalUsers].forEach(user => {
+      if (!user?.active) return;
+      if (user.role !== 'ADM' && !user.permissions?.equipeTecnica && !user.permissions?.ordensServico) return;
+      byId.set(String(user.id), user);
+    });
+    return [...byId.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [usuarios, operationalUsers]);
+
   const pendingPasswordTotal = useMemo(
     () => usuarios.filter(user => user.mustChangePassword).length,
     [usuarios]
@@ -2087,6 +2098,9 @@ const AdminDashboard = () => {
     }
     if (user.role === 'ADM' || user.permissions?.ordensServico) {
       calls.push(request('/api/admin/ordens-servico').then(setOrdensServico));
+    }
+    if (user.role === 'ADM' || user.permissions?.equipeTecnica || user.permissions?.ordensServico) {
+      calls.push(request('/api/admin/equipe-operacional').then(setOperationalUsers));
     }
     if (user.role === 'ADM' || user.permissions?.usuarios) {
       calls.push(request('/api/admin/usuarios').then(setUsuarios));
@@ -8827,7 +8841,7 @@ const AdminDashboard = () => {
                 </select>
                 <select value={instInstaladorFilter} onChange={(e) => { setInstInstaladorFilter(e.target.value); setInstPage(1); }}>
                   <option value="">Instalador</option>
-                  {usuarios.filter(u => u.active && (u.role === 'ADM' || u.permissions?.equipeTecnica)).map(u => (
+                  {operationalUserOptions.filter(u => u.role === 'ADM' || u.permissions?.equipeTecnica).map(u => (
                     <option key={u.id} value={String(u.id)}>{u.nome}</option>
                   ))}
                 </select>
@@ -9555,7 +9569,7 @@ const AdminDashboard = () => {
                 </select>
                 <select value={osResponsavelFilter} onChange={(event) => { setOsResponsavelFilter(event.target.value); setOsPage(1); }}>
                   <option value="todos">Técnico</option>
-                  {usuarios.filter(u => u.active && (u.role === 'ADM' || u.permissions?.equipeTecnica || u.permissions?.ordensServico)).map(u => (
+                  {operationalUserOptions.map(u => (
                     <option key={u.id} value={u.id}>{u.nome}</option>
                   ))}
                 </select>
@@ -11018,7 +11032,7 @@ const AdminDashboard = () => {
                         <label>Técnico / equipe</label>
                         <select value={osForm.responsavelId} onChange={(e) => setOsForm(prev => ({ ...prev, responsavelId: e.target.value }))}>
                           <option value="">Selecionar</option>
-                          {usuarios.filter(u => u.active && (u.role === 'ADM' || u.permissions?.equipeTecnica || u.permissions?.ordensServico)).map(u => (
+                          {operationalUserOptions.map(u => (
                             <option key={u.id} value={u.id}>{u.nome}</option>
                           ))}
                         </select>

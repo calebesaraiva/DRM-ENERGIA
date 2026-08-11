@@ -8880,6 +8880,36 @@ app.get('/api/admin/consultores', authRequired, async (req, res) => {
     })));
 });
 
+app.get('/api/admin/equipe-operacional', authRequired, async (req, res) => {
+  if (req.user.role !== 'ADM' && !can(req.user, 'equipeTecnica') && !can(req.user, 'ordensServico')) {
+    return res.status(403).json({ message: 'Sem permissão para listar equipe operacional.' });
+  }
+  const usuarios = await db.all(
+    `SELECT id, nome, username, role, permissions, active
+       FROM usuarios
+      WHERE active = 1
+      ORDER BY nome ASC`
+  );
+  res.json(usuarios
+    .map(user => ({
+      ...user,
+      permissions: parsePermissions(user.permissions),
+      active: Boolean(user.active),
+    }))
+    .filter(user => user.role === 'ADM' || can(user, 'equipeTecnica') || can(user, 'ordensServico'))
+    .map(user => ({
+      id: user.id,
+      nome: user.nome,
+      username: user.username,
+      role: user.role,
+      active: user.active,
+      permissions: {
+        equipeTecnica: can(user, 'equipeTecnica'),
+        ordensServico: can(user, 'ordensServico'),
+      },
+    })));
+});
+
 app.post('/api/admin/usuarios', authRequired, requirePermission('usuarios'), async (req, res) => {
   const { nome, username, email, whatsapp, role, permissions, temporaryPassword } = req.body;
   const normalizedName = String(nome || '').trim();
