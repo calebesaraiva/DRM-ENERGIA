@@ -8,6 +8,7 @@ import CompleteSystemGuide from '../components/CompleteSystemGuide';
 import ClientCommunicationCenter from '../components/ClientCommunicationCenter';
 import ClientFinancingSimulator from '../components/ClientFinancingSimulator';
 import UpdateNoticeModal from '../components/UpdateNoticeModal';
+import NotificationBell from '../components/NotificationBell';
 
 const money = (value) => Number(value || 0).toLocaleString('pt-BR', {
   style: 'currency',
@@ -236,10 +237,26 @@ function Dashboard() {
     window.location.href = withApiBase(`/api/cliente/contratos/${contract.id}/download?token=${encodeURIComponent(token || '')}`);
   };
 
-  const markNotificationsRead = async () => {
+  const markNotificationsRead = useCallback(async () => {
     await request('/api/cliente/notificacoes/lidas', { method: 'PUT' });
     setPortal(prev => ({ ...prev, notifications: (prev?.notifications || []).map(item => ({ ...item, readAt: item.readAt || new Date().toISOString() })) }));
-  };
+  }, [request]);
+
+  const portalNotifications = useMemo(() => (
+    (portal?.notifications || []).slice(0, 8).map(item => ({
+      id: item.id,
+      type: item.readAt ? 'info' : 'warning',
+      title: item.title || 'Atualização DRM',
+      description: item.message,
+      meta: item.createdAt ? dateTimeBr(item.createdAt) : 'Central DRM',
+      unread: !item.readAt,
+      actionLabel: item.readAt ? 'Abrir central' : 'Marcar como lida',
+      onAction: async () => {
+        if (!item.readAt) await markNotificationsRead();
+        setActiveView('communication');
+      },
+    }))
+  ), [markNotificationsRead, portal?.notifications]);
 
   const sendMessage = async (payload) => {
     await request('/api/cliente/mensagens', {
@@ -299,6 +316,12 @@ function Dashboard() {
             <span>Portal do cliente</span>
             <strong>{portal?.cliente?.nome || user?.nome || 'Cliente DRM'}</strong>
           </div>
+          <NotificationBell
+            items={portalNotifications}
+            title="Notificações"
+            emptyTitle="Nenhuma novidade pendente"
+            emptyText="As atualizações importantes do seu projeto aparecerão aqui."
+          />
           <button type="button" onClick={handleLogout}>Sair</button>
         </div>
       </header>

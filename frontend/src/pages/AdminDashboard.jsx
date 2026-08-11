@@ -8,6 +8,7 @@ import AdminCommunicationCenter from '../components/AdminCommunicationCenter';
 import PricingWorkbench from '../components/PricingWorkbench';
 import CurrencyInput from '../components/CurrencyInput';
 import UpdateNoticeModal from '../components/UpdateNoticeModal';
+import NotificationBell from '../components/NotificationBell';
 import SidebarIcon from '../components/SidebarIcon';
 import { currencyInputToNumber } from '../utils/currency';
 import {
@@ -1340,6 +1341,34 @@ const AdminDashboard = () => {
     () => usuarios.filter(user => user.mustChangePassword).length,
     [usuarios]
   );
+  const pendingPasswordUsers = useMemo(
+    () => usuarios.filter(user => (
+      user.active !== 0
+      && user.mustChangePassword
+      && String(user.username || '').toLowerCase() !== 'deivson'
+    )),
+    [usuarios]
+  );
+  const adminNotifications = useMemo(() => {
+    if (!isMasterAdmin || pendingPasswordUsers.length === 0) return [];
+
+    const names = pendingPasswordUsers
+      .slice(0, 5)
+      .map(user => user.nome || user.username || user.email)
+      .filter(Boolean)
+      .join(', ');
+    const remaining = Math.max(pendingPasswordUsers.length - 5, 0);
+
+    return [{
+      id: 'pending-password-users',
+      type: 'warning',
+      title: `${pendingPasswordUsers.length} colaborador${pendingPasswordUsers.length === 1 ? '' : 'es'} com acesso pendente`,
+      description: `${names}${remaining ? ` e mais ${remaining}` : ''} precisam trocar a senha temporária para usar o painel sem bloqueio.`,
+      meta: 'Ação recomendada: confirmar primeiro acesso ou resetar senha.',
+      actionLabel: 'Abrir vendedores',
+      onAction: () => navigatePanel({ activeTab: 'usuarios' }),
+    }];
+  }, [isMasterAdmin, navigatePanel, pendingPasswordUsers]);
 
   const contratoSummary = useMemo(() => ({
     total: contratos.length,
@@ -4496,6 +4525,12 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="topbar-actions">
+            <NotificationBell
+              items={adminNotifications}
+              title="Avisos operacionais"
+              emptyTitle="Nenhuma pendência crítica"
+              emptyText="A equipe está sem alertas urgentes no momento."
+            />
             <button
               type="button"
               className="theme-toggle-button"
