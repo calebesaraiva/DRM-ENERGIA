@@ -400,7 +400,7 @@ const contractToReviewForm = (contrato = {}) => ({
 
 const getContractSignatureMeta = (contrato = {}) => {
   const assinatura = contrato?.dados?.assinatura || {};
-  const drmSigned = Boolean(assinatura?.drm?.dataUrl && assinatura?.drm?.signedAt);
+  const drmSigned = Boolean((assinatura?.drm?.dataUrl || assinatura?.drm?.autoApplied) && assinatura?.drm?.signedAt);
   const clienteSigned = Boolean(assinatura?.cliente?.dataUrl && assinatura?.cliente?.signedAt);
   if (drmSigned && clienteSigned) return { label: 'Assinado digitalmente', tone: 'success' };
   if (drmSigned) return { label: 'Aguardando assinatura do cliente', tone: 'warning' };
@@ -4181,6 +4181,12 @@ const AdminDashboard = () => {
   };
 
   const generateContractSignatureLink = async (contrato) => {
+    const clienteSigned = Boolean(contrato?.dados?.assinatura?.cliente?.signedAt);
+    if (clienteSigned) {
+      const confirmed = window.confirm('Este contrato já tem assinatura do cliente. Gerar um novo link vai apagar a assinatura anterior e exigir uma nova assinatura. Deseja continuar?');
+      if (!confirmed) return '';
+    }
+
     try {
       const data = await request(`/api/admin/contratos/${contrato.id}/assinatura-link`, {
         method: 'POST',
@@ -4188,7 +4194,12 @@ const AdminDashboard = () => {
       setContratos(prev => prev.map(item => item.id === data.contrato.id ? data.contrato : item));
       setSelectedContrato(current => (current?.id === data.contrato.id ? data.contrato : current));
       setContractSignatureModal(prev => ({ ...prev, signatureLink: data.signatureUrl || '' }));
-      await copyToClipboard(data.signatureUrl, 'Link de assinatura copiado.');
+      await copyToClipboard(
+        data.signatureUrl,
+        data.replacedPreviousSignature
+          ? 'Nova assinatura solicitada. Link copiado.'
+          : 'Link de assinatura copiado.'
+      );
       return data.signatureUrl;
     } catch (err) {
       showToast(err.message, 'error');
@@ -7500,7 +7511,11 @@ const AdminDashboard = () => {
                         </div>
                         <div className="approved-actions-buttons">
                           {canEditReviewedContract(selectedContrato) && <button type="button" className="btn btn-outline" onClick={() => saveContractReview(selectedContrato)}>Salvar alterações</button>}
-                          {adminUser.role === 'ADM' && selectedContrato.status === 'Aprovado' && <button type="button" className="btn btn-outline" onClick={() => generateContractSignatureLink(selectedContrato)}>Gerar link do cliente</button>}
+                          {adminUser.role === 'ADM' && selectedContrato.status === 'Aprovado' && (
+                            <button type="button" className="btn btn-outline" onClick={() => generateContractSignatureLink(selectedContrato)}>
+                              {selectedContrato.dados?.assinatura?.cliente?.signedAt ? 'Gerar novo link' : 'Gerar link do cliente'}
+                            </button>
+                          )}
                           {adminUser.role === 'ADM' && selectedContrato.status === 'Aprovado' && (
                             <button type="button" className="btn btn-outline ctr-modal-suspend" onClick={() => alterarStatusContrato(selectedContrato, 'Suspenso')}>Suspender venda</button>
                           )}

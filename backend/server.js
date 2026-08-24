@@ -8686,37 +8686,37 @@ app.post('/api/admin/contratos/:id/assinatura-link', authRequired, requirePermis
   const existingAssinatura = parsed.dados?.assinatura || {};
   const now = new Date();
   const signatureAlreadyCompleted = Boolean(existingAssinatura?.cliente?.signedAt);
-  if (signatureAlreadyCompleted) {
-    return res.status(400).json({ message: 'Este contrato já foi assinado pelo cliente e o link não pode mais ser reaberto.' });
-  }
   const token = crypto.randomBytes(24).toString('hex');
   const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 30).toISOString();
   const drm = buildAutoDrmSignature({
     signedAt: existingAssinatura?.drm?.signedAt || now.toISOString(),
     approvedByUser: req.user,
   });
+  const assinaturaBase = {
+    method: existingAssinatura?.method || 'Assinatura eletrônica simples com trilha de evidências',
+    provider: existingAssinatura?.provider || 'DRM Energia Solar',
+    drm,
+  };
   const documentHash = buildSignatureDocumentHash({
     ...parsed,
     dados: {
       ...(parsed.dados || {}),
-      assinatura: {
-        ...existingAssinatura,
-        drm,
-      },
+      assinatura: assinaturaBase,
     },
   });
   const assinatura = {
-    ...existingAssinatura,
+    ...assinaturaBase,
     method: 'Assinatura eletrônica simples com trilha de evidências',
     provider: 'DRM Energia Solar',
     documentHash,
-    drm,
     link: {
       token,
       createdAt: now.toISOString(),
       expiresAt,
       createdById: req.user.id,
       createdByName: req.user.nome,
+      replacesClientSignature: signatureAlreadyCompleted,
+      replacedAt: signatureAlreadyCompleted ? now.toISOString() : null,
     },
   };
   const assinaturaStatus = resolveAssinaturaStatus(assinatura);
@@ -8746,6 +8746,7 @@ app.post('/api/admin/contratos/:id/assinatura-link', authRequired, requirePermis
     signatureUrl: `${baseUrl}/assinatura/contrato/${token}`,
     expiresAt,
     documentHash,
+    replacedPreviousSignature: signatureAlreadyCompleted,
   });
 });
 
