@@ -4046,6 +4046,19 @@ const sendContratoPdf = async (res, contrato, { download = true } = {}) => {
   res.send(pdf);
 };
 
+const getContratoBySignatureToken = async (token, { includeConsumed = false } = {}) => {
+  const normalizedToken = String(token || '').trim();
+  if (!normalizedToken) return null;
+
+  const activeContrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', normalizedToken);
+  if (activeContrato || !includeConsumed) return activeContrato;
+
+  return db.get(
+    "SELECT * FROM contratos WHERE json_extract(dados, '$.assinatura.link.token') = ?",
+    normalizedToken
+  );
+};
+
 const buildProcuracaoPdf = async (procuracao) => {
   const parsed = parseProcuracao(procuracao);
   const cliente = parsed.clienteDados || {};
@@ -8703,7 +8716,7 @@ app.post('/api/admin/contratos/:id/assinar-drm', authRequired, requirePermission
 app.get('/api/assinatura/contrato/:token', async (req, res) => {
   const token = String(req.params.token || '').trim();
   if (!token) return res.status(400).json({ message: 'Token de assinatura inválido.' });
-  const contrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', token);
+  const contrato = await getContratoBySignatureToken(token);
   if (!contrato) return res.status(404).json({ message: 'Link de assinatura não encontrado.' });
 
   const parsed = parseContrato(contrato);
@@ -8743,7 +8756,7 @@ app.get('/api/assinatura/contrato/:token', async (req, res) => {
 app.post('/api/assinatura/contrato/:token/cliente', async (req, res) => {
   const token = String(req.params.token || '').trim();
   if (!token) return res.status(400).json({ message: 'Token de assinatura inválido.' });
-  const contrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', token);
+  const contrato = await getContratoBySignatureToken(token);
   if (!contrato) return res.status(404).json({ message: 'Link de assinatura não encontrado.' });
   if (contrato.status !== 'Aprovado') {
     return res.status(400).json({ message: 'Este contrato ainda não está liberado para assinatura.' });
@@ -8818,18 +8831,24 @@ app.post('/api/assinatura/contrato/:token/cliente', async (req, res) => {
 });
 
 app.get('/api/assinatura/contrato/:token/pdf', async (req, res) => {
-  const contrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', req.params.token);
+  const contrato = await getContratoBySignatureToken(req.params.token, { includeConsumed: true });
   if (!contrato) return res.status(404).send('Link de assinatura não encontrado.');
-  if (contrato.assinaturaTokenExpiraEm && new Date(contrato.assinaturaTokenExpiraEm).getTime() < Date.now()) {
+  const parsed = parseContrato(contrato);
+  const consumedAt = parsed.dados?.assinatura?.link?.consumedAt;
+  const expiresAt = contrato.assinaturaTokenExpiraEm || parsed.dados?.assinatura?.link?.expiresAt || null;
+  if (!consumedAt && expiresAt && new Date(expiresAt).getTime() < Date.now()) {
     return res.status(410).send('Este link expirou.');
   }
   await sendContratoPdf(res, contrato, { download: false });
 });
 
 app.get('/api/assinatura/contrato/:token/download', async (req, res) => {
-  const contrato = await db.get('SELECT * FROM contratos WHERE assinaturaToken = ?', req.params.token);
+  const contrato = await getContratoBySignatureToken(req.params.token, { includeConsumed: true });
   if (!contrato) return res.status(404).send('Link de assinatura não encontrado.');
-  if (contrato.assinaturaTokenExpiraEm && new Date(contrato.assinaturaTokenExpiraEm).getTime() < Date.now()) {
+  const parsed = parseContrato(contrato);
+  const consumedAt = parsed.dados?.assinatura?.link?.consumedAt;
+  const expiresAt = contrato.assinaturaTokenExpiraEm || parsed.dados?.assinatura?.link?.expiresAt || null;
+  if (!consumedAt && expiresAt && new Date(expiresAt).getTime() < Date.now()) {
     return res.status(410).send('Este link expirou.');
   }
   await sendContratoPdf(res, contrato, { download: true });
