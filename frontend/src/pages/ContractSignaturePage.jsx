@@ -173,6 +173,50 @@ function ContractSignaturePage() {
     window.setTimeout(resizeCanvas, 0);
   };
 
+  const getSignatureDataUrl = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return '';
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+    const pixels = ctx.getImageData(0, 0, width, height);
+    let minX = width;
+    let minY = height;
+    let maxX = 0;
+    let maxY = 0;
+
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const index = (y * width + x) * 4;
+        const alpha = pixels.data[index + 3];
+        const red = pixels.data[index];
+        const green = pixels.data[index + 1];
+        const blue = pixels.data[index + 2];
+        if (alpha > 20 && (red < 245 || green < 245 || blue < 245)) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+
+    if (minX > maxX || minY > maxY) return canvas.toDataURL('image/png');
+
+    const padding = Math.max(18, Math.round(Math.min(width, height) * 0.04));
+    const cropX = Math.max(0, minX - padding);
+    const cropY = Math.max(0, minY - padding);
+    const cropWidth = Math.min(width - cropX, maxX - minX + padding * 2);
+    const cropHeight = Math.min(height - cropY, maxY - minY + padding * 2);
+    const output = document.createElement('canvas');
+    output.width = cropWidth;
+    output.height = cropHeight;
+    const outputCtx = output.getContext('2d');
+    outputCtx.fillStyle = '#ffffff';
+    outputCtx.fillRect(0, 0, cropWidth, cropHeight);
+    outputCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    return output.toDataURL('image/png');
+  };
+
   const submitSignature = async () => {
     if (!signerName.trim()) {
       setStatus('Informe seu nome para concluir a assinatura.');
@@ -201,7 +245,7 @@ function ContractSignaturePage() {
           signerName,
           signerBirthDate,
           acceptedTerms,
-          signatureDataUrl: canvas.toDataURL('image/png'),
+          signatureDataUrl: getSignatureDataUrl(),
           signatureMode,
         }),
       });

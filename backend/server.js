@@ -17,6 +17,7 @@ const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const ffmpegPath = require('ffmpeg-static');
 const PDFDocument = require('pdfkit');
+const { PNG } = require('pngjs');
 const QRCode = require('qrcode');
 const pino = require('pino');
 const {
@@ -2708,6 +2709,63 @@ const dataUrlToBuffer = (dataUrl) => {
   return Buffer.from(match[2].replace(/\s/g, ''), 'base64');
 };
 
+const cropSignaturePngBuffer = (dataUrl) => {
+  const value = String(dataUrl || '');
+  if (!/^data:image\/png;base64,/i.test(value)) return dataUrlToBuffer(value);
+
+  const originalBuffer = dataUrlToBuffer(value);
+  if (!originalBuffer) return null;
+
+  try {
+    const png = PNG.sync.read(originalBuffer);
+    let minX = png.width;
+    let minY = png.height;
+    let maxX = -1;
+    let maxY = -1;
+
+    for (let y = 0; y < png.height; y += 1) {
+      for (let x = 0; x < png.width; x += 1) {
+        const index = (png.width * y + x) << 2;
+        const alpha = png.data[index + 3];
+        const red = png.data[index];
+        const green = png.data[index + 1];
+        const blue = png.data[index + 2];
+        if (alpha > 20 && (red < 245 || green < 245 || blue < 245)) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+
+    if (maxX < minX || maxY < minY) return originalBuffer;
+
+    const padding = Math.max(18, Math.round(Math.min(png.width, png.height) * 0.04));
+    const cropX = Math.max(0, minX - padding);
+    const cropY = Math.max(0, minY - padding);
+    const cropWidth = Math.min(png.width - cropX, maxX - minX + padding * 2);
+    const cropHeight = Math.min(png.height - cropY, maxY - minY + padding * 2);
+    const cropped = new PNG({ width: cropWidth, height: cropHeight, colorType: 6 });
+
+    for (let y = 0; y < cropHeight; y += 1) {
+      for (let x = 0; x < cropWidth; x += 1) {
+        const sourceIndex = (png.width * (cropY + y) + cropX + x) << 2;
+        const targetIndex = (cropWidth * y + x) << 2;
+        cropped.data[targetIndex] = png.data[sourceIndex];
+        cropped.data[targetIndex + 1] = png.data[sourceIndex + 1];
+        cropped.data[targetIndex + 2] = png.data[sourceIndex + 2];
+        cropped.data[targetIndex + 3] = png.data[sourceIndex + 3];
+      }
+    }
+
+    return PNG.sync.write(cropped);
+  } catch (error) {
+    console.warn('Nao foi possivel recortar a assinatura PNG:', error?.message || error);
+    return originalBuffer;
+  }
+};
+
 const normalizeIpAddress = (value) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -3934,8 +3992,8 @@ const buildContratoPdf = async (contrato) => {
     const signatureY = doc.y;
     doc.strokeColor(dark).moveTo(doc.page.margins.left, signatureY).lineTo(doc.page.margins.left + 205, signatureY).stroke();
     doc.moveTo(doc.page.margins.left + pageWidth - 205, signatureY).lineTo(doc.page.margins.left + pageWidth, signatureY).stroke();
-    const drmSignatureBuffer = assinatura?.drm?.dataUrl ? dataUrlToBuffer(assinatura.drm.dataUrl) : null;
-    const clientSignatureBuffer = assinatura?.cliente?.dataUrl ? dataUrlToBuffer(assinatura.cliente.dataUrl) : null;
+    const drmSignatureBuffer = assinatura?.drm?.dataUrl ? cropSignaturePngBuffer(assinatura.drm.dataUrl) : null;
+    const clientSignatureBuffer = assinatura?.cliente?.dataUrl ? cropSignaturePngBuffer(assinatura.cliente.dataUrl) : null;
     const drawVisibleSignerName = ({ x, y, width, name, color = orange }) => {
       const signerName = sanitize(name);
       if (!signerName || signerName === 'Não informado') return;
@@ -3947,21 +4005,25 @@ const buildContratoPdf = async (contrato) => {
         { width, height: 15, align: 'center', ellipsis: true, lineBreak: false }
       );
     };
+    let drmSignatureRendered = false;
+    let clientSignatureRendered = false;
     if (drmSignatureBuffer) {
       try {
-        doc.image(drmSignatureBuffer, doc.page.margins.left + 24, signatureY - 54, { fit: [156, 38], align: 'center' });
+        doc.image(drmSignatureBuffer, doc.page.margins.left + 10, signatureY - 80, { fit: [185, 68], align: 'center' });
+        drmSignatureRendered = true;
       } catch (error) {
         console.warn('Nao foi possivel renderizar a assinatura DRM no PDF:', error?.message || error);
       }
     }
     if (clientSignatureBuffer) {
       try {
-        doc.image(clientSignatureBuffer, doc.page.margins.left + pageWidth - 181, signatureY - 54, { fit: [156, 38], align: 'center' });
+        doc.image(clientSignatureBuffer, doc.page.margins.left + pageWidth - 200, signatureY - 80, { fit: [195, 68], align: 'center' });
+        clientSignatureRendered = true;
       } catch (error) {
         console.warn('Nao foi possivel renderizar a assinatura do cliente no PDF:', error?.message || error);
       }
     }
-    if (assinatura?.drm?.signedAt) {
+    if (assinatura?.drm?.signedAt && !drmSignatureRendered) {
       drawVisibleSignerName({
         x: doc.page.margins.left + 5,
         y: signatureY - 24,
@@ -3969,7 +4031,7 @@ const buildContratoPdf = async (contrato) => {
         name: assinatura.drm.signedByName || DRM_SIGNATORY.nome,
       });
     }
-    if (assinatura?.cliente?.signedAt) {
+    if (assinatura?.cliente?.signedAt && (!clientSignatureRendered || assinatura?.cliente?.signatureMode === 'typed')) {
       drawVisibleSignerName({
         x: doc.page.margins.left + pageWidth - 200,
         y: signatureY - 24,
