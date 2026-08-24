@@ -2703,9 +2703,9 @@ const validateSignatureDataUrl = (dataUrl) => {
 };
 
 const dataUrlToBuffer = (dataUrl) => {
-  const match = String(dataUrl || '').match(/^data:([^;]+);base64,(.+)$/i);
+  const match = String(dataUrl || '').match(/^data:([^;]+);base64,([\s\S]+)$/i);
   if (!match) return null;
-  return Buffer.from(match[2], 'base64');
+  return Buffer.from(match[2].replace(/\s/g, ''), 'base64');
 };
 
 const normalizeIpAddress = (value) => {
@@ -3936,27 +3936,46 @@ const buildContratoPdf = async (contrato) => {
     doc.moveTo(doc.page.margins.left + pageWidth - 205, signatureY).lineTo(doc.page.margins.left + pageWidth, signatureY).stroke();
     const drmSignatureBuffer = assinatura?.drm?.dataUrl ? dataUrlToBuffer(assinatura.drm.dataUrl) : null;
     const clientSignatureBuffer = assinatura?.cliente?.dataUrl ? dataUrlToBuffer(assinatura.cliente.dataUrl) : null;
+    const drawVisibleSignerName = ({ x, y, width, name, color = orange }) => {
+      const signerName = sanitize(name);
+      if (!signerName || signerName === 'Não informado') return;
+      const fontSize = signerName.length > 34 ? 9 : signerName.length > 24 ? 10.2 : 11.6;
+      doc.font('Helvetica-Oblique').fontSize(fontSize).fillColor(color).text(
+        signerName,
+        x,
+        y,
+        { width, height: 15, align: 'center', ellipsis: true, lineBreak: false }
+      );
+    };
     if (drmSignatureBuffer) {
       try {
-        doc.image(drmSignatureBuffer, doc.page.margins.left + 24, signatureY - 48, { fit: [156, 42], align: 'center' });
+        doc.image(drmSignatureBuffer, doc.page.margins.left + 24, signatureY - 54, { fit: [156, 38], align: 'center' });
       } catch (error) {
         console.warn('Nao foi possivel renderizar a assinatura DRM no PDF:', error?.message || error);
       }
-    } else if (assinatura?.drm?.signedAt) {
-      const autoDrmName = assinatura?.drm?.signedByName || DRM_SIGNATORY.nome;
-      doc.font('Helvetica-Oblique').fontSize(12.5).fillColor(orange).text(
-        autoDrmName,
-        doc.page.margins.left + 5,
-        signatureY - 27,
-        { width: 195, height: 17, align: 'center', ellipsis: true, lineBreak: false }
-      );
     }
     if (clientSignatureBuffer) {
       try {
-        doc.image(clientSignatureBuffer, doc.page.margins.left + pageWidth - 181, signatureY - 48, { fit: [156, 42], align: 'center' });
+        doc.image(clientSignatureBuffer, doc.page.margins.left + pageWidth - 181, signatureY - 54, { fit: [156, 38], align: 'center' });
       } catch (error) {
         console.warn('Nao foi possivel renderizar a assinatura do cliente no PDF:', error?.message || error);
       }
+    }
+    if (assinatura?.drm?.signedAt) {
+      drawVisibleSignerName({
+        x: doc.page.margins.left + 5,
+        y: signatureY - 24,
+        width: 195,
+        name: assinatura.drm.signedByName || DRM_SIGNATORY.nome,
+      });
+    }
+    if (assinatura?.cliente?.signedAt) {
+      drawVisibleSignerName({
+        x: doc.page.margins.left + pageWidth - 200,
+        y: signatureY - 24,
+        width: 195,
+        name: assinatura.cliente.signedByName || parsed.clienteNome,
+      });
     }
     doc.font('Helvetica-Bold').fontSize(8.5).text(template.empresa.nome, doc.page.margins.left, signatureY + 7, { width: 205, align: 'center' });
     doc.text(parsed.clienteNome, doc.page.margins.left + pageWidth - 205, signatureY + 7, { width: 205, align: 'center' });
