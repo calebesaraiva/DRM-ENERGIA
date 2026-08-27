@@ -10184,50 +10184,96 @@ app.post('/api/admin/sistemas-fv', authRequired, requirePermission('equipeTecnic
 app.put('/api/admin/sistemas-fv/:id', authRequired, requirePermission('equipeTecnica'), async (req, res) => {
   try {
     const sistema = await db.get('SELECT * FROM sistemas_fv WHERE id = ?', req.params.id);
-    if (!sistema) return res.status(404).json({ error: 'Sistema não encontrado' });
+    if (!sistema) return res.status(404).json({ message: 'Sistema não encontrado.' });
 
     const { etapaAtual, status, prazoAtual, proximaAcao, responsavelAtual, observacoes, potenciaKwp, valorVenda, cidade, estado, consultorNome, consultorId } = req.body;
     const now = new Date().toISOString();
-    const normalizedEtapaAtual = etapaAtual ? normalizeSfvEtapa(etapaAtual) : null;
     const sistemaEtapaAtual = normalizeSfvEtapa(sistema.etapaAtual);
+    const hasField = (field) => Object.prototype.hasOwnProperty.call(req.body, field);
+    const nullableText = (value) => {
+      const text = String(value ?? '').trim();
+      return text || null;
+    };
+    const nullableNumber = (value) => {
+      if (value === '' || typeof value === 'undefined' || value === null) return null;
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    };
+    const normalizedEtapaAtual = hasField('etapaAtual') ? normalizeSfvEtapa(etapaAtual) : sistemaEtapaAtual;
+    const normalizedStatus = hasField('status') ? String(status || '').trim() : (sistema.status || 'No prazo');
+
+    if (!SFV_ETAPAS.includes(normalizedEtapaAtual)) {
+      return res.status(400).json({ message: 'Escolha uma etapa válida para o sistema.' });
+    }
+    if (!SFV_STATUS.includes(normalizedStatus)) {
+      return res.status(400).json({ message: 'Escolha um status válido para o sistema.' });
+    }
+
+    const next = {
+      etapaAtual: normalizedEtapaAtual,
+      status: normalizedStatus,
+      prazoAtual: hasField('prazoAtual') ? nullableText(prazoAtual) : sistema.prazoAtual,
+      proximaAcao: hasField('proximaAcao') ? nullableText(proximaAcao) : sistema.proximaAcao,
+      responsavelAtual: hasField('responsavelAtual') ? nullableText(responsavelAtual) : sistema.responsavelAtual,
+      observacoes: hasField('observacoes') && nullableText(observacoes) ? nullableText(observacoes) : sistema.observacoes,
+      potenciaKwp: hasField('potenciaKwp') ? nullableNumber(potenciaKwp) : sistema.potenciaKwp,
+      valorVenda: hasField('valorVenda') ? nullableNumber(valorVenda) : sistema.valorVenda,
+      cidade: hasField('cidade') ? nullableText(cidade) : sistema.cidade,
+      estado: hasField('estado') ? nullableText(estado) : sistema.estado,
+      consultorNome: hasField('consultorNome') ? nullableText(consultorNome) : sistema.consultorNome,
+      consultorId: hasField('consultorId') ? nullableNumber(consultorId) : sistema.consultorId,
+    };
 
     await db.run(
       `UPDATE sistemas_fv SET
-        etapaAtual = COALESCE(?, etapaAtual),
-        status = COALESCE(?, status),
-        prazoAtual = COALESCE(?, prazoAtual),
-        proximaAcao = COALESCE(?, proximaAcao),
-        responsavelAtual = COALESCE(?, responsavelAtual),
-        observacoes = COALESCE(?, observacoes),
-        potenciaKwp = COALESCE(?, potenciaKwp),
-        valorVenda = COALESCE(?, valorVenda),
-        cidade = COALESCE(?, cidade),
-        estado = COALESCE(?, estado),
-        consultorNome = COALESCE(?, consultorNome),
-        consultorId = COALESCE(?, consultorId),
+        etapaAtual = ?,
+        status = ?,
+        prazoAtual = ?,
+        proximaAcao = ?,
+        responsavelAtual = ?,
+        observacoes = ?,
+        potenciaKwp = ?,
+        valorVenda = ?,
+        cidade = ?,
+        estado = ?,
+        consultorNome = ?,
+        consultorId = ?,
         updatedAt = ?
        WHERE id = ?`,
-      normalizedEtapaAtual || null, status || null, prazoAtual || null, proximaAcao || null,
-      responsavelAtual || null, observacoes || null,
-      potenciaKwp != null ? Number(potenciaKwp) : null,
-      valorVenda != null ? Number(valorVenda) : null,
-      cidade || null, estado || null, consultorNome || null,
-      consultorId || null, now, req.params.id
+      next.etapaAtual,
+      next.status,
+      next.prazoAtual,
+      next.proximaAcao,
+      next.responsavelAtual,
+      next.observacoes,
+      next.potenciaKwp,
+      next.valorVenda,
+      next.cidade,
+      next.estado,
+      next.consultorNome,
+      next.consultorId,
+      now,
+      req.params.id
     );
 
-    const etapaChanged = normalizedEtapaAtual && normalizedEtapaAtual !== sistemaEtapaAtual;
-    const statusChanged = status && status !== sistema.status;
-    if (etapaChanged || statusChanged || proximaAcao || observacoes) {
+    const etapaChanged = next.etapaAtual !== sistemaEtapaAtual;
+    const statusChanged = next.status !== sistema.status;
+    const proximaAcaoChanged = next.proximaAcao !== (sistema.proximaAcao || null);
+    const prazoChanged = next.prazoAtual !== (sistema.prazoAtual || null);
+    const responsavelChanged = next.responsavelAtual !== (sistema.responsavelAtual || null);
+    const observacaoHistorico = hasField('observacoes') ? nullableText(observacoes) : null;
+    const observacoesRegistradas = Boolean(observacaoHistorico);
+    if (etapaChanged || statusChanged || proximaAcaoChanged || prazoChanged || responsavelChanged || observacoesRegistradas) {
       await db.run(
         `INSERT INTO sistemas_fv_historico (sistemaId, etapa, status, responsavel, proximaAcao, prazo, observacoes, criadoPorId, criadoPorNome, createdAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         req.params.id,
-        normalizedEtapaAtual || sistemaEtapaAtual,
-        status || sistema.status,
-        responsavelAtual || req.user.nome,
-        proximaAcao || null,
-        prazoAtual || sistema.prazoAtual || null,
-        observacoes || null,
+        next.etapaAtual,
+        next.status,
+        next.responsavelAtual || req.user.nome,
+        next.proximaAcao,
+        next.prazoAtual,
+        observacaoHistorico || 'Atualização registrada.',
         req.user.id, req.user.nome, now
       );
     }

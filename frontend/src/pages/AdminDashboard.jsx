@@ -765,6 +765,7 @@ const AdminDashboard = () => {
   const [sfvSelected, setSfvSelected] = useState(null);
   const [sfvHistorico, setSfvHistorico] = useState([]);
   const [sfvUpdateOpen, setSfvUpdateOpen] = useState(false);
+  const [sfvSaving, setSfvSaving] = useState(false);
   const [sfvUpdateForm, setSfvUpdateForm] = useState({ etapaAtual: '', status: '', proximaAcao: '', prazoAtual: '', responsavelAtual: '', observacoes: '' });
   const [, setSfvFichaTab] = useState('resumo');
   // ── End Esteira Sistemas FV state ───────────────────────────────────────────
@@ -1906,7 +1907,7 @@ const AdminDashboard = () => {
         localStorage.setItem('user', JSON.stringify({ ...currentUser, requiresEmailVerification: true }));
         navigate('/verificar-email');
       }
-      throw new Error(data.message || 'Falha ao carregar dados.');
+      throw new Error(data.message || data.error || 'Falha ao carregar dados.');
     }
     return data;
   }, [headers, navigate]);
@@ -4210,6 +4211,51 @@ const AdminDashboard = () => {
   const getOrcamentoDownloadUrl = (orcamentoId) => (
     `${withApiBase(`/api/admin/orcamentos/${orcamentoId}/download`)}?token=${localStorage.getItem('token')}`
   );
+
+  const openSfvUpdateModal = (sistema) => {
+    if (!sistema?.id) return;
+    setSfvSelected(sistema);
+    setSfvUpdateForm({
+      etapaAtual: sistema.etapaAtual || SFV_ETAPAS[0],
+      status: sistema.status || 'No prazo',
+      proximaAcao: sistema.proximaAcao || '',
+      prazoAtual: String(sistema.prazoAtual || '').slice(0, 10),
+      responsavelAtual: sistema.responsavelAtual || '',
+      observacoes: '',
+    });
+    setSfvUpdateOpen(true);
+  };
+
+  const saveSfvUpdate = async (event) => {
+    event.preventDefault();
+    if (!sfvSelected?.id || sfvSaving) return;
+
+    setSfvSaving(true);
+    try {
+      const payload = {
+        etapaAtual: sfvUpdateForm.etapaAtual || sfvSelected.etapaAtual || SFV_ETAPAS[0],
+        status: sfvUpdateForm.status || sfvSelected.status || 'No prazo',
+        proximaAcao: sfvUpdateForm.proximaAcao,
+        prazoAtual: sfvUpdateForm.prazoAtual,
+        responsavelAtual: sfvUpdateForm.responsavelAtual,
+        observacoes: sfvUpdateForm.observacoes,
+      };
+      const updated = await request(`/api/admin/sistemas-fv/${sfvSelected.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      setSistemasFv(prev => prev.map(s => Number(s.id) === Number(updated.id) ? updated : s));
+      setSfvSelected(updated);
+      const hist = await request(`/api/admin/sistemas-fv/${updated.id}/historico`).catch(() => []);
+      setSfvHistorico(hist);
+      setSfvUpdateOpen(false);
+      showToast('Etapa atualizada com sucesso.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Erro ao atualizar etapa.', 'error');
+    } finally {
+      setSfvSaving(false);
+    }
+  };
 
   const prepareOrcamentoPdfWindow = useCallback(() => {
     const pdfWindow = window.open('', '_blank');
@@ -10166,17 +10212,7 @@ const AdminDashboard = () => {
                     <button
                       type="button"
                       className="btn btn-primary sfv-update-btn"
-                      onClick={() => {
-                        setSfvUpdateForm({
-                          etapaAtual: sfvSelected.etapaAtual || '',
-                          status: sfvSelected.status || 'No prazo',
-                          proximaAcao: sfvSelected.proximaAcao || '',
-                          prazoAtual: sfvSelected.prazoAtual || '',
-                          responsavelAtual: sfvSelected.responsavelAtual || '',
-                          observacoes: '',
-                        });
-                        setSfvUpdateOpen(true);
-                      }}
+                      onClick={() => openSfvUpdateModal(sfvSelected)}
                     >
                       Atualizar etapa
                     </button>
@@ -10193,23 +10229,7 @@ const AdminDashboard = () => {
                       <button type="button" className="sfv-ficha-close" onClick={() => setSfvUpdateOpen(false)}>✕</button>
                     </div>
                     <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        try {
-                          const updated = await request(`/api/admin/sistemas-fv/${sfvSelected.id}`, {
-                            method: 'PUT',
-                            body: JSON.stringify(sfvUpdateForm),
-                          });
-                          setSistemasFv(prev => prev.map(s => s.id === updated.id ? updated : s));
-                          setSfvSelected(updated);
-                          const hist = await request(`/api/admin/sistemas-fv/${updated.id}/historico`).catch(() => []);
-                          setSfvHistorico(hist);
-                          setSfvUpdateOpen(false);
-                          showToast('Etapa atualizada com sucesso.', 'success');
-                        } catch (err) {
-                          showToast(err.message || 'Erro ao atualizar.', 'error');
-                        }
-                      }}
+                      onSubmit={saveSfvUpdate}
                     >
                       <div className="sfv-modal-form">
                         <label>
@@ -10242,8 +10262,10 @@ const AdminDashboard = () => {
                         </label>
                       </div>
                       <div className="sfv-modal-actions">
-                        <button type="button" className="btn btn-outline" onClick={() => setSfvUpdateOpen(false)}>Cancelar</button>
-                        <button type="submit" className="btn btn-primary">Salvar atualização</button>
+                        <button type="button" className="btn btn-outline" onClick={() => setSfvUpdateOpen(false)} disabled={sfvSaving}>Cancelar</button>
+                        <button type="submit" className="btn btn-primary" disabled={sfvSaving}>
+                          {sfvSaving ? 'Salvando...' : 'Salvar atualização'}
+                        </button>
                       </div>
                     </form>
                   </div>
