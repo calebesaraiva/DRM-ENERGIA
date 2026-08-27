@@ -10114,7 +10114,25 @@ const AdminDashboard = () => {
                           {sfvSelected.status}
                         </span>
                       </div>
-                      <button type="button" className="sfv-ficha-close" onClick={() => setSfvSelected(null)}>✕</button>
+                      <div className="sfv-ficha-head-actions">
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm-admin sfv-update-top-btn"
+                          onClick={() => openSfvUpdateModal(sfvSelected)}
+                        >
+                          Atualizar etapa
+                        </button>
+                        <button
+                          type="button"
+                          className="sfv-ficha-close"
+                          onClick={() => {
+                            setSfvSelected(null);
+                            setSfvUpdateOpen(false);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
 
                     <div className="sfv-ficha-meta">
@@ -10209,24 +10227,26 @@ const AdminDashboard = () => {
                     )}
 
                     {/* Update button */}
-                    <button
-                      type="button"
-                      className="btn btn-primary sfv-update-btn"
-                      onClick={() => openSfvUpdateModal(sfvSelected)}
-                    >
-                      Atualizar etapa
-                    </button>
+                    <div className="sfv-ficha-actions">
+                      <button
+                        type="button"
+                        className="btn btn-primary sfv-update-btn"
+                        onClick={() => openSfvUpdateModal(sfvSelected)}
+                      >
+                        Atualizar etapa
+                      </button>
+                    </div>
                   </aside>
                 )}
               </div>
 
               {/* Atualizar etapa modal */}
               {sfvUpdateOpen && sfvSelected && (
-                <div className="sfv-modal-overlay" onClick={() => setSfvUpdateOpen(false)}>
+                <div className="sfv-modal-overlay" onClick={() => { if (!sfvSaving) setSfvUpdateOpen(false); }}>
                   <div className="sfv-modal" onClick={e => e.stopPropagation()}>
                     <div className="sfv-modal-head">
                       <h4>Atualizar etapa — {sfvSelected.clienteNome}</h4>
-                      <button type="button" className="sfv-ficha-close" onClick={() => setSfvUpdateOpen(false)}>✕</button>
+                      <button type="button" className="sfv-ficha-close" onClick={() => setSfvUpdateOpen(false)} disabled={sfvSaving}>✕</button>
                     </div>
                     <form
                       onSubmit={saveSfvUpdate}

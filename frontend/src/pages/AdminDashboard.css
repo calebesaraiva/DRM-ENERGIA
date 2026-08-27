@@ -18794,6 +18794,10 @@ button.pg-mini-card:hover { background: #fafafa; }
   padding: 1rem;
   border-bottom: 1px solid #f1f5f9;
   gap: 0.5rem;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 .sfv-ficha-nome {
   font-size: 0.95rem;
@@ -18813,6 +18817,19 @@ button.pg-mini-card:hover { background: #fafafa; }
   flex-shrink: 0;
 }
 .sfv-ficha-close:hover { color: #0f172a; }
+
+.sfv-ficha-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.sfv-update-top-btn {
+  min-height: 32px;
+  padding: 0.4rem 0.65rem;
+  white-space: nowrap;
+}
 
 .sfv-ficha-meta {
   display: grid;
@@ -18934,9 +18951,19 @@ button.pg-mini-card:hover { background: #fafafa; }
 .sfv-hist-obs { font-size: 0.75rem; color: #475569; margin-top: 0.1rem; }
 
 /* Update button */
+.sfv-ficha-actions {
+  background: #fff;
+  border-top: 1px solid #f1f5f9;
+  bottom: 0;
+  margin-top: auto;
+  padding: 0.85rem 1rem;
+  position: sticky;
+  z-index: 3;
+}
+
 .sfv-update-btn {
-  margin: 1rem;
-  width: calc(100% - 2rem);
+  min-height: 42px;
+  width: 100%;
 }
 
 /* Modal */
@@ -19128,6 +19155,8 @@ button.pg-mini-card:hover { background: #fafafa; }
 .admin-layout.theme-dark .sfv-stat-card,
 .admin-layout.theme-dark .sfv-kanban-col,
 .admin-layout.theme-dark .sfv-ficha,
+.admin-layout.theme-dark .sfv-ficha-head,
+.admin-layout.theme-dark .sfv-ficha-actions,
 .admin-layout.theme-dark .contract-modal,
 .admin-layout.theme-dark .suspensao-modal,
 .admin-layout.theme-dark .lead-modal,
