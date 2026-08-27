@@ -10114,25 +10114,16 @@ const AdminDashboard = () => {
                           {sfvSelected.status}
                         </span>
                       </div>
-                      <div className="sfv-ficha-head-actions">
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm-admin sfv-update-top-btn"
-                          onClick={() => openSfvUpdateModal(sfvSelected)}
-                        >
-                          Atualizar etapa
-                        </button>
-                        <button
-                          type="button"
-                          className="sfv-ficha-close"
-                          onClick={() => {
-                            setSfvSelected(null);
-                            setSfvUpdateOpen(false);
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="sfv-ficha-close"
+                        onClick={() => {
+                          setSfvSelected(null);
+                          setSfvUpdateOpen(false);
+                        }}
+                      >
+                        ✕
+                      </button>
                     </div>
 
                     <div className="sfv-ficha-meta">

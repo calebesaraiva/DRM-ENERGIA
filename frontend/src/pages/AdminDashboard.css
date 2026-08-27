@@ -18818,19 +18818,6 @@ button.pg-mini-card:hover { background: #fafafa; }
 }
 .sfv-ficha-close:hover { color: #0f172a; }
 
-.sfv-ficha-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex-shrink: 0;
-}
-
-.sfv-update-top-btn {
-  min-height: 32px;
-  padding: 0.4rem 0.65rem;
-  white-space: nowrap;
-}
-
 .sfv-ficha-meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -18956,14 +18943,16 @@ button.pg-mini-card:hover { background: #fafafa; }
   border-top: 1px solid #f1f5f9;
   bottom: 0;
   margin-top: auto;
-  padding: 0.85rem 1rem;
+  padding: 0.9rem 1rem;
   position: sticky;
   z-index: 3;
+  box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .sfv-update-btn {
   min-height: 42px;
   width: 100%;
+  justify-content: center;
 }
 
 /* Modal */
